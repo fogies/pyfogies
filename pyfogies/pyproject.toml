@@ -1,0 +1,19 @@
+[project]
+name = "fogies"
+# version follows semantic versioning <https://semver.org/>.
+version = "0.0.0-dev.1"
+description = ""
+authors = [
+    {name = "James Fogarty",email = "jayfo@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+]
+
+[tool.poetry]
+packages = [{include = "fogies", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
