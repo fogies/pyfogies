@@ -30,7 +30,7 @@ REM Ensure dependencies are installed.
 py -m poetry install
 
 REM Use Poetry to get the activation command.
-for /f "tokens=*usebackq" %%i in (`py -m poetry env activate`) do set POETRY_ACTIVATE=%%i
+for /f "tokens=* usebackq" %%i in (`py -m poetry env activate`) do set POETRY_ACTIVATE=%%i
 
 if not defined POETRY_ACTIVATE (
     echo Poetry did not return an activation command.
