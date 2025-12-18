@@ -1,0 +1,25 @@
+---
+description: Style guidelines for comments.
+alwaysApply: true
+---
+
+# Comments Style
+
+This rule file describes style conventions for code comments.
+These are always applied, regardless of the programming language or file type.
+
+## Use Full Sentences
+
+- Prefer comments are short but still a full sentence.
+- Comments that are a full sentence should end with a period.
+  - Example: `# Verify the required dependency is available.`
+  - Example: `// Verify the required dependency is available.`
+  - Example: `/* Verify the required dependency is available. */`
+  - Example: `<!-- Verify the required dependency is available. -->`
+  - Example: `REM Verify the required dependency is available.`
+
+## Be Concise
+
+- Avoid filler words that can be deleted without changing the meaning of a sentence.
+  - The word `that` is often a filler word.
+    - Example: `# Verify that the required dependency is available.` should be `# Verify the required dependency is available.`
