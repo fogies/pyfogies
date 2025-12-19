@@ -39,5 +39,5 @@ if not defined POETRY_ACTIVATE (
     exit /b 1
 )
 
-REM Activate the virtual environment in this shell.
-call %POETRY_ACTIVATE%
+REM Activate the virtual environment in a command shell.
+cmd /k %POETRY_ACTIVATE%
