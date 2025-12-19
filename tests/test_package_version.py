@@ -1,7 +1,7 @@
 """Test the package version in pyproject.toml is a valid semantic version."""
 
-from pathlib import Path
 import tomllib
+from pathlib import Path
 
 import pytest
 import semver
