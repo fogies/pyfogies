@@ -1,4 +1,5 @@
 """Test the package version in pyproject.toml is a valid semantic version."""
+
 from pathlib import Path
 import tomllib
 
@@ -12,8 +13,8 @@ def test_package_version_is_valid_semver(pytestconfig: pytest.Config):
     pyproject_path = Path(pytestconfig.rootdir, "pyproject.toml")
     with open(pyproject_path, "rb") as f:
         pyproject = tomllib.load(f)
-    
+
     version = pyproject["project"]["version"]
-    
+
     # Validate using semver package, will raise ValueError if invalid.
     semver.VersionInfo.parse(version)

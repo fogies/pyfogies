@@ -31,5 +31,5 @@ class FormatTasks:
         """
         namespace = Collection("format")
         namespace.add_task(self.task_format)
-        
+
         return namespace
