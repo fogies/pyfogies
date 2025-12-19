@@ -19,10 +19,21 @@ class FormatTasks:
         context.run(
             command=" ".join(
                 [
+                    "isort",
+                    ".",
+                ]
+            ),
+            echo=True,
+        )
+
+        context.run(
+            command=" ".join(
+                [
                     "black",
                     ".",
                 ]
             ),
+            echo=True,
         )
 
     def get_collection(self) -> Collection:
