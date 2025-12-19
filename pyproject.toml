@@ -17,6 +17,7 @@ packages = [{include = "fogies", from = "src"}]
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
 semver = ">=3.0.0"
+invoke = ">=2.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
