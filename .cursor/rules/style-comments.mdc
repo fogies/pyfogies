@@ -23,3 +23,4 @@ These are always applied, regardless of the programming language or file type.
 - Avoid filler words that can be deleted without changing the meaning of a sentence.
   - The word `that` is often a filler word.
     - Example: `# Verify that the required dependency is available.` should be `# Verify the required dependency is available.`
+    - Example: `"""Test that black is available."""` should be `"""Test black is available."""`
