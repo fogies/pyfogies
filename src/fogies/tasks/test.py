@@ -45,4 +45,3 @@ class TestTasks:
         namespace.add_task(self.task_test)
 
         return namespace
-
