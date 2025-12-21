@@ -15,6 +15,7 @@ packages = [{include = "fogies", from = "src"}]
 [tool.poetry.dependencies]
 
 [tool.poetry.group.dev.dependencies]
+basedpyright = ">=1.36.1"
 black = ">=24.0.0"
 invoke = ">=2.0.0"
 isort = ">=5.13.0"

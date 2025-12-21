@@ -4,6 +4,7 @@ import colorama
 from invoke import Collection
 
 import fogies.tasks.format
+import fogies.tasks.lint
 import fogies.tasks.test
 
 # Root namespace for tasks.
@@ -14,4 +15,5 @@ colorama.init()
 
 # TODO: This still feels messy, will need a bettery way to compose tasks as more develop.
 namespace.add_task(fogies.tasks.format.FormatTasks().get_collection()["format"])
+namespace.add_task(fogies.tasks.lint.LintTasks().get_collection()["lint"])
 namespace.add_task(fogies.tasks.test.TestTasks().get_collection()["test"])
