@@ -26,6 +26,7 @@ semver = ">=3.0.0"
 typeCheckingMode = "recommended"
 pythonVersion = "3.14"
 include = ["src", "tasks", "tests"]
+allowedUntypedLibraries = ["invoke"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

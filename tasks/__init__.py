@@ -1,7 +1,7 @@
 """Invoke tasks for this project."""
 
 import colorama
-from invoke import Collection
+from invoke.collection import Collection
 
 import fogies.tasks.format
 import fogies.tasks.lint
@@ -14,6 +14,19 @@ namespace: Collection = Collection()
 colorama.init()
 
 # TODO: This still feels messy, will need a bettery way to compose tasks as more develop.
-namespace.add_task(fogies.tasks.format.FormatTasks().get_collection()["format"])
-namespace.add_task(fogies.tasks.lint.LintTasks().get_collection()["lint"])
-namespace.add_task(fogies.tasks.test.TestTasks().get_collection()["test"])
+# Type errors ignored until we reorganize task composition.
+namespace.add_task(
+    task=fogies.tasks.format.FormatTasks().get_collection()[
+        "format"
+    ],  # pyright: ignore[reportAny]
+)
+namespace.add_task(
+    task=fogies.tasks.lint.LintTasks().get_collection()[
+        "lint"
+    ],  # pyright: ignore[reportAny]
+)
+namespace.add_task(
+    task=fogies.tasks.test.TestTasks().get_collection()[
+        "test"
+    ],  # pyright: ignore[reportAny]
+)
