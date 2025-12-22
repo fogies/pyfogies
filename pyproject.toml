@@ -17,10 +17,15 @@ packages = [{include = "fogies", from = "src"}]
 [tool.poetry.group.dev.dependencies]
 basedpyright = ">=1.36.1"
 black = ">=24.0.0"
-invoke = ">=2.0.0"
+invoke = ">=2.2.1"
 isort = ">=5.13.0"
 pytest = ">=8.0.0"
 semver = ">=3.0.0"
+
+[tool.basedpyright]
+typeCheckingMode = "recommended"
+pythonVersion = "3.14"
+include = ["src", "tasks", "tests"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
