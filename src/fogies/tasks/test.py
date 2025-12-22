@@ -4,7 +4,6 @@ Task for running tests.
 
 import os
 import shutil
-
 from typing import Callable, cast
 
 from invoke.collection import Collection
