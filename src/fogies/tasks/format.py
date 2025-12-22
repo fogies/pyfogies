@@ -2,7 +2,44 @@
 Task for applying code formatting.
 """
 
-from invoke import Collection, task
+from typing import Callable, cast
+
+from invoke.collection import Collection
+from invoke.context import Context
+from invoke.tasks import task
+
+
+@task(name="format")  # pyright: ignore[reportUntypedFunctionDecorator]
+def _task_format_impl(context: Context) -> None:
+    """
+    Apply code formatting.
+    """
+    _ = context.run(
+        command=" ".join(
+            [
+                "isort",
+                ".",
+            ]
+        ),
+        echo=True,
+    )
+
+    _ = context.run(
+        command=" ".join(
+            [
+                "black",
+                ".",
+            ]
+        ),
+        echo=True,
+    )
+
+
+# Explicitly type the decorated function.
+task_format: Callable[[Context], None] = cast(
+    Callable[[Context], None],
+    _task_format_impl,
+)
 
 
 class FormatTasks:
@@ -10,37 +47,11 @@ class FormatTasks:
     Tasks for applying code formatting.
     """
 
-    @task(name="format")
-    def task_format(context):
-        """
-        Apply code formatting.
-        """
-
-        context.run(
-            command=" ".join(
-                [
-                    "isort",
-                    ".",
-                ]
-            ),
-            echo=True,
-        )
-
-        context.run(
-            command=" ".join(
-                [
-                    "black",
-                    ".",
-                ]
-            ),
-            echo=True,
-        )
-
     def get_collection(self) -> Collection:
         """
         Get a collection of tasks.
         """
         namespace = Collection("format")
-        namespace.add_task(self.task_format)
+        namespace.add_task(task_format)
 
         return namespace
