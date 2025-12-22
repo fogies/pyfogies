@@ -6,7 +6,7 @@ from typing import Callable, cast
 
 from invoke.collection import Collection
 from invoke.context import Context
-from invoke.tasks import task
+from invoke.tasks import Task, task
 
 
 @task(name="format")  # pyright: ignore[reportUntypedFunctionDecorator]
@@ -36,8 +36,8 @@ def _task_format_impl(context: Context) -> None:
 
 
 # Explicitly type the decorated function.
-task_format: Callable[[Context], None] = cast(
-    Callable[[Context], None],
+task_format: Task[Callable[[Context], None]] = cast(
+    Task[Callable[[Context], None]],
     _task_format_impl,
 )
 
