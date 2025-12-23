@@ -10,7 +10,7 @@ These are always applied, regardless of the programming language or file type.
 
 ## Use Full Sentences
 
-- Prefer comments are short but still a full sentence.
+- Comments should be short but still a full sentence.
 - Comments that are a full sentence should end with a period.
   - Example: `# Verify the required dependency is available.`
   - Example: `// Verify the required dependency is available.`

@@ -15,7 +15,7 @@ packages = [{include = "fogies", from = "src"}]
 [tool.poetry.dependencies]
 
 [tool.poetry.group.dev.dependencies]
-# ^ specifies allows all minor and patch releases.
+# ^ allows all minor and patch releases.
 #   Example: ^1.2.3 will match 1.x.x versions >=1.2.3 but <2.0.0.
 # ~ allows only patch releases.
 #   Example: ~1.2.3 will match versions >=1.2.3 but <1.3.0.

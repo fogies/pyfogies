@@ -12,7 +12,7 @@ This rule file describes style conventions for Windows batch (`.bat`) files.
 
 - Use `REM` comments. Do not use `::` comments.
 
-- Prefer that comments are a full sentence.
+- Comments should be a full sentence.
 - **Sentence comments** (full sentences in `REM` comments) should **end with a period**.
   - Example: `REM Check if Python Install Manager is installed.`
 - Non-sentence comments (single words, labels, or short phrases) do **not** need a period.
