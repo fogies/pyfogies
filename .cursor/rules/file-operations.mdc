@@ -8,6 +8,6 @@ alwaysApply: true
 ## Moving Files
 
 - If the agent is going to move a file, check whether it is under version control.
-- If it is under version contorl, the agent should use `git mv` instead of creating a new file and deleting the old one.
+- If it is under version control, the agent should use `git mv` instead of creating a new file and deleting the old one.
 - This preserves the file history in git and is the correct way to move tracked files.
 - Example: Use `git mv tests/test_black.py tests/unit/tools/test_black.py` instead of creating the new file and deleting the old one.
