@@ -11,29 +11,36 @@ from invoke.context import Context
 from invoke.tasks import Task, task
 
 
-@task(name="build")  # pyright: ignore[reportUntypedFunctionDecorator]
-def _task_build_impl(context: Context) -> None:
+def get_task_build() -> Task[Callable[[Context], None]]:
     """
-    Build package artifacts.
+    Get a task that builds package artifacts.
     """
-    _ = context.run(
-        command=" ".join(
-            [
-                "poetry",
-                "build",
-            ]
-        ),
-        echo=True,
-    )
+
+    @task(name="build")  # pyright: ignore[reportUntypedFunctionDecorator]
+    def task_build(context: Context) -> None:
+        """
+        Build package artifacts.
+        """
+        _ = context.run(
+            command=" ".join(
+                [
+                    "poetry",
+                    "build",
+                ]
+            ),
+            echo=True,
+        )
+
+    return cast(Task[Callable[[Context], None]], task_build)
 
 
-def _task_publish_get(*, path_secrets_poetry: Path) -> Task[Callable[[Context], None]]:
+def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], None]]:
     """
     Get a task that publishes package artifacts.
     """
 
     @task(name="publish")  # pyright: ignore[reportUntypedFunctionDecorator]
-    def _task_publish_impl(context: Context) -> None:
+    def task_publish(context: Context) -> None:
         """
         Publish package to PyPI.
         """
@@ -55,7 +62,7 @@ def _task_publish_get(*, path_secrets_poetry: Path) -> Task[Callable[[Context], 
             echo=True,
         )
 
-    return cast(Task[Callable[[Context], None]], _task_publish_impl)
+    return cast(Task[Callable[[Context], None]], task_publish)
 
 
 def get_collection(path_secrets_poetry: Path) -> Collection:
@@ -64,12 +71,8 @@ def get_collection(path_secrets_poetry: Path) -> Collection:
     """
     namespace = Collection("poetry")
 
-    # Explicitly type the decorated functions.
-    task_build: Task[Callable[[Context], None]] = cast(
-        Task[Callable[[Context], None]],
-        _task_build_impl,
-    )
-    task_publish = _task_publish_get(path_secrets_poetry=path_secrets_poetry)
+    task_build = get_task_build()
+    task_publish = get_task_publish(path_secrets_poetry=path_secrets_poetry)
 
     namespace.add_task(task_build)
     namespace.add_task(task_publish)
