@@ -19,25 +19,10 @@ namespace: Collection = Collection()
 # Enable color output.
 colorama.init()
 
-# TODO: This still feels messy, will need a bettery way to compose tasks as more develop.
-# Type errors ignored until we reorganize task composition.
-namespace.add_task(
-    task=fogies.tasks.format.FormatTasks().get_collection()[
-        "format"
-    ],  # pyright: ignore[reportAny]
-)
-namespace.add_task(
-    task=fogies.tasks.lint.LintTasks().get_collection()[
-        "lint"
-    ],  # pyright: ignore[reportAny]
-)
-namespace.add_task(
-    task=fogies.tasks.test.TestTasks().get_collection()[
-        "test"
-    ],  # pyright: ignore[reportAny]
-)
-
-# Add the PoetryTasks collection to the root namespace.
+# Add tasks to the root namespace.
+namespace.add_task(fogies.tasks.format.get_task_format())
+namespace.add_task(fogies.tasks.lint.get_task_lint())
+namespace.add_task(fogies.tasks.test.get_task_test())
 namespace.add_collection(
     fogies.tasks.poetry.get_collection(path_secrets_poetry=PATH_SECRETS_POETRY)
 )

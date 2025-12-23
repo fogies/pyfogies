@@ -12,10 +12,6 @@ from invoke.tasks import Task, task
 
 
 def get_task_build() -> Task[Callable[[Context], None]]:
-    """
-    Get a task that builds package artifacts.
-    """
-
     @task(name="build")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_build(context: Context) -> None:
         """
@@ -35,10 +31,6 @@ def get_task_build() -> Task[Callable[[Context], None]]:
 
 
 def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], None]]:
-    """
-    Get a task that publishes package artifacts.
-    """
-
     @task(name="publish")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_publish(context: Context) -> None:
         """
