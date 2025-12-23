@@ -1,11 +1,17 @@
 """Invoke tasks for this project."""
 
+from pathlib import Path
+
 import colorama
 from invoke.collection import Collection
 
 import fogies.tasks.format
 import fogies.tasks.lint
+import fogies.tasks.poetry
 import fogies.tasks.test
+
+# Path to the Poetry secrets configuration file.
+PATH_SECRETS_POETRY = Path("secrets", "poetry.toml")
 
 # Root namespace for tasks.
 namespace: Collection = Collection()
@@ -29,4 +35,9 @@ namespace.add_task(
     task=fogies.tasks.test.TestTasks().get_collection()[
         "test"
     ],  # pyright: ignore[reportAny]
+)
+
+# Add the PoetryTasks collection to the root namespace.
+namespace.add_collection(
+    fogies.tasks.poetry.get_collection(path_secrets_poetry=PATH_SECRETS_POETRY)
 )

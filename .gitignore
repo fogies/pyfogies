@@ -4,3 +4,9 @@ __pycache__/
 
 # Virtual environments.
 /.venv
+
+# Build artifacts.
+/dist
+
+# Secrets directory.
+/secrets
