@@ -1,0 +1,18 @@
+---
+description: Style guidelines for batch files.
+globs: ["**/*.bat"]
+alwaysApply: true
+---
+
+# Batch File Style
+
+This rule file describes style conventions for Windows batch (`.bat`) files.
+
+## Comments
+
+- Use `REM` comments. Do not use `::` comments.
+
+- Comments should be a full sentence.
+- **Sentence comments** (full sentences in `REM` comments) should **end with a period**.
+  - Example: `REM Check if Python Install Manager is installed.`
+- Non-sentence comments (single words, labels, or short phrases) do **not** need a period.

@@ -1,0 +1,12 @@
+# Compiled Python.
+__pycache__/
+*.pyc
+
+# Virtual environments.
+/.venv
+
+# Build artifacts.
+/dist
+
+# Secrets directory.
+/secrets
