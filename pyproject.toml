@@ -26,7 +26,6 @@ isort = "^7.0.0"
 poetry = "^2.2.1"
 pytest = "^9.0.2"
 semver = "^3.0.4"
-towncrier = "^25.8.0"
 
 [tool.basedpyright]
 typeCheckingMode = "recommended"
