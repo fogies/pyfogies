@@ -7,7 +7,7 @@ authors = [
     {name = "James Fogarty",email = "jayfo@users.noreply.github.com"}
 ]
 readme = "README.md"
-requires-python = "^3.14"
+requires-python = ">=3.14,<4.0"
 
 [tool.poetry]
 packages = [{include = "fogies", from = "src"}]
