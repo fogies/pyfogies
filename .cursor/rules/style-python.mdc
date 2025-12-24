@@ -1,0 +1,23 @@
+---
+description: Style guidelines for Python code.
+globs: ["**/*.py"]
+alwaysApply: true
+---
+
+# Python Style
+
+This rule file describes style conventions for Python code.
+
+## String Formatting
+
+- Prefer `.format()` over f-strings or `%` formatting.
+  - Example: `"Invalid type '{}'. Must be one of: {}".format(type_input, ', '.join(VALID_TYPES))`
+  - Example: `"{}.{}.md".format(i, news_type)` instead of `f"{i}.{news_type}.md"`
+- When formatting with multiple parameters, put each parameter on its own line for readability.
+  - Example:
+    ```python
+    "Invalid type '{}'. Must be one of: {}".format(
+        type_input,
+        ', '.join(VALID_TYPES)
+    )
+    ```
