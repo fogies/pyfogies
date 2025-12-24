@@ -46,7 +46,6 @@ def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], N
                 [
                     "poetry",
                     "publish",
-                    "--dry-run",
                     "--username {}".format("__token__"),
                     "--password {}".format(api_key),
                 ]
