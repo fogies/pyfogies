@@ -35,7 +35,7 @@ Will not document changes in Cursor rules.
 - Security fix description.
 -->
 
-## [Planned 0.0.0.dev1] (Unreleased)
+## [0.0.0.dev1] (2025-12-23)
 
 ### Added
 - Initial project configuration and dependencies (#1).
