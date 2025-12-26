@@ -14,7 +14,7 @@ Will not document changes in Cursor rules.
 - New feature description.
 
 ### Changed
-- Change description.
+- Changed feature description.
 
 ### Deprecated
 - Deprecated feature description.
@@ -29,10 +29,10 @@ Will not document changes in Cursor rules.
 - Security fix description.
 
 ### Documentation
-- Security fix description.
+- Documentation change description.
 
 ### Tests
-- Security fix description.
+- Testing change description.
 -->
 
 ## [0.0.0.dev1] (2025-12-23)
