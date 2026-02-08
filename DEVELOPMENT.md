@@ -2,7 +2,9 @@
 
 ## System Dependencies
 
-- [Python](https://www.python.org/)
+- Python
+
+  <https://www.python.org/>
 
   Development uses version >= 3.14.
 
@@ -12,7 +14,9 @@
  
   <https://docs.python.org/dev/using/windows.html>
 
-- [Poetry](https://python-poetry.org/)
+- Poetry
+  
+  <https://python-poetry.org/>
 
   On Windows, using Python Install Manager:
 
