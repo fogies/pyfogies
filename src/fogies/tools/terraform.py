@@ -52,7 +52,7 @@ def terraform(
     """Download a Terraform binary and yield a Terraform object.
 
     Cache the downloaded binary in *cache_dir* (defaulting to ``.bin``).
-    
+
     """
     if sys.platform != "win32":
         raise RuntimeError("Only implemented on Windows")
