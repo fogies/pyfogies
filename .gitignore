@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Binary cache.
+/.bin
+
 # Virtual environments.
 /.venv
 
