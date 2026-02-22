@@ -7,7 +7,7 @@ from fogies.tools.terraform import terraform
 from paths import PATH_STAGING_BINARY_CACHE
 
 
-def test_tooling():
+def test_tool():
     """Apply and then destroy the tooling module using the Terraform tool."""
     command_params = SubprocessCommandParams(capture_output=False)
     path_module = pathlib.Path(__file__).parent
