@@ -35,9 +35,12 @@ def command_run(
     args_combined = [str(command)] + (args or [])
     if isinstance(command_params, ContextCommandParams):
         if cwd is not None:
-            with command_params.context.cd(
-                str(cwd)
-            ):  # pyright: ignore[reportUnknownMemberType]
+            context_cd = (
+                command_params.context.cd(  # pyright: ignore[reportUnknownMemberType]
+                    str(cwd)
+                )
+            )
+            with context_cd:
                 result = command_params.context.run(" ".join(args_combined))
         else:
             result = command_params.context.run(" ".join(args_combined))
