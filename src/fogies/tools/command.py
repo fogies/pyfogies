@@ -31,12 +31,13 @@ def command_run(
     args: list[str] | None = None,
     cwd: pathlib.Path | None = None,
 ) -> subprocess.CompletedProcess[str] | Result:
-    """Run a command via context.run() or subprocess.run().
-    """
+    """Run a command via context.run() or subprocess.run()."""
     args_combined = [str(command)] + (args or [])
     if isinstance(command_params, ContextCommandParams):
         if cwd is not None:
-            with command_params.context.cd(str(cwd)):  # pyright: ignore[reportUnknownMemberType]
+            with command_params.context.cd(
+                str(cwd)
+            ):  # pyright: ignore[reportUnknownMemberType]
                 result = command_params.context.run(" ".join(args_combined))
         else:
             result = command_params.context.run(" ".join(args_combined))
@@ -44,7 +45,9 @@ def command_run(
         # invoke's context.run() returns None when run with disown=True.
         # Ensure future revisions to this code never introduce that parameter.
         return cast(Result, result)
-    elif isinstance(command_params, SubprocessCommandParams):  # pyright: ignore[reportUnnecessaryIsInstance]
+    elif isinstance(
+        command_params, SubprocessCommandParams
+    ):  # pyright: ignore[reportUnnecessaryIsInstance]
         return subprocess.run(
             args_combined,
             capture_output=command_params.capture_output,
