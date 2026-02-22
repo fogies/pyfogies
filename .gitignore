@@ -2,14 +2,14 @@
 __pycache__/
 *.pyc
 
-# Binary cache.
-/.bin
-
 # Virtual environments.
 /.venv
 
 # Build artifacts.
 /dist
+
+# Staging directory.
+/.staging
 
 # Secrets directory.
 /secrets

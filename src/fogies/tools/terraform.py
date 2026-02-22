@@ -13,8 +13,6 @@ from typing import assert_never, overload, cast
 from invoke.context import Context
 from invoke.runners import Result
 
-_BIN_DIR = pathlib.Path(".bin")
-
 _KNOWN_VERSIONS = [
     "1.14.4",
 ]
@@ -123,7 +121,7 @@ class Terraform:
         stdout/stderr as text. *run_params* is passed to context.run() or
         subprocess.run() as appropriate.
         """
-        command_args = [str(self.path), "init"]
+        command_args = [str(self.path), "init", "-upgrade"]
         return _run_command(
             run_params=run_params,
             command_args=command_args,
@@ -221,12 +219,9 @@ class Terraform:
 def terraform(
     *,
     version: str = _DEFAULT_VERSION,
-    cache_dir: pathlib.Path = _BIN_DIR,
+    path_binary_cache: pathlib.Path,
 ) -> Iterator[Terraform]:
     """Download a Terraform binary and yield a Terraform object.
-
-    Cache the downloaded binary in *cache_dir* (defaulting to ``.bin``).
-
     """
     if sys.platform != "win32":
         raise RuntimeError("Only implemented on Windows")
@@ -241,10 +236,10 @@ def terraform(
         )
 
     exe_name = "terraform_{}.exe".format(version.replace(".", "_"))
-    exe_path = cache_dir / exe_name
+    exe_path = path_binary_cache / exe_name
 
     if not exe_path.exists():
-        cache_dir.mkdir(parents=True, exist_ok=True)
+        path_binary_cache.mkdir(parents=True, exist_ok=True)
 
         url = _TERRAFORM_URL_TEMPLATE.format(version=version)
         response = cast(HTTPResponse, urllib.request.urlopen(url))

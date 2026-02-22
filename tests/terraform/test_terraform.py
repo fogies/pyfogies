@@ -4,11 +4,12 @@ import pathlib
 import subprocess
 
 from fogies.tools.terraform import terraform
+from paths import PATH_STAGING_BINARY_CACHE
 
 
-def test_terraform_is_available(tmp_path: pathlib.Path):
+def test_terraform_is_available():
     """Test that context manager provides a working executable."""
-    with terraform(cache_dir=tmp_path) as tf:
+    with terraform(path_binary_cache=PATH_STAGING_BINARY_CACHE) as tf:
         # Verify the executable exists.
         assert tf.path.exists()
 

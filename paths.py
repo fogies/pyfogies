@@ -2,8 +2,14 @@
 
 from pathlib import Path
 
-# Binary cache directory.
-PATH_BINARY_CACHE = Path(".bin")
+# Secrets directory.
+PATH_SECRETS = Path("secrets")
 
 # Path to the Poetry secrets configuration file.
-PATH_SECRETS_POETRY = Path("secrets", "poetry.toml")
+PATH_SECRETS_POETRY = PATH_SECRETS / "poetry.toml"
+
+# Staging directory.
+PATH_STAGING = Path(".staging")
+
+# Binary cache directory (inside staging).
+PATH_STAGING_BINARY_CACHE = PATH_STAGING / "bin"
