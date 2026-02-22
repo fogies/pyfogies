@@ -3,15 +3,15 @@
 import pathlib
 
 from fogies.tools.terraform import SubprocessRunParams, terraform
-from paths import PATH_BINARY_CACHE
+from paths import PATH_STAGING_BINARY_CACHE
 
 
 def test_tooling():
     """Apply and then destroy the tooling module using the Terraform tool."""
     path_module = pathlib.Path(__file__).parent
-    run_params = SubprocessRunParams(capture_output=True)
+    run_params = SubprocessRunParams(capture_output=False)
 
-    with terraform(cache_dir=PATH_BINARY_CACHE) as tf:
+    with terraform(path_binary_cache=PATH_STAGING_BINARY_CACHE) as tf:
         init_result = tf.init(
             run_params=run_params,
             path_module=path_module,
