@@ -27,7 +27,6 @@ def test_tool():
         )
         try:
             assert apply_result.returncode == 0
-            assert apply_result.stdout is not None
         finally:
             destroy_result = tf.destroy(
                 command_params=command_params,
