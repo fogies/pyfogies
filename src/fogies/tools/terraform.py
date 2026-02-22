@@ -1,4 +1,3 @@
-import dataclasses
 import io
 import pathlib
 import subprocess
@@ -8,10 +7,16 @@ import zipfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from http.client import HTTPResponse
-from typing import assert_never, overload, cast
+from typing import cast, overload
 
-from invoke.context import Context
 from invoke.runners import Result
+
+from fogies.tools.command import (
+    CommandParams,
+    ContextCommandParams,
+    SubprocessCommandParams,
+    command_run,
+)
 
 _KNOWN_VERSIONS = [
     "1.14.4",
@@ -23,51 +28,6 @@ _TERRAFORM_URL_TEMPLATE = (
     "https://releases.hashicorp.com/terraform"
     "/{version}/terraform_{version}_windows_amd64.zip"
 )
-
-
-@dataclasses.dataclass
-class ContextRunParams:
-    """Params for execution via invoke context.run()."""
-
-    context: Context
-
-
-@dataclasses.dataclass
-class SubprocessRunParams:
-    """Params for execution via subprocess.run()."""
-
-    capture_output: bool = False
-
-
-RunParams = ContextRunParams | SubprocessRunParams
-
-
-def _run_command(
-    *,
-    run_params: RunParams,
-    command_args: list[str],
-    cwd: pathlib.Path | None,
-) -> subprocess.CompletedProcess[str] | Result:
-    """Run a command via context.run() or subprocess.run().
-    """
-    if isinstance(run_params, ContextRunParams):
-        # invoke's context.run() returns None when run with disown=True.
-        # Ensure future revisions to this code never introduce that parameter.
-        if cwd is not None:
-            with run_params.context.cd(str(cwd)):  # pyright: ignore[reportUnknownMemberType]
-                result = run_params.context.run(" ".join(command_args))
-        else:
-            result = run_params.context.run(" ".join(command_args))
-        return cast(Result, result)
-    elif isinstance(run_params, SubprocessRunParams):  # pyright: ignore[reportUnnecessaryIsInstance]
-        return subprocess.run(
-            command_args,
-            capture_output=run_params.capture_output,
-            text=True if run_params.capture_output else None,
-            cwd=cwd,
-        )
-    else:
-        assert_never(run_params)
 
 
 class Terraform:
@@ -94,7 +54,7 @@ class Terraform:
     def init(
         self,
         *,
-        run_params: SubprocessRunParams,
+        command_params: SubprocessCommandParams,
         path_module: pathlib.Path,
     ) -> subprocess.CompletedProcess[str]: ...
 
@@ -102,29 +62,29 @@ class Terraform:
     def init(
         self,
         *,
-        run_params: ContextRunParams,
+        command_params: ContextCommandParams,
         path_module: pathlib.Path,
     ) -> Result: ...
 
     def init(
         self,
         *,
-        run_params: RunParams,
+        command_params: CommandParams,
         path_module: pathlib.Path,
     ) -> subprocess.CompletedProcess[str] | Result:
         """Run terraform init.
 
         *path_module* is the folder containing the Terraform files (used as
-        working directory). If *run_params* is ContextRunParams, run via
+        working directory). If *command_params* is ContextCommandParams, run via
         context.run(); otherwise use subprocess.run(). When using
-        SubprocessRunParams, set *capture_output* there to capture
-        stdout/stderr as text. *run_params* is passed to context.run() or
+        SubprocessCommandParams, set *capture_output* there to capture
+        stdout/stderr as text. *command_params* is passed to context.run() or
         subprocess.run() as appropriate.
         """
-        command_args = [str(self.path), "init", "-upgrade"]
-        return _run_command(
-            run_params=run_params,
-            command_args=command_args,
+        return command_run(
+            command=self.path,
+            command_params=command_params,
+            args=["init", "-upgrade"],
             cwd=path_module,
         )
 
@@ -132,7 +92,7 @@ class Terraform:
     def apply(
         self,
         *,
-        run_params: SubprocessRunParams,
+        command_params: SubprocessCommandParams,
         path_module: pathlib.Path,
         auto_approve: bool = False,
     ) -> subprocess.CompletedProcess[str]: ...
@@ -141,7 +101,7 @@ class Terraform:
     def apply(
         self,
         *,
-        run_params: ContextRunParams,
+        command_params: ContextCommandParams,
         path_module: pathlib.Path,
         auto_approve: bool = False,
     ) -> Result: ...
@@ -149,25 +109,26 @@ class Terraform:
     def apply(
         self,
         *,
-        run_params: RunParams,
+        command_params: CommandParams,
         path_module: pathlib.Path,
         auto_approve: bool = False,
     ) -> subprocess.CompletedProcess[str] | Result:
         """Run terraform apply.
 
         *path_module* is the folder containing the Terraform files (used as
-        working directory). If *run_params* is ContextRunParams, run via
+        working directory). If *command_params* is ContextCommandParams, run via
         context.run(); otherwise use subprocess.run(). If *auto_approve* is
-        true, pass -auto-approve. When using SubprocessRunParams, set
-        *capture_output* there to capture stdout/stderr as text. *run_params*
+        true, pass -auto-approve. When using SubprocessCommandParams, set
+        *capture_output* there to capture stdout/stderr as text. *command_params*
         is passed to context.run() or subprocess.run() as appropriate.
         """
-        command_args = [str(self.path), "apply"]
+        apply_args = ["apply"]
         if auto_approve:
-            command_args.append("-auto-approve")
-        return _run_command(
-            run_params=run_params,
-            command_args=command_args,
+            apply_args.append("-auto-approve")
+        return command_run(
+            command=self.path,
+            command_params=command_params,
+            args=apply_args,
             cwd=path_module,
         )
 
@@ -175,7 +136,7 @@ class Terraform:
     def destroy(
         self,
         *,
-        run_params: SubprocessRunParams,
+        command_params: SubprocessCommandParams,
         path_module: pathlib.Path,
         auto_approve: bool = False,
     ) -> subprocess.CompletedProcess[str]: ...
@@ -184,7 +145,7 @@ class Terraform:
     def destroy(
         self,
         *,
-        run_params: ContextRunParams,
+        command_params: ContextCommandParams,
         path_module: pathlib.Path,
         auto_approve: bool = False,
     ) -> Result: ...
@@ -192,25 +153,26 @@ class Terraform:
     def destroy(
         self,
         *,
-        run_params: RunParams,
+        command_params: CommandParams,
         path_module: pathlib.Path,
         auto_approve: bool = False,
     ) -> subprocess.CompletedProcess[str] | Result:
         """Run terraform destroy.
 
         *path_module* is the folder containing the Terraform files (used as
-        working directory). If *run_params* is ContextRunParams, run via
+        working directory). If *command_params* is ContextCommandParams, run via
         context.run(); otherwise use subprocess.run(). If *auto_approve* is
-        true, pass -auto-approve. When using SubprocessRunParams, set
-        *capture_output* there to capture stdout/stderr as text. *run_params*
+        true, pass -auto-approve. When using SubprocessCommandParams, set
+        *capture_output* there to capture stdout/stderr as text. *command_params*
         is passed to context.run() or subprocess.run() as appropriate.
         """
-        command_args = [str(self.path), "destroy"]
+        destroy_args = ["destroy"]
         if auto_approve:
-            command_args.append("-auto-approve")
-        return _run_command(
-            run_params=run_params,
-            command_args=command_args,
+            destroy_args.append("-auto-approve")
+        return command_run(
+            command=self.path,
+            command_params=command_params,
+            args=destroy_args,
             cwd=path_module,
         )
 
