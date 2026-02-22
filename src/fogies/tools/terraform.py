@@ -8,7 +8,7 @@ import zipfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from http.client import HTTPResponse
-from typing import overload, cast
+from typing import assert_never, overload, cast
 
 from invoke.context import Context
 from invoke.runners import Result
@@ -29,14 +29,14 @@ _TERRAFORM_URL_TEMPLATE = (
 
 @dataclasses.dataclass
 class ContextRunParams:
-    """Params for running Terraform via invoke context.run()."""
+    """Params for execution via invoke context.run()."""
 
     context: Context
 
 
 @dataclasses.dataclass
 class SubprocessRunParams:
-    """Params for running Terraform via subprocess.run()."""
+    """Params for execution via subprocess.run()."""
 
     capture_output: bool = False
 
@@ -50,25 +50,26 @@ def _run_command(
     command_args: list[str],
     cwd: pathlib.Path | None,
 ) -> subprocess.CompletedProcess[str] | Result:
-    """Run a command via context.run() or subprocess.run()."""
+    """Run a command via context.run() or subprocess.run().
+    """
     if isinstance(run_params, ContextRunParams):
+        # invoke's context.run() returns None when run with disown=True.
+        # Ensure future revisions to this code never introduce that parameter.
         if cwd is not None:
-            with run_params.context.cd(str(cwd)):
-                return run_params.context.run(" ".join(command_args))
-        return run_params.context.run(" ".join(command_args))
-    elif isinstance(run_params, SubprocessRunParams):
-        kwargs: dict = {"capture_output": run_params.capture_output}
-        if run_params.capture_output:
-            kwargs["text"] = True
-        if cwd is not None:
-            kwargs["cwd"] = cwd
-        return subprocess.run(command_args, **kwargs)
-    else:
-        raise TypeError(
-            "run_params must be ContextRunParams or SubprocessRunParams, got {}".format(
-                type(run_params).__name__,
-            )
+            with run_params.context.cd(str(cwd)):  # pyright: ignore[reportUnknownMemberType]
+                result = run_params.context.run(" ".join(command_args))
+        else:
+            result = run_params.context.run(" ".join(command_args))
+        return cast(Result, result)
+    elif isinstance(run_params, SubprocessRunParams):  # pyright: ignore[reportUnnecessaryIsInstance]
+        return subprocess.run(
+            command_args,
+            capture_output=run_params.capture_output,
+            text=True if run_params.capture_output else None,
+            cwd=cwd,
         )
+    else:
+        assert_never(run_params)
 
 
 class Terraform:
