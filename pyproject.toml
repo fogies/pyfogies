@@ -1,7 +1,7 @@
 [project]
 name = "fogies"
 # Version follows semantic versioning <https://semver.org/>.
-version = "0.0.0-dev.1"
+version = "0.0.0-dev.2"
 description = ""
 authors = [
     {name = "James Fogarty",email = "jayfo@users.noreply.github.com"}
