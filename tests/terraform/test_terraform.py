@@ -3,8 +3,9 @@
 import pathlib
 import subprocess
 
-from fogies.tools.terraform import terraform
 from paths import PATH_STAGING_BINARY_CACHE
+
+from fogies.tools.terraform import terraform
 
 
 def test_terraform_is_available():

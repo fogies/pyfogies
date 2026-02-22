@@ -183,8 +183,7 @@ def terraform(
     version: str = _DEFAULT_VERSION,
     path_binary_cache: pathlib.Path,
 ) -> Iterator[Terraform]:
-    """Download a Terraform binary and yield a Terraform object.
-    """
+    """Download a Terraform binary and yield a Terraform object."""
     if sys.platform != "win32":
         raise RuntimeError("Only implemented on Windows")
 

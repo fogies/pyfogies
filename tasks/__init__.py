@@ -2,12 +2,12 @@
 
 import colorama
 from invoke.collection import Collection
+from paths import PATH_SECRETS_POETRY
 
 import fogies.tasks.format
 import fogies.tasks.lint
 import fogies.tasks.poetry
 import fogies.tasks.test
-from paths import PATH_SECRETS_POETRY
 
 # Root namespace for tasks.
 namespace: Collection = Collection()

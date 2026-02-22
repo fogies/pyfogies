@@ -2,9 +2,10 @@
 
 import pathlib
 
+from paths import PATH_STAGING_BINARY_CACHE
+
 from fogies.tools.command import SubprocessCommandParams
 from fogies.tools.terraform import terraform
-from paths import PATH_STAGING_BINARY_CACHE
 
 
 def test_tool():
