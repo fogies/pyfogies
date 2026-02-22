@@ -1,6 +1,5 @@
 """Test Terraform context manager downloads and runs correctly."""
 
-import pathlib
 import subprocess
 
 from paths import PATH_STAGING_BINARY_CACHE
