@@ -9,28 +9,29 @@ terraform {
   }
 }
 
-variable "filename" {
-  description = "Path of the test file."
+variable "test_content" {
+  description = "Content written by the Terraform tool test."
   type        = string
 }
 
-variable "content" {
-  description = "Content to write to the test file."
+variable "test_path" {
+  description = "Path to the temporary resource created by the test."
   type        = string
-  default     = "created by terraform"
 }
 
 resource "local_file" "test_file" {
-  filename = var.filename
-  content  = var.content
+  # Write a small marker file so the test
+  # can verify Terraform applied successfully.
+  filename = var.test_path
+  content  = var.test_content
 }
 
-output "filename" {
+output "file_path" {
   description = "Path of the test file."
   value       = local_file.test_file.filename
 }
 
-output "content" {
+output "file_content" {
   description = "Content of the test file."
   value       = local_file.test_file.content
 }
