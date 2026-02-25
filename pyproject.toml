@@ -16,6 +16,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
+pydantic = "^2.12.5"
 
 [tool.poetry.group.dev.dependencies]
 # ^ allows all minor and patch releases.
@@ -27,7 +28,6 @@ black = "~25.12.0" # Black does not semver.
 invoke = "^2.2.1"
 isort = "^7.0.0"
 poetry = "^2.2.1"
-pydantic = "^2.12.5"
 pytest = "^9.0.2"
 semver = "^3.0.4"
 
