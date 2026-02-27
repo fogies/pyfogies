@@ -1,61 +1,43 @@
 import dataclasses
 import pathlib
-import subprocess
-from typing import assert_never, cast
+from typing import cast
 
 from invoke.context import Context
 from invoke.runners import Result
 
 
 @dataclasses.dataclass
-class ContextCommandParams:
-    """Params for execution via invoke context.run()."""
+class CommandParams:
+    """Params for execution via invoke."""
 
-    context: Context
-
-
-@dataclasses.dataclass
-class SubprocessCommandParams:
-    """Params for execution via subprocess.run()."""
-
-    capture_output: bool = False
-
-
-CommandParams = ContextCommandParams | SubprocessCommandParams
+    cwd: pathlib.Path | None = None
 
 
 def command_run(
     *,
+    context: Context | None = None,
     command: pathlib.Path,
-    command_params: CommandParams,
+    command_params: CommandParams | None = None,
     args: list[str] | None = None,
-    cwd: pathlib.Path | None = None,
-) -> subprocess.CompletedProcess[str] | Result:
-    """Run a command via context.run() or subprocess.run()."""
-    args_combined = [str(command)] + (args or [])
-    if isinstance(command_params, ContextCommandParams):
-        if cwd is not None:
-            context_cd = (
-                command_params.context.cd(  # pyright: ignore[reportUnknownMemberType]
-                    str(cwd)
-                )
-            )
-            with context_cd:
-                result = command_params.context.run(" ".join(args_combined))
-        else:
-            result = command_params.context.run(" ".join(args_combined))
+) -> Result:
+    """Run a command via invoke run().
 
-        # invoke's context.run() returns None when run with disown=True.
-        # Ensure future revisions to this code never introduce that parameter.
-        return cast(Result, result)
-    elif isinstance(
-        command_params, SubprocessCommandParams
-    ):  # pyright: ignore[reportUnnecessaryIsInstance]
-        return subprocess.run(
-            args_combined,
-            capture_output=command_params.capture_output,
-            text=True if command_params.capture_output else None,
-            cwd=cwd,
-        )
+    If *context* is provided, use context.run(). Otherwise create a new
+    Context and run the command there.
+    """
+    command_params = command_params or CommandParams()
+    context = context or Context()
+
+    args_combined = [str(command)] + (args or [])
+    command_str = " ".join(args_combined)
+
+    if command_params.cwd is not None:
+        context_cd = context.cd(str(command_params.cwd))  # pyright: ignore[reportUnknownMemberType]
+        with context_cd:
+            result = context.run(command_str)
     else:
-        assert_never(command_params)
+        result = context.run(command_str)
+
+    # invoke's Context.run() returns None when run with disown=True.
+    # Ensure future revisions to this code never introduce that parameter.
+    return cast(Result, result)
