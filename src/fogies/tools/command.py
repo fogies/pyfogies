@@ -13,6 +13,7 @@ class CommandParams:
 
     context: Context | None = None
     cwd: pathlib.Path | None = None
+    in_stream: bool = True
 
     def require_cwd(self, path: pathlib.Path) -> "CommandParams":
         """Ensure cwd is set to *path*; return updated params or raise if conflicting."""
@@ -66,9 +67,9 @@ def command_run(
     if command_params.cwd is not None:
         context_cd = context.cd(str(command_params.cwd))  # pyright: ignore[reportUnknownMemberType]
         with context_cd:
-            result = context.run(command_str)
+            result = context.run(command_str, in_stream=command_params.in_stream)
     else:
-        result = context.run(command_str)
+        result = context.run(command_str, in_stream=command_params.in_stream)
 
     # invoke's Context.run() returns None when run with disown=True.
     # Ensure future revisions to this code never introduce that parameter.
