@@ -3,9 +3,8 @@
 import pathlib
 import subprocess
 
-from pydantic import BaseModel
-
 from paths import PATH_STAGING_BINARY_CACHE
+from pydantic import BaseModel
 
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import terraform, terraform_tfvars
@@ -29,6 +28,7 @@ def test_terraform_is_available() -> None:
 
 def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
     """terraform_tfvars writes the file and yields the path."""
+
     class Vars(BaseModel):
         key: str
 
@@ -85,9 +85,7 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
             try:
                 assert apply_result.exited == 0
                 assert expected_file_path.exists()
-                assert (
-                    expected_file_path.read_text().strip() == expected_file_content
-                )
+                assert expected_file_path.read_text().strip() == expected_file_content
 
                 # Imagine Terraform exposes a typed output helper that returns
                 # Pydantic models from `terraform output -json`.

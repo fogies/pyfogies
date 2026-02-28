@@ -6,7 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from fogies.tools.command import CommandParams, _resolve_command  # pyright: ignore[reportPrivateUsage]
+from fogies.tools.command import _resolve_command  # pyright: ignore[reportPrivateUsage]
+from fogies.tools.command import CommandParams
 
 
 def test_require_cwd_sets_cwd() -> None:

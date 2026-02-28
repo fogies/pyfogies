@@ -55,11 +55,7 @@ def write_tfvars(
     """
     suffixes = path.suffixes
     if suffixes[-2:] != [".tfvars", ".json"]:
-        raise ValueError(
-            "Path '{}' must end with '.tfvars.json'".format(
-                path
-            )
-        )
+        raise ValueError("Path '{}' must end with '.tfvars.json'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:
         json.dump(variables.model_dump(mode="json"), f, indent=2)
@@ -207,10 +203,11 @@ class Terraform:
             args=["output", "-json"],
         )
 
-        parsed_terraform_output = _TerraformCommandOutputModel.model_validate_json(result.stdout)
+        parsed_terraform_output = _TerraformCommandOutputModel.model_validate_json(
+            result.stdout
+        )
         recovered_values = {
-            name: entry.value
-            for name, entry in parsed_terraform_output.root.items()
+            name: entry.value for name, entry in parsed_terraform_output.root.items()
         }
         return output_model.model_validate(recovered_values)
 
