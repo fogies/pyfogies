@@ -43,7 +43,7 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
 
 def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
     """Apply and then destroy the tooling module using the Terraform tool."""
-    command_params = CommandParams()
+    command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent / "tool"
 
     class ToolVars(BaseModel):
