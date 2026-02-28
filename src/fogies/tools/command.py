@@ -65,7 +65,9 @@ def command_run(
     command_str = " ".join(args_combined)
 
     if command_params.cwd is not None:
-        context_cd = context.cd(str(command_params.cwd))  # pyright: ignore[reportUnknownMemberType]
+        context_cd = context.cd(  # pyright: ignore[reportUnknownMemberType]
+            str(command_params.cwd)
+        )
         with context_cd:
             result = context.run(command_str, in_stream=command_params.in_stream)
     else:
