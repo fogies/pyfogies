@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from paths import PATH_STAGING_BINARY_CACHE
 
-from fogies.tools.command import SubprocessCommandParams
+from fogies.tools.command import CommandParams
 from fogies.tools.terraform import terraform, terraform_tfvars
 
 
@@ -41,25 +41,33 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
         assert vars_loaded == Vars(key="value")
 
 
-def test_init_apply_destroy(tmp_path: pathlib.Path) -> None:
+def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
     """Apply and then destroy the tooling module using the Terraform tool."""
-    command_params = SubprocessCommandParams(capture_output=False)
-    module_path = pathlib.Path(__file__).resolve().parent / "tool"
+    command_params = CommandParams()
+    module_path = pathlib.Path(__file__).parent / "tool"
 
     class ToolVars(BaseModel):
         test_path: str
         test_content: str
 
+    class ToolOutput(BaseModel):
+        file_path: str
+        file_content: str
+
     expected_tfvars_path = tmp_path / "tool.tfvars.json"
     expected_file_path = tmp_path / "test_resource.txt"
-    expected_file_content = "test_init_apply_destroy"
+    expected_file_content = "test_init_apply_output_destroy"
+    expected_output = ToolOutput(
+        file_path=str(expected_file_path),
+        file_content=expected_file_content,
+    )
 
     with terraform(path_binary_cache=PATH_STAGING_BINARY_CACHE) as tf:
         init_result = tf.init(
             command_params=command_params,
             module_path=module_path,
         )
-        assert init_result.returncode == 0, init_result.stderr
+        assert init_result.exited == 0, init_result.stderr
 
         with terraform_tfvars(
             path=expected_tfvars_path,
@@ -75,11 +83,21 @@ def test_init_apply_destroy(tmp_path: pathlib.Path) -> None:
                 auto_approve=True,
             )
             try:
-                assert apply_result.returncode == 0
+                assert apply_result.exited == 0
                 assert expected_file_path.exists()
                 assert (
                     expected_file_path.read_text().strip() == expected_file_content
                 )
+
+                # Imagine Terraform exposes a typed output helper that returns
+                # Pydantic models from `terraform output -json`.
+                tool_output = tf.output(
+                    command_params=command_params,
+                    module_path=module_path,
+                    output_model=ToolOutput,
+                )
+                assert isinstance(tool_output, ToolOutput)
+                assert tool_output == expected_output
             finally:
                 destroy_result = tf.destroy(
                     command_params=command_params,
@@ -87,4 +105,4 @@ def test_init_apply_destroy(tmp_path: pathlib.Path) -> None:
                     tfvars_path=tfvars_path,
                     auto_approve=True,
                 )
-                assert destroy_result.returncode == 0
+                assert destroy_result.exited == 0
