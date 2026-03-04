@@ -25,3 +25,4 @@ Ensure new Cursor rules are always added here.
 @.cursor/rules/style-batch.mdc
 @.cursor/rules/style-comments.mdc
 @.cursor/rules/style-python.mdc
+@.cursor/rules/style-tests-python.mdc
