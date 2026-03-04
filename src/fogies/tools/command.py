@@ -74,5 +74,5 @@ def command_run(
         result = context.run(command_str, in_stream=command_params.in_stream)
 
     # invoke's Context.run() returns None when run with disown=True.
-    # Ensure future revisions to this code never introduce that parameter.
+    # Ensure future revisions to this code never introduce the parameter.
     return cast(Result, result)

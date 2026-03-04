@@ -47,7 +47,7 @@ def test_resolve_command_with_cwd_in_path() -> None:
     """With cwd set, a command that does not point to a file should resolve on the path."""
     cwd = pathlib.Path("workingdir", "workingdir")
     cmd_in_path = pathlib.Path("command")
-    # No executable at that path, so use the path as given.
+    # No executable at the path, so use the path as given.
     with patch.object(pathlib.Path, "exists", return_value=False):
         assert _resolve_command(cmd_in_path, cwd) == str(cmd_in_path)
 

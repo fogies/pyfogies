@@ -87,8 +87,6 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
                 assert expected_file_path.exists()
                 assert expected_file_path.read_text().strip() == expected_file_content
 
-                # Imagine Terraform exposes a typed output helper that returns
-                # Pydantic models from `terraform output -json`.
                 tool_output = tf.output(
                     command_params=command_params,
                     module_path=module_path,
