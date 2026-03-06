@@ -216,7 +216,7 @@ class Terraform:
 def terraform(
     *,
     version: str = _DEFAULT_VERSION,
-    path_binary_cache: pathlib.Path,
+    binary_cache_path: pathlib.Path,
 ) -> Iterator[Terraform]:
     """Download a Terraform binary and yield a Terraform object."""
     if sys.platform != "win32":
@@ -232,10 +232,10 @@ def terraform(
         )
 
     exe_name = "terraform_{}.exe".format(version.replace(".", "_"))
-    exe_path = path_binary_cache / exe_name
+    exe_path = binary_cache_path / exe_name
 
     if not exe_path.exists():
-        path_binary_cache.mkdir(parents=True, exist_ok=True)
+        binary_cache_path.mkdir(parents=True, exist_ok=True)
 
         url = _TERRAFORM_URL_TEMPLATE.format(version=version)
         response = cast(HTTPResponse, urllib.request.urlopen(url))

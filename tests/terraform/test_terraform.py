@@ -12,7 +12,7 @@ from fogies.tools.terraform import terraform, terraform_tfvars
 
 def test_terraform_is_available() -> None:
     """Context manager provides a working executable."""
-    with terraform(path_binary_cache=PATH_STAGING_BINARY_CACHE) as tf:
+    with terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf:
         # Verify the executable exists.
         assert tf.path.exists()
 
@@ -62,7 +62,7 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
         file_content=expected_file_content,
     )
 
-    with terraform(path_binary_cache=PATH_STAGING_BINARY_CACHE) as tf:
+    with terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf:
         init_result = tf.init(
             command_params=command_params,
             module_path=module_path,
