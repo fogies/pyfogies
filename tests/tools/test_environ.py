@@ -85,4 +85,3 @@ def test_environ_allows_changed_when_flag_false() -> None:
         os.environ[name] = "modified"
 
     assert name not in os.environ
-
