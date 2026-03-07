@@ -62,43 +62,45 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
         file_content=expected_file_content,
     )
 
-    with terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf:
+    with (
+        terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf,
+        terraform_tfvars(
+            path=expected_tfvars_path,
+            variables=ToolVars(
+                test_path=str(expected_file_path),
+                test_content=expected_file_content,
+            ),
+        ) as tfvars_path,
+    ):
         init_result = tf.init(
             command_params=command_params,
             module_path=module_path,
         )
         assert init_result.exited == 0, init_result.stderr
 
-        with terraform_tfvars(
-            path=expected_tfvars_path,
-            variables=ToolVars(
-                test_path=str(expected_file_path),
-                test_content=expected_file_content,
-            ),
-        ) as tfvars_path:
-            apply_result = tf.apply(
+        apply_result = tf.apply(
+            command_params=command_params,
+            module_path=module_path,
+            tfvars_path=tfvars_path,
+            auto_approve=True,
+        )
+        try:
+            assert apply_result.exited == 0
+            assert expected_file_path.exists()
+            assert expected_file_path.read_text().strip() == expected_file_content
+
+            tool_output = tf.output(
+                command_params=command_params,
+                module_path=module_path,
+                output_model=ToolOutput,
+            )
+            assert isinstance(tool_output, ToolOutput)
+            assert tool_output == expected_output
+        finally:
+            destroy_result = tf.destroy(
                 command_params=command_params,
                 module_path=module_path,
                 tfvars_path=tfvars_path,
                 auto_approve=True,
             )
-            try:
-                assert apply_result.exited == 0
-                assert expected_file_path.exists()
-                assert expected_file_path.read_text().strip() == expected_file_content
-
-                tool_output = tf.output(
-                    command_params=command_params,
-                    module_path=module_path,
-                    output_model=ToolOutput,
-                )
-                assert isinstance(tool_output, ToolOutput)
-                assert tool_output == expected_output
-            finally:
-                destroy_result = tf.destroy(
-                    command_params=command_params,
-                    module_path=module_path,
-                    tfvars_path=tfvars_path,
-                    auto_approve=True,
-                )
-                assert destroy_result.exited == 0
+            assert destroy_result.exited == 0
