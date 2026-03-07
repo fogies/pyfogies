@@ -32,7 +32,7 @@ class _TerraformCommandOutputEntryModel(BaseModel):
     """One output entry from `terraform output -json`, wrapping a value."""
 
     value: object
-    type: str
+    type: object
     sensitive: bool
 
 
