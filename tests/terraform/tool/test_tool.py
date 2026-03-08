@@ -9,7 +9,9 @@ from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
+    InitParams,
     terraform,
+    terraform_output,
     terraform_tfvars,
 )
 
@@ -44,7 +46,7 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
 def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
     """Apply and then destroy the tooling module using the Terraform tool."""
     command_params = CommandParams(in_stream=False)
-    module_path = pathlib.Path(__file__).parent
+    module_path = pathlib.Path(__file__).parent / "valid"
 
     expected_tfvars_path = tmp_path / "tool.tfvars.json"
     expected_file_path = tmp_path / "test_resource.txt"
@@ -67,6 +69,7 @@ def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
         init_result = tf.init(
             command_params=command_params,
             module_path=module_path,
+            init_params=InitParams(upgrade=True),
         )
         assert init_result.exited == 0, init_result.stderr
 
@@ -101,10 +104,10 @@ def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
 def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
     """Context manager runs init/apply on entry and destroy on exit; test only calls output."""
     command_params = CommandParams(in_stream=False)
-    module_path = pathlib.Path(__file__).parent
+    module_path = pathlib.Path(__file__).parent / "valid"
 
     tfvars_path = tmp_path / "tool.tfvars.json"
-    expected_file_path = tmp_path / "test_resource_entry_exit.txt"
+    expected_file_path = tmp_path / "test_resource.txt"
     expected_file_content = "test_terraform_entry_exit"
     expected_output = _ToolOutput(
         file_path=str(expected_file_path),
@@ -125,6 +128,7 @@ def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
             module_path=module_path,
             tfvars_path=tfvars_path,
             init_on_entry=True,
+            init_params=InitParams(upgrade=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             delete_on_exit=True,
@@ -139,5 +143,47 @@ def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
             module_path=module_path,
             output_model=_ToolOutput,
         )
+        assert isinstance(tool_output, _ToolOutput)
+        assert tool_output == expected_output
+
+
+def test_terraform_output(tmp_path: pathlib.Path) -> None:
+    """terraform_output runs init/apply/output/destroy and returns the output."""
+    command_params = CommandParams(in_stream=False)
+    module_path = pathlib.Path(__file__).parent / "valid"
+
+    tfvars_path = tmp_path / "tool.tfvars.json"
+    expected_file_path = tmp_path / "test_resource_output.txt"
+    expected_file_content = "test_terraform_output"
+    expected_output = _ToolOutput(
+        file_path=str(expected_file_path),
+        file_content=expected_file_content,
+    )
+
+    with (
+        terraform_tfvars(
+            path=tfvars_path,
+            variables=_ToolVars(
+                test_path=str(expected_file_path),
+                test_content=expected_file_content,
+            ),
+        ) as tfvars_path,
+        terraform_output(
+            binary_cache_path=PATH_STAGING_BINARY_CACHE,
+            command_params=command_params,
+            module_path=module_path,
+            tfvars_path=tfvars_path,
+            init_on_entry=True,
+            init_params=InitParams(upgrade=True),
+            apply_on_entry=True,
+            apply_params=ApplyParams(auto_approve=True),
+            delete_on_exit=True,
+            destroy_params=DestroyParams(auto_approve=True),
+            output_model=_ToolOutput,
+        ) as tool_output,
+    ):
+        assert expected_file_path.exists()
+        assert expected_file_path.read_text().strip() == expected_file_content
+
         assert isinstance(tool_output, _ToolOutput)
         assert tool_output == expected_output
