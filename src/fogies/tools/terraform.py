@@ -89,7 +89,7 @@ def terraform_tfvars(
     *,
     path: pathlib.Path,
     variables: BaseModel,
-    delete_on_exit: bool = False,
+    delete_on_exit: bool = True,
 ) -> Iterator[pathlib.Path]:
     """Write in-memory variables to a file and yield the path for use with apply/destroy.
 
