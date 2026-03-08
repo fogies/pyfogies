@@ -175,9 +175,7 @@ class Terraform:
             apply_args.append("-auto-approve")
         if tfvars_path is not None:
             paths = (
-                [tfvars_path]
-                if isinstance(tfvars_path, pathlib.Path)
-                else tfvars_path
+                [tfvars_path] if isinstance(tfvars_path, pathlib.Path) else tfvars_path
             )
             for p in paths:
                 apply_args.extend(["-var-file", str(p)])
@@ -212,9 +210,7 @@ class Terraform:
             destroy_args.append("-auto-approve")
         if tfvars_path is not None:
             paths = (
-                [tfvars_path]
-                if isinstance(tfvars_path, pathlib.Path)
-                else tfvars_path
+                [tfvars_path] if isinstance(tfvars_path, pathlib.Path) else tfvars_path
             )
             for p in paths:
                 destroy_args.extend(["-var-file", str(p)])
@@ -293,17 +289,11 @@ def terraform(
         )
 
     if init_on_entry and (command_params is None or module_path is None):
-        raise ValueError(
-            "init_on_entry requires command_params and module_path"
-        )
+        raise ValueError("init_on_entry requires command_params and module_path")
     if apply_on_entry and (command_params is None or module_path is None):
-        raise ValueError(
-            "apply_on_entry requires command_params and module_path"
-        )
+        raise ValueError("apply_on_entry requires command_params and module_path")
     if delete_on_exit and (command_params is None or module_path is None):
-        raise ValueError(
-            "delete_on_exit requires command_params and module_path"
-        )
+        raise ValueError("delete_on_exit requires command_params and module_path")
 
     exe_name = "terraform_{}.exe".format(version.replace(".", "_"))
     exe_path = binary_cache_path / exe_name
@@ -335,11 +325,7 @@ def terraform(
                 )
             )
 
-    if (
-        apply_on_entry
-        and command_params is not None
-        and module_path is not None
-    ):
+    if apply_on_entry and command_params is not None and module_path is not None:
         apply_result = tf.apply(
             command_params=command_params,
             module_path=module_path,
@@ -357,11 +343,7 @@ def terraform(
     try:
         yield tf
     finally:
-        if (
-            delete_on_exit
-            and command_params is not None
-            and module_path is not None
-        ):
+        if delete_on_exit and command_params is not None and module_path is not None:
             destroy_result = tf.destroy(
                 command_params=command_params,
                 module_path=module_path,
@@ -372,7 +354,6 @@ def terraform(
                 raise RuntimeError(
                     "terraform destroy failed (exit {}): {}".format(
                         destroy_result.exited,
-                        destroy_result.stderr.strip()
-                        or destroy_result.stdout.strip(),
+                        destroy_result.stderr.strip() or destroy_result.stdout.strip(),
                     )
                 )
