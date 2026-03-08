@@ -6,7 +6,12 @@ from paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.tools.command import CommandParams
-from fogies.tools.terraform import ApplyParams, DestroyParams, terraform, terraform_tfvars
+from fogies.tools.terraform import (
+    ApplyParams,
+    DestroyParams,
+    terraform,
+    terraform_tfvars,
+)
 
 
 class _ToolVars(BaseModel):
@@ -39,7 +44,7 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
 def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
     """Apply and then destroy the tooling module using the Terraform tool."""
     command_params = CommandParams(in_stream=False)
-    module_path = pathlib.Path(__file__).parent / "tool"
+    module_path = pathlib.Path(__file__).parent
 
     expected_tfvars_path = tmp_path / "tool.tfvars.json"
     expected_file_path = tmp_path / "test_resource.txt"
@@ -96,7 +101,7 @@ def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
 def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
     """Context manager runs init/apply on entry and destroy on exit; test only calls output."""
     command_params = CommandParams(in_stream=False)
-    module_path = pathlib.Path(__file__).parent / "tool"
+    module_path = pathlib.Path(__file__).parent
 
     tfvars_path = tmp_path / "tool.tfvars.json"
     expected_file_path = tmp_path / "test_resource_entry_exit.txt"
