@@ -312,51 +312,30 @@ def terraform(
     tf = Terraform(version=version, path=exe_path)
 
     if init_on_entry and command_params is not None and module_path is not None:
-        init_result = tf.init(
+        _ = tf.init(
             command_params=command_params,
             module_path=module_path,
             init_params=init_params,
         )
-        if init_result.exited != 0:
-            raise RuntimeError(
-                "terraform init failed (exit {}): {}".format(
-                    init_result.exited,
-                    init_result.stderr.strip() or init_result.stdout.strip(),
-                )
-            )
 
     if apply_on_entry and command_params is not None and module_path is not None:
-        apply_result = tf.apply(
+        _ = tf.apply(
             command_params=command_params,
             module_path=module_path,
             tfvars_path=tfvars_path,
             apply_params=apply_params,
         )
-        if apply_result.exited != 0:
-            raise RuntimeError(
-                "terraform apply failed (exit {}): {}".format(
-                    apply_result.exited,
-                    apply_result.stderr.strip() or apply_result.stdout.strip(),
-                )
-            )
 
     try:
         yield tf
     finally:
         if delete_on_exit and command_params is not None and module_path is not None:
-            destroy_result = tf.destroy(
+            _ = tf.destroy(
                 command_params=command_params,
                 module_path=module_path,
                 tfvars_path=tfvars_path,
                 destroy_params=destroy_params,
             )
-            if destroy_result.exited != 0:
-                raise RuntimeError(
-                    "terraform destroy failed (exit {}): {}".format(
-                        destroy_result.exited,
-                        destroy_result.stderr.strip() or destroy_result.stdout.strip(),
-                    )
-                )
 
 
 @contextmanager

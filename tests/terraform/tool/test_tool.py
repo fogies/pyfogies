@@ -2,6 +2,10 @@
 
 import pathlib
 
+import pytest
+
+from invoke.exceptions import UnexpectedExit
+
 from paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
@@ -187,3 +191,36 @@ def test_terraform_output(tmp_path: pathlib.Path) -> None:
 
         assert isinstance(tool_output, _ToolOutput)
         assert tool_output == expected_output
+
+
+def test_terraform_output_invalid_module_raises(tmp_path: pathlib.Path) -> None:
+    """terraform_output with invalid module raises when apply fails."""
+    command_params = CommandParams(in_stream=False)
+    module_path = pathlib.Path(__file__).parent / "invalid"
+
+    tfvars_path = tmp_path / "tool.tfvars.json"
+    expected_file_path = tmp_path / "test_resource_invalid.txt"
+    expected_file_content = "test_terraform_output_invalid"
+
+    with terraform_tfvars(
+        path=tfvars_path,
+        variables=_ToolVars(
+            test_path=str(expected_file_path),
+            test_content=expected_file_content,
+        ),
+    ) as tfvars_path:
+        with pytest.raises(UnexpectedExit):
+            with terraform_output(
+                binary_cache_path=PATH_STAGING_BINARY_CACHE,
+                command_params=command_params,
+                module_path=module_path,
+                tfvars_path=tfvars_path,
+                init_on_entry=True,
+                init_params=InitParams(upgrade=True),
+                apply_on_entry=True,
+                apply_params=ApplyParams(auto_approve=True),
+                delete_on_exit=True,
+                destroy_params=DestroyParams(auto_approve=True),
+                output_model=_ToolOutput,
+            ) as _:
+                pass
