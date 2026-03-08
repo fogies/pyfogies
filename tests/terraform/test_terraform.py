@@ -6,7 +6,7 @@ from paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.tools.command import CommandParams
-from fogies.tools.terraform import terraform, terraform_tfvars
+from fogies.tools.terraform import ApplyParams, DestroyParams, terraform, terraform_tfvars
 
 
 def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
@@ -46,7 +46,6 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
     )
 
     with (
-        terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf,
         terraform_tfvars(
             path=expected_tfvars_path,
             variables=ToolVars(
@@ -54,6 +53,7 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
                 test_content=expected_file_content,
             ),
         ) as tfvars_path,
+        terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf,
     ):
         init_result = tf.init(
             command_params=command_params,
@@ -65,7 +65,7 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
             command_params=command_params,
             module_path=module_path,
             tfvars_path=tfvars_path,
-            auto_approve=True,
+            apply_params=ApplyParams(auto_approve=True),
         )
         try:
             assert apply_result.exited == 0
@@ -84,6 +84,6 @@ def test_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
                 command_params=command_params,
                 module_path=module_path,
                 tfvars_path=tfvars_path,
-                auto_approve=True,
+                destroy_params=DestroyParams(auto_approve=True),
             )
             assert destroy_result.exited == 0
