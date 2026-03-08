@@ -357,3 +357,45 @@ def terraform(
                         destroy_result.stderr.strip() or destroy_result.stdout.strip(),
                     )
                 )
+
+
+@contextmanager
+def terraform_output(
+    *,
+    version: str = _DEFAULT_VERSION,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: bool = False,
+    apply_params: ApplyParams | None = None,
+    delete_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+) -> Iterator[TerraformOutputModel]:
+    """Run the terraform context manager, call output() internally, and yield the parsed result.
+
+    All entry/exit parameters are passed through to terraform(); the caller
+    sets *init_on_entry*, *apply_on_entry*, and *delete_on_exit* as needed.
+    Yields the output model; destroy runs on exit when *delete_on_exit* is true.
+    """
+    with terraform(
+        version=version,
+        binary_cache_path=binary_cache_path,
+        command_params=command_params,
+        module_path=module_path,
+        tfvars_path=tfvars_path,
+        init_on_entry=init_on_entry,
+        init_params=init_params,
+        apply_on_entry=apply_on_entry,
+        apply_params=apply_params,
+        delete_on_exit=delete_on_exit,
+        destroy_params=destroy_params,
+    ) as tf:
+        yield tf.output(
+            command_params=command_params,
+            module_path=module_path,
+            output_model=output_model,
+        )
