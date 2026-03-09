@@ -1,4 +1,4 @@
-variable "name_prefix" {
+variable "name" {
   description = "Base prefix for backend resources (used to derive bucket and lock names)."
   type        = string
 }

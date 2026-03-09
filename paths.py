@@ -8,6 +8,9 @@ PATH_SECRETS = Path("secrets")
 # Path to the AWS profile secrets configuration file.
 PATH_SECRETS_AWS = PATH_SECRETS / "aws.toml"
 
+# AWS profile name for pyfogies test environment.
+SECRETS_AWS_PROFILE_PYFOGIES_TEST = "pyfogies-test"
+
 # Path to the Poetry secrets configuration file.
 PATH_SECRETS_POETRY = PATH_SECRETS / "poetry.toml"
 

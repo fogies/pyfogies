@@ -3,9 +3,7 @@
 import pathlib
 
 import pytest
-
 from invoke.exceptions import UnexpectedExit
-
 from paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 

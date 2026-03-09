@@ -1,5 +1,5 @@
 resource "aws_dynamodb_table" "lock" {
-  name         = "${var.name_prefix}-lock"
+  name         = "${var.name}-lock"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 
@@ -10,7 +10,7 @@ resource "aws_dynamodb_table" "lock" {
 
   tags = merge(
     {
-      Name = "${var.name_prefix}-lock"
+      Name = "${var.name}-lock"
     },
     var.tags,
   )
