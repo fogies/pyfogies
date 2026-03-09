@@ -1,12 +1,12 @@
 # Use a single bucket. 
-# Different state will be stored using keys.
+# Different states will be stored using keys.
 resource "aws_s3_bucket" "state" {
-  bucket        = "${var.name_prefix}-bucket"
+  bucket        = "${var.name}-bucket"
   force_destroy = var.force_destroy
 
   tags = merge(
     {
-      Name = "${var.name_prefix}-bucket"
+      Name = "${var.name}-bucket"
     },
     var.tags,
   )
@@ -42,4 +42,3 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
     }
   }
 }
-
