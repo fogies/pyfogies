@@ -17,6 +17,7 @@ packages = [
 
 [tool.poetry.dependencies]
 pydantic = "^2.12.5"
+ollama = "^0.6.1"
 
 [tool.poetry.group.dev.dependencies]
 # ^ allows all minor and patch releases.
