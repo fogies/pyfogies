@@ -4,7 +4,6 @@ import pathlib
 from collections.abc import Iterator
 
 import pytest
-from invoke.exceptions import UnexpectedExit
 from paths import (
     PATH_STAGING_BINARY_CACHE,
 )
@@ -38,7 +37,8 @@ class _TestStateOutput(BaseModel):
     test_value: str
 
 
-_BACKEND_NAME = "pyfogies-test-backend"
+_BACKEND_REGION = "us-west-2"
+_BACKEND_NAME = "test-backend-backend"
 _BACKEND_STATES = ["test-state-a", "test-state-b"]
 
 
@@ -57,15 +57,15 @@ def backend_output(
     with (
         terraform_tfbackend_s3(
             path=tfbackend_path,
-            region=_BACKEND_REGION,
-            bucket=pyfogies_test_backend.bucket_name,
-            key="test-backend-key",
+            backend=pyfogies_test_backend,
+            state="test-backend",
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
             variables=_TestBackendVars(
                 backend=BackendVars(
                     name=_BACKEND_NAME,
+                    region=_BACKEND_REGION,
                     states=_BACKEND_STATES,
                     tags={},
                     # force_destroy can be used here
@@ -95,7 +95,10 @@ def backend_output(
 
 def test_backend_output(backend_output: BackendOutput) -> None:
     """Backend module output matches expected bucket and state keys."""
-    expected_bucket_name = "{}-bucket".format(_BACKEND_NAME)
+    expected_bucket_name = "{}-bucket-{}".format(
+        _BACKEND_NAME,
+        _BACKEND_REGION,
+    )
     expected_state_keys = {s: "{}/terraform.tfstate".format(s) for s in _BACKEND_STATES}
 
     assert isinstance(backend_output, BackendOutput)
@@ -126,15 +129,13 @@ def test_state_a_and_state_b(
     with (
         terraform_tfbackend_s3(
             path=tfbackend_a_path,
-            region=_BACKEND_REGION,
-            bucket=backend_output.bucket_name,
-            key=backend_output.state_keys["test-state-a"],
+            backend=backend_output,
+            state="test-state-a",
         ) as tfbackend_a_path,
         terraform_tfbackend_s3(
             path=tfbackend_b_path,
-            region=_BACKEND_REGION,
-            bucket=backend_output.bucket_name,
-            key=backend_output.state_keys["test-state-b"],
+            backend=backend_output,
+            state="test-state-b",
         ) as tfbackend_b_path,
         terraform_tfvars(
             path=tfvars_a,
@@ -179,10 +180,6 @@ def test_state_a_and_state_b(
         assert output_b.test_value == expected_value_b
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Have not implemented enforcement of key prefix. Found S3 bucket policies did not support without additional IAM configuration.",
-)
 def test_invalid_state_c(
     backend_output: BackendOutput,
     tmp_path: pathlib.Path,
@@ -191,38 +188,15 @@ def test_invalid_state_c(
     # Ensure backend fixture.
     assert backend_output is not None
 
-    command_params = CommandParams(in_stream=False)
-    module_path = pathlib.Path(__file__).parent / "invalid_state_c"
-
     tfbackend_c_path = tmp_path / "invalid_state_c.s3.tfbackend"
-    tfvars_c = tmp_path / "invalid_state_c.tfvars.json"
 
-    with pytest.raises(UnexpectedExit):
+    with pytest.raises(ValueError):
         with (
-            terraform_tfbackend_s3(
+            terraform_tfbackend_s3( 
                 path=tfbackend_c_path,
-                region=_BACKEND_REGION,
-                bucket=backend_output.bucket_name,
-                key="invalid_state_c/terraform.tfstate",
+                backend=backend_output,
+                state="invalid_state_c",
             ) as tfbackend_c_path,
-            terraform_tfvars(
-                path=tfvars_c,
-                variables=_TestStateVars(test_value="test-invalid-state-c"),
-            ) as tfvars_c,
-            terraform_output(
-                binary_cache_path=PATH_STAGING_BINARY_CACHE,
-                command_params=command_params,
-                module_path=module_path,
-                tfvars_path=tfvars_c,
-                tfbackend_path=tfbackend_c_path,
-                init_on_entry=True,
-                init_params=InitParams(upgrade=True, reconfigure=True,),
-                apply_on_entry=True,
-                apply_params=ApplyParams(auto_approve=True),
-                delete_on_exit=True,
-                destroy_params=DestroyParams(auto_approve=True),
-                output_model=_TestStateOutput,
-            ) as _,
         ):
             # Apply should fail.
             pass

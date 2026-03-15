@@ -1,12 +1,15 @@
 # Use a single bucket. 
 # Different states will be stored using keys.
 resource "aws_s3_bucket" "state" {
-  bucket        = "${var.name}-bucket"
+  # We include the region in the bucket name
+  # because of the large delays associated with deleting and creating a bucket in a different region.
+  # This ensures a unique name in any region.
+  bucket        = "${var.name}-bucket-${var.region}"
   force_destroy = var.force_destroy
 
   tags = merge(
     {
-      Name = "${var.name}-bucket"
+      Name = "${var.name}-bucket-${var.region}"
     },
     var.tags,
   )
