@@ -9,10 +9,15 @@ terraform {
   }
 }
 
+provider "aws" {
+  region = var.backend.region
+}
+
 variable "backend" {
   description = "Backend configuration."
   type = object({
     name          = string
+    region        = string
     states        = list(string)
     tags          = map(string)
     force_destroy = bool
@@ -23,6 +28,7 @@ module "backend" {
   source = "../../../terraform/backend"
 
   name          = var.backend.name
+  region        = var.backend.region
   states        = var.backend.states
   tags          = var.backend.tags
   force_destroy = var.backend.force_destroy
