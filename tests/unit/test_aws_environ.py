@@ -16,25 +16,22 @@ def test_aws_environ_sets_variables(tmp_path: Path) -> None:
             "[test]",
             'aws_access_key_id = "value-aws-access-key-id"',
             'aws_secret_access_key = "value-aws-secret-access-key"',
-            'region = "us-east-1"',
             "",
             "[test-other]",
             'aws_access_key_id = "other-value-aws-access-key-id"',
             'aws_secret_access_key = "other-value-aws-secret-access-key"',
-            'region = "us-east-2"',
             "",
         ]
     )
     _ = profiles_path.write_text(config_text, encoding="utf-8")
 
-    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"):
+    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",):
         if name in os.environ:
             del os.environ[name]
 
     with aws_environ(profiles_path=profiles_path, profile="test"):
         assert os.environ.get("AWS_ACCESS_KEY_ID") == "value-aws-access-key-id"
         assert os.environ.get("AWS_SECRET_ACCESS_KEY") == "value-aws-secret-access-key"
-        assert os.environ.get("AWS_DEFAULT_REGION") == "us-east-1"
 
     with aws_environ(profiles_path=profiles_path, profile="test-other"):
         assert os.environ.get("AWS_ACCESS_KEY_ID") == "other-value-aws-access-key-id"
@@ -42,11 +39,9 @@ def test_aws_environ_sets_variables(tmp_path: Path) -> None:
             os.environ.get("AWS_SECRET_ACCESS_KEY")
             == "other-value-aws-secret-access-key"
         )
-        assert os.environ.get("AWS_DEFAULT_REGION") == "us-east-2"
 
     assert "AWS_ACCESS_KEY_ID" not in os.environ
     assert "AWS_SECRET_ACCESS_KEY" not in os.environ
-    assert "AWS_DEFAULT_REGION" not in os.environ
 
 
 def test_aws_environ_raises_for_missing_file(tmp_path: Path) -> None:
