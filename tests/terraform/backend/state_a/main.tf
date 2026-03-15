@@ -2,10 +2,6 @@ terraform {
   required_version = "~> 1.14.0"
 
   backend "s3" {
-    bucket         = "pyfogies-test-backend-bucket"
-    key            = "test-state-a/terraform.tfstate"
-    dynamodb_table = "pyfogies-test-backend-lock"
-    region         = "us-east-1"
   }
 
   required_providers {
