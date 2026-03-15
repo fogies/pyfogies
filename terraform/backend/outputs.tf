@@ -3,6 +3,11 @@ output "bucket_name" {
   value       = aws_s3_bucket.state.id
 }
 
+output "region" {
+  description = "AWS region in which the backend resources were created."
+  value       = var.region
+}
+
 output "state_keys" {
   description = "Map of logical state name to key prefix in the state bucket."
   value = {

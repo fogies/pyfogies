@@ -3,6 +3,11 @@ variable "name" {
   type        = string
 }
 
+variable "region" {
+  description = "AWS region in which to create backend resources."
+  type        = string
+}
+
 variable "states" {
   description = "Logical names of Terraform states to manage within this backend."
   type        = list(string)
