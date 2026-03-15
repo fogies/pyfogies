@@ -12,5 +12,4 @@ class BackendVars(BaseModel):
 
 class BackendOutput(BaseModel):
     bucket_name: str
-    lock_name: str
     state_keys: dict[str, str]

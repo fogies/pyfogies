@@ -1,5 +1,5 @@
 variable "name" {
-  description = "Base prefix for backend resources (used to derive bucket and lock names)."
+  description = "Base prefix for backend resources (used to derive bucket name)."
   type        = string
 }
 
