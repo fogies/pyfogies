@@ -6,20 +6,18 @@ from collections.abc import Iterator
 import pytest
 from invoke.exceptions import UnexpectedExit
 from paths import (
-    PATH_SECRETS_AWS,
     PATH_STAGING_BINARY_CACHE,
-    SECRETS_AWS_PROFILE_PYFOGIES_TEST,
 )
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput, BackendVars
-from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
     terraform_output,
+    terraform_tfbackend_s3,
     terraform_tfvars,
 )
 
@@ -46,18 +44,23 @@ _BACKEND_STATES = ["test-state-a", "test-state-b"]
 
 @pytest.fixture(scope="module")
 def backend_output(
+    pyfogies_test_backend: BackendOutput,
     tmp_path_factory: pytest.TempPathFactory,
-) -> Iterator[_TestBackendOutput]:
+) -> Iterator[BackendOutput]:
     """Apply the backend module; yield output; destroy on teardown."""
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent / "backend"
-    tmp_path = tmp_path_factory.mktemp("backend")
-    tfvars_path = tmp_path / "backend.tfvars.json"
+    tmp_path = tmp_path_factory.mktemp("test-backend")
+    tfbackend_path = tmp_path / "test-backend.s3.tfbackend"
+    tfvars_path = tmp_path / "test-backend.tfvars.json"
 
     with (
-        aws_environ(
-            profiles_path=PATH_SECRETS_AWS, profile=SECRETS_AWS_PROFILE_PYFOGIES_TEST
-        ),
+        terraform_tfbackend_s3(
+            path=tfbackend_path,
+            region=_BACKEND_REGION,
+            bucket=pyfogies_test_backend.bucket_name,
+            key="test-backend-key",
+        ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
             variables=_TestBackendVars(
@@ -65,6 +68,9 @@ def backend_output(
                     name=_BACKEND_NAME,
                     states=_BACKEND_STATES,
                     tags={},
+                    # force_destroy can be used here
+                    # because their are no AWS resources created in tests.
+                    # There is nothing that could be orphaned by a deletion.
                     force_destroy=True,
                 ),
             ),
@@ -74,8 +80,9 @@ def backend_output(
             command_params=command_params,
             module_path=module_path,
             tfvars_path=tfvars_path,
+            tfbackend_path=tfbackend_path,
             init_on_entry=True,
-            init_params=InitParams(upgrade=True),
+            init_params=InitParams(upgrade=True, reconfigure=True,),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             delete_on_exit=True,
@@ -83,23 +90,21 @@ def backend_output(
             output_model=_TestBackendOutput,
         ) as output,
     ):
-        yield output
+        yield output.backend
 
 
-def test_backend_output(backend_output: _TestBackendOutput) -> None:
-    """Backend module output matches expected bucket, lock, and state keys."""
+def test_backend_output(backend_output: BackendOutput) -> None:
+    """Backend module output matches expected bucket and state keys."""
     expected_bucket_name = "{}-bucket".format(_BACKEND_NAME)
-    expected_lock_name = "{}-lock".format(_BACKEND_NAME)
     expected_state_keys = {s: "{}/terraform.tfstate".format(s) for s in _BACKEND_STATES}
 
-    assert isinstance(backend_output, _TestBackendOutput)
-    assert backend_output.backend.bucket_name == expected_bucket_name
-    assert backend_output.backend.lock_name == expected_lock_name
-    assert backend_output.backend.state_keys == expected_state_keys
+    assert isinstance(backend_output, BackendOutput)
+    assert backend_output.bucket_name == expected_bucket_name
+    assert backend_output.state_keys == expected_state_keys
 
 
 def test_state_a_and_state_b(
-    backend_output: _TestBackendOutput,
+    backend_output: BackendOutput,
     tmp_path: pathlib.Path,
 ) -> None:
     """Apply state_a and state_b, using backend bucket."""
@@ -111,12 +116,26 @@ def test_state_a_and_state_b(
     state_a_module_path = backend_path / "state_a"
     state_b_module_path = backend_path / "state_b"
 
+    tfbackend_a_path = tmp_path / "state_a.s3.tfbackend"
+    tfbackend_b_path = tmp_path / "state_b.s3.tfbackend"
     tfvars_a = tmp_path / "state_a.tfvars.json"
     tfvars_b = tmp_path / "state_b.tfvars.json"
     expected_value_a = "test-state-a"
     expected_value_b = "test-state-b"
 
     with (
+        terraform_tfbackend_s3(
+            path=tfbackend_a_path,
+            region=_BACKEND_REGION,
+            bucket=backend_output.bucket_name,
+            key=backend_output.state_keys["test-state-a"],
+        ) as tfbackend_a_path,
+        terraform_tfbackend_s3(
+            path=tfbackend_b_path,
+            region=_BACKEND_REGION,
+            bucket=backend_output.bucket_name,
+            key=backend_output.state_keys["test-state-b"],
+        ) as tfbackend_b_path,
         terraform_tfvars(
             path=tfvars_a,
             variables=_TestStateVars(test_value=expected_value_a),
@@ -130,8 +149,9 @@ def test_state_a_and_state_b(
             command_params=command_params,
             module_path=state_a_module_path,
             tfvars_path=tfvars_a,
+            tfbackend_path=tfbackend_a_path,
             init_on_entry=True,
-            init_params=InitParams(upgrade=True),
+            init_params=InitParams(upgrade=True, reconfigure=True,),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             delete_on_exit=True,
@@ -143,8 +163,9 @@ def test_state_a_and_state_b(
             command_params=command_params,
             module_path=state_b_module_path,
             tfvars_path=tfvars_b,
+            tfbackend_path=tfbackend_b_path,
             init_on_entry=True,
-            init_params=InitParams(upgrade=True),
+            init_params=InitParams(upgrade=True, reconfigure=True,),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             delete_on_exit=True,
@@ -163,7 +184,7 @@ def test_state_a_and_state_b(
     reason="Have not implemented enforcement of key prefix. Found S3 bucket policies did not support without additional IAM configuration.",
 )
 def test_invalid_state_c(
-    backend_output: _TestBackendOutput,
+    backend_output: BackendOutput,
     tmp_path: pathlib.Path,
 ) -> None:
     """Applying invalid_state_c fails due to disallowed key prefix."""
@@ -173,10 +194,17 @@ def test_invalid_state_c(
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent / "invalid_state_c"
 
+    tfbackend_c_path = tmp_path / "invalid_state_c.s3.tfbackend"
     tfvars_c = tmp_path / "invalid_state_c.tfvars.json"
 
     with pytest.raises(UnexpectedExit):
         with (
+            terraform_tfbackend_s3(
+                path=tfbackend_c_path,
+                region=_BACKEND_REGION,
+                bucket=backend_output.bucket_name,
+                key="invalid_state_c/terraform.tfstate",
+            ) as tfbackend_c_path,
             terraform_tfvars(
                 path=tfvars_c,
                 variables=_TestStateVars(test_value="test-invalid-state-c"),
@@ -186,8 +214,9 @@ def test_invalid_state_c(
                 command_params=command_params,
                 module_path=module_path,
                 tfvars_path=tfvars_c,
+                tfbackend_path=tfbackend_c_path,
                 init_on_entry=True,
-                init_params=InitParams(upgrade=True),
+                init_params=InitParams(upgrade=True, reconfigure=True,),
                 apply_on_entry=True,
                 apply_params=ApplyParams(auto_approve=True),
                 delete_on_exit=True,

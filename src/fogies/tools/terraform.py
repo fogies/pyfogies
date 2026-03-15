@@ -20,6 +20,8 @@ from fogies.tools.command import CommandParams, command_run
 class InitParams:
     """Params for terraform init."""
 
+    migrate_state: bool = False
+    reconfigure: bool = False
     upgrade: bool = False
 
 
@@ -65,23 +67,36 @@ class _TerraformCommandOutputModel(
     """Root model for the full `terraform output -json` payload."""
 
 
-def _write_tfvars(
+@contextmanager
+def terraform_tfbackend_s3(
     *,
     path: pathlib.Path,
-    variables: BaseModel,
-) -> None:
-    """Write Terraform variables to a .tfvars.json file.
+    region: str,
+    bucket: str,
+    key: str,
+    delete_on_exit: bool = True,
+) -> Iterator[pathlib.Path]:
+    """Write S3 backend configuration to a file and yield the path.
 
-    *path* is the output file path (use a .tfvars.json suffix so Terraform
-    accepts it with -var-file). *variables* is a Pydantic model; its fields
-    are written as the Terraform variable set (nested models are serialized).
+    The file is written as flat key/value entries, one per line, e.g.:
+
+    region = "us-west-2"
+    bucket = "pyfogies-test-backend-bucket"
+    key = "test-state-a/terraform.tfstate"
+    use_lockfile = true
     """
-    suffixes = path.suffixes
-    if suffixes[-2:] != [".tfvars", ".json"]:
-        raise ValueError("Path '{}' must end with '.tfvars.json'".format(path))
+    if path.suffixes[-2:] != [".s3", ".tfbackend"]:
+        raise ValueError("Path '{}' must end with '.s3.tfbackend'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:
-        json.dump(variables.model_dump(mode="json"), f, indent=2)
+        _ = f.write('region = "{}"\n'.format(region))
+        _ = f.write('bucket = "{}"\n'.format(bucket))
+        _ = f.write('key = "{}"\n'.format(key))
+    try:
+        yield path
+    finally:
+        if delete_on_exit and path.exists():
+            path.unlink()
 
 
 @contextmanager
@@ -99,7 +114,12 @@ def terraform_tfvars(
     or destroy(). If *delete_on_exit* is true, remove the file when exiting the
     context.
     """
-    _write_tfvars(path=path, variables=variables)
+    suffixes = path.suffixes
+    if suffixes[-2:] != [".tfvars", ".json"]:
+        raise ValueError("Path '{}' must end with '.tfvars.json'".format(path))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        json.dump(variables.model_dump(mode="json"), f, indent=2)
     try:
         yield path
     finally:
@@ -132,17 +152,28 @@ class Terraform:
         *,
         command_params: CommandParams,
         module_path: pathlib.Path,
+        tfbackend_path: pathlib.Path | None = None,
         init_params: InitParams | None = None,
     ) -> Result:
         """Run terraform init.
 
         *module_path* is the folder containing the Terraform files.
+        *init_params.migrate_state* when true passes -migrate-state to terraform init.
+        *init_params.reconfigure* when true passes -reconfigure to terraform init.
         *init_params.upgrade* when true passes -upgrade to terraform init.
+        *tfbackend_path* when set passes -backend-config=<path> to terraform
+        init, where <path> is a backend configuration file.
         """
         command_params = command_params.require_cwd(module_path)
         if init_params is None:
             init_params = InitParams()
         init_args = ["init"]
+        if tfbackend_path is not None:
+            init_args.extend(["-backend-config", str(tfbackend_path)])
+        if init_params.migrate_state:
+            init_args.append("-migrate-state")
+        if init_params.reconfigure:
+            init_args.append("-reconfigure")
         if init_params.upgrade:
             init_args.append("-upgrade")
         return command_run(
@@ -259,6 +290,7 @@ def terraform(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams | None = None,
     module_path: pathlib.Path | None = None,
+    tfbackend_path: pathlib.Path | None = None,
     tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
     init_on_entry: bool = False,
     init_params: InitParams | None = None,
@@ -272,9 +304,10 @@ def terraform(
     If *init_on_entry* is true, run init after preparing the binary; requires
     *command_params* and *module_path*. If *apply_on_entry* is true, run
     apply after init; requires *command_params* and *module_path*.
-    *tfvars_path* is optional for apply. If *delete_on_exit* is true, run
-    destroy when exiting the context; requires *command_params* and
-    *module_path*. *tfvars_path* is optional for destroy.
+    *tfbackend_path* is optional for init and, when set, is passed as
+    -backend-config=<path>. *tfvars_path* is optional for apply. If
+    *delete_on_exit* is true, run destroy when exiting the context; requires
+    *command_params* and *module_path*. *tfvars_path* is optional for destroy.
     """
     if sys.platform != "win32":
         raise RuntimeError("Only implemented on Windows")
@@ -311,14 +344,19 @@ def terraform(
 
     tf = Terraform(version=version, path=exe_path)
 
-    if init_on_entry and command_params is not None and module_path is not None:
+    if init_on_entry:
+        assert command_params is not None
+        assert module_path is not None
         _ = tf.init(
             command_params=command_params,
             module_path=module_path,
+            tfbackend_path=tfbackend_path,
             init_params=init_params,
         )
 
-    if apply_on_entry and command_params is not None and module_path is not None:
+    if apply_on_entry:
+        assert command_params is not None
+        assert module_path is not None
         _ = tf.apply(
             command_params=command_params,
             module_path=module_path,
@@ -329,7 +367,9 @@ def terraform(
     try:
         yield tf
     finally:
-        if delete_on_exit and command_params is not None and module_path is not None:
+        if delete_on_exit:
+            assert command_params is not None
+            assert module_path is not None
             _ = tf.destroy(
                 command_params=command_params,
                 module_path=module_path,
@@ -345,6 +385,7 @@ def terraform_output(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams,
     module_path: pathlib.Path,
+    tfbackend_path: pathlib.Path | None = None,
     tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
     init_on_entry: bool = False,
     init_params: InitParams | None = None,
@@ -365,6 +406,7 @@ def terraform_output(
         binary_cache_path=binary_cache_path,
         command_params=command_params,
         module_path=module_path,
+        tfbackend_path=tfbackend_path,
         tfvars_path=tfvars_path,
         init_on_entry=init_on_entry,
         init_params=init_params,

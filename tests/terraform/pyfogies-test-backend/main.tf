@@ -1,9 +1,6 @@
 terraform {
   required_version = "~> 1.14.0"
 
-  backend "s3" {
-  }
-
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -23,7 +20,7 @@ variable "backend" {
 }
 
 module "backend" {
-  source = "../../../../terraform/backend"
+  source = "../../../terraform/backend"
 
   name          = var.backend.name
   states        = var.backend.states
