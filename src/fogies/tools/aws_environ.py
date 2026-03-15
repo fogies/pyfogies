@@ -13,7 +13,6 @@ from fogies.tools.environ import environ
 class _AwsProfile(BaseModel):
     aws_access_key_id: str
     aws_secret_access_key: str
-    region: str
 
 
 def _load_aws_profile_from_toml(profiles_path: Path, profile: str) -> _AwsProfile:
@@ -24,7 +23,6 @@ def _load_aws_profile_from_toml(profiles_path: Path, profile: str) -> _AwsProfil
     [test]
     aws_access_key_id = "value-id"
     aws_secret_access_key = "value-secret"
-    region = "us-west-2"
     """
     if profiles_path.suffix != ".toml":
         raise ValueError(
@@ -73,7 +71,6 @@ def aws_environ(
     variables: dict[str, str] = {
         "AWS_ACCESS_KEY_ID": aws_profile.aws_access_key_id,
         "AWS_SECRET_ACCESS_KEY": aws_profile.aws_secret_access_key,
-        "AWS_DEFAULT_REGION": aws_profile.region,
     }
     return environ(
         variables=variables,
