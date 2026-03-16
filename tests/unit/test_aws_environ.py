@@ -8,7 +8,9 @@ import pytest
 from fogies.tools.aws_environ import aws_environ
 
 
-def test_aws_environ_sets_variables(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_aws_environ_sets_variables(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """aws_environ loads variables from a TOML profiles file using environ."""
 
     # Start from a clean environment for these variables within this test.
