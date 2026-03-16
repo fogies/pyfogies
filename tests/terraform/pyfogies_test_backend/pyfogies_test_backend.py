@@ -8,19 +8,13 @@ from typing import cast
 import boto3
 import pytest
 from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
-from pydantic import BaseModel
-
-from tests.terraform.backend import (
-    PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
-)
-
 from paths import (
     AWS_PROFILE_PYFOGIES_TEST,
     PATH_SECRETS_AWS,
     PATH_STAGING_BINARY_CACHE,
 )
+from pydantic import BaseModel
+
 from fogies.terraform.backend import BackendOutput, BackendVars
 from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
@@ -30,6 +24,11 @@ from fogies.tools.terraform import (
     InitParams,
     terraform_output,
     terraform_tfvars,
+)
+from tests.terraform.backend import (
+    PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
+    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
+    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
 )
 
 
@@ -60,10 +59,12 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
         resources = cast(list[object], state_json.get("resources", []))
 
         if len(resources) > 0:
-            msg = "In fixture teardown, state '{}' still has {} resource(s).\n{}".format(
-                state_name,
-                len(resources),
-                json.dumps(resources, indent=2),
+            msg = (
+                "In fixture teardown, state '{}' still has {} resource(s).\n{}".format(
+                    state_name,
+                    len(resources),
+                    json.dumps(resources, indent=2),
+                )
             )
             pytest.fail(msg)
 
@@ -71,9 +72,9 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
     state_keys = set(backend.state_keys.values())
     lock_keys = {"{}.tflock".format(key) for key in state_keys}
     keys_to_delete = state_keys | lock_keys
-        
+
     # Bucket has versioning enabled; delete all versions and delete markers.
-    objects_to_delete: list[ObjectIdentifierTypeDef] = []    
+    objects_to_delete: list[ObjectIdentifierTypeDef] = []
     paginator = client.get_paginator("list_object_versions")
     for page in paginator.paginate(Bucket=backend.bucket_name):
         for version in page.get("Versions") or []:
@@ -86,7 +87,7 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
             version_id = marker.get("VersionId")
             if key in keys_to_delete and version_id is not None:
                 objects_to_delete.append({"Key": key, "VersionId": version_id})
-    
+
     # Perform the deletions.
     for i in range(0, len(objects_to_delete), 1000):
         _ = client.delete_objects(
@@ -142,7 +143,7 @@ def pyfogies_test_backend(
             output_model=_PyFogiesTestBackendOutput,
         ) as output,
     ):
-        try: 
+        try:
             yield output.backend
         finally:
             # Verify that backend states are empty, then delete bucket contents so Terraform can destroy it.

@@ -2,7 +2,7 @@
 
 import pathlib
 from collections.abc import Iterator
-from tests.terraform.backend import PYFOGIES_TEST_TERRAFORM_BACKEND_STATES, PYFOGIES_TEST_TERRAFORM_BACKEND_REGION
+
 import pytest
 from paths import (
     PATH_STAGING_BINARY_CACHE,
@@ -18,6 +18,10 @@ from fogies.tools.terraform import (
     terraform_output,
     terraform_tfbackend_s3,
     terraform_tfvars,
+)
+from tests.terraform.backend import (
+    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
+    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
 )
 
 
@@ -83,7 +87,10 @@ def nested_backend_output(
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
             init_on_entry=True,
-            init_params=InitParams(upgrade=True, reconfigure=True,),
+            init_params=InitParams(
+                upgrade=True,
+                reconfigure=True,
+            ),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             delete_on_exit=True,
@@ -100,7 +107,9 @@ def test_backend_output(nested_backend_output: BackendOutput) -> None:
         _TEST_BACKEND_NESTED_BACKEND_NAME,
         _TEST_BACKEND_REGION,
     )
-    expected_state_keys = {s: "{}/terraform.tfstate".format(s) for s in _TEST_BACKEND_NESTED_BACKEND_STATES}
+    expected_state_keys = {
+        s: "{}/terraform.tfstate".format(s) for s in _TEST_BACKEND_NESTED_BACKEND_STATES
+    }
 
     assert isinstance(nested_backend_output, BackendOutput)
     assert nested_backend_output.bucket_name == expected_bucket_name
@@ -153,7 +162,10 @@ def test_state_a_and_state_b(
             tfvars_path=tfvars_a,
             tfbackend_path=tfbackend_a_path,
             init_on_entry=True,
-            init_params=InitParams(upgrade=True, reconfigure=True,),
+            init_params=InitParams(
+                upgrade=True,
+                reconfigure=True,
+            ),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             delete_on_exit=True,
@@ -167,7 +179,10 @@ def test_state_a_and_state_b(
             tfvars_path=tfvars_b,
             tfbackend_path=tfbackend_b_path,
             init_on_entry=True,
-            init_params=InitParams(upgrade=True, reconfigure=True,),
+            init_params=InitParams(
+                upgrade=True,
+                reconfigure=True,
+            ),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             delete_on_exit=True,
