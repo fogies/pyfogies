@@ -95,7 +95,7 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
         )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="package")
 def pyfogies_test_backend(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[BackendOutput]:
