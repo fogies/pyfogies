@@ -8,8 +8,13 @@ import pytest
 from fogies.tools.aws_environ import aws_environ
 
 
-def test_aws_environ_sets_variables(tmp_path: Path) -> None:
+def test_aws_environ_sets_variables(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """aws_environ loads variables from a TOML profiles file using environ."""
+
+    # Start from a clean environment for these variables within this test.
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
+
     profiles_path = tmp_path / "test_aws_environ.toml"
     config_text = "\n".join(
         [
@@ -24,10 +29,6 @@ def test_aws_environ_sets_variables(tmp_path: Path) -> None:
         ]
     )
     _ = profiles_path.write_text(config_text, encoding="utf-8")
-
-    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",):
-        if name in os.environ:
-            del os.environ[name]
 
     with aws_environ(profiles_path=profiles_path, profile="test"):
         assert os.environ.get("AWS_ACCESS_KEY_ID") == "value-aws-access-key-id"
