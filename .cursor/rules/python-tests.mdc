@@ -1,0 +1,15 @@
+---
+description: Rules for Python tests.
+globs: ["tests/**/*.py"]
+alwaysApply: false
+---
+
+# Python Tests – File Creation
+
+Tests may create files only in a temporary path.
+
+- Use a temporary directory (e.g. pytest’s `tmp_path` fixture) for any files created by the test.
+- Do not create files in staging (`.staging`), the project root, or any other fixed path.
+- Do not write tfvars, artifacts, or test outputs to `.staging` or paths outside the temporary directory.
+
+This keeps test runs isolated and avoids polluting the workspace or conflicting with other tools that use staging.
