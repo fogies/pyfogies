@@ -135,7 +135,7 @@ def terraform_tfvars(
             path.unlink()
 
 
-class Terraform:
+class _Terraform:
     """Represents a Terraform binary."""
 
     _version: str
@@ -294,7 +294,7 @@ class Terraform:
 @contextmanager
 def terraform(
     *,
-    version: str = _DEFAULT_VERSION,
+    version: str | None = None,
     binary_cache_path: pathlib.Path,
     command_params: CommandParams | None = None,
     module_path: pathlib.Path | None = None,
@@ -306,8 +306,8 @@ def terraform(
     apply_params: ApplyParams | None = None,
     delete_on_exit: bool = False,
     destroy_params: DestroyParams | None = None,
-) -> Iterator[Terraform]:
-    """Download a Terraform binary and yield a Terraform object.
+) -> Iterator[_Terraform]:
+    """Download a Terraform binary and yield a Terraform handle.
 
     If *init_on_entry* is true, run init after preparing the binary; requires
     *command_params* and *module_path*. If *apply_on_entry* is true, run
@@ -316,9 +316,13 @@ def terraform(
     -backend-config=<path>. *tfvars_path* is optional for apply. If
     *delete_on_exit* is true, run destroy when exiting the context; requires
     *command_params* and *module_path*. *tfvars_path* is optional for destroy.
+    *version* when None uses the bundled default Terraform version.
     """
     if sys.platform != "win32":
         raise RuntimeError("Only implemented on Windows")
+
+    if version is None:
+        version = _DEFAULT_VERSION
 
     if version not in _KNOWN_VERSIONS:
         known = ", ".join(_KNOWN_VERSIONS)
@@ -350,7 +354,7 @@ def terraform(
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             _ = exe_path.write_bytes(zf.read("terraform.exe"))
 
-    tf = Terraform(version=version, path=exe_path)
+    tf = _Terraform(version=version, path=exe_path)
 
     if init_on_entry:
         assert command_params is not None
@@ -389,7 +393,7 @@ def terraform(
 @contextmanager
 def terraform_output(
     *,
-    version: str = _DEFAULT_VERSION,
+    version: str | None = None,
     binary_cache_path: pathlib.Path,
     command_params: CommandParams,
     module_path: pathlib.Path,
@@ -408,6 +412,7 @@ def terraform_output(
     All entry/exit parameters are passed through to terraform(); the caller
     sets *init_on_entry*, *apply_on_entry*, and *delete_on_exit* as needed.
     Yields the output model; destroy runs on exit when *delete_on_exit* is true.
+    *version* when None uses the bundled default Terraform version.
     """
     with terraform(
         version=version,
