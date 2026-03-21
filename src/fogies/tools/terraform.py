@@ -95,7 +95,7 @@ def terraform_tfbackend_s3(
             )
         )
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
+    with path.open("w", encoding="utf-8") as f:
         _ = f.write('region = "{}"\n'.format(backend.region))
         _ = f.write('bucket = "{}"\n'.format(backend.bucket_name))
         _ = f.write('key = "{}"\n'.format(backend.state_keys[state]))
@@ -126,7 +126,7 @@ def terraform_tfvars(
     if suffixes[-2:] != [".tfvars", ".json"]:
         raise ValueError("Path '{}' must end with '.tfvars.json'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
+    with path.open("w", encoding="utf-8") as f:
         json.dump(variables.model_dump(mode="json"), f, indent=2)
     try:
         yield path
