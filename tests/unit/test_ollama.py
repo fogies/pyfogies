@@ -8,7 +8,10 @@ from pydantic import BaseModel
 from fogies.tools.ollama import (
     _create_time_seconds,  # pyright: ignore[reportPrivateUsage]
 )
-from fogies.tools.ollama import ollama, ollama_client
+from fogies.tools.ollama import (
+    ollama,
+    ollama_client,
+)
 
 _TEST_OLLAMA_MODEL = "llama3.1:8b"
 
