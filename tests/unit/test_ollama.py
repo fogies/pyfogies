@@ -3,8 +3,14 @@
 import psutil
 import pytest
 from paths import PATH_STAGING_BINARY_CACHE
+from pydantic import BaseModel
 
+from fogies.tools.ollama import (
+    _create_time_seconds,  # pyright: ignore[reportPrivateUsage]
+)
 from fogies.tools.ollama import ollama, ollama_client
+
+_TEST_OLLAMA_MODEL = "llama3.1:8b"
 
 
 def test_ollama_lock_context() -> None:
@@ -50,7 +56,8 @@ def test_ollama_refcount_management() -> None:
                 process = psutil.Process(started_pid.pid)
                 assert not (
                     process.is_running()
-                    and process.create_time() == started_pid.create_time
+                    and _create_time_seconds(process.create_time())
+                    == started_pid.create_time_seconds
                 )
             except psutil.Error:
                 pass
@@ -58,25 +65,23 @@ def test_ollama_refcount_management() -> None:
 
 def test_ollama_client_basic_query() -> None:
     """Test ollama_client can handle a small multi-turn sequence."""
-    model = "llama3.1:8b"
+    model = _TEST_OLLAMA_MODEL
 
-    with ollama_client(
-        binary_cache_path=PATH_STAGING_BINARY_CACHE, show_window=True
-    ) as client:
+    with ollama_client(binary_cache_path=PATH_STAGING_BINARY_CACHE) as client:
         # Pull the model (will no-op if already present).
         _ = client.pull(model)
 
+        pick_number_message = {
+            "role": "user",
+            "content": (
+                "Pick a number between 1 and 10.\n"
+                + "Reply with only a single numeric response, not a word.\n"
+            ),
+        }
+
         first_response = client.chat(  # pyright: ignore[reportUnknownMemberType]
             model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "Pick a number between 1 and 10.\n"
-                        + "Reply with only a single numeric response, not a word.\n"
-                    ),
-                }
-            ],
+            messages=[pick_number_message],
             stream=False,
         )
         first_number_text = first_response.message.content
@@ -86,15 +91,7 @@ def test_ollama_client_basic_query() -> None:
 
         second_response = client.chat(  # pyright: ignore[reportUnknownMemberType]
             model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "Pick a number between 1 and 10.\n"
-                        + "Reply with only a single numeric response, not a word.\n"
-                    ),
-                }
-            ],
+            messages=[pick_number_message],
             stream=False,
         )
         second_number_text = second_response.message.content
