@@ -118,3 +118,39 @@ def test_ollama_client_basic_query() -> None:
         assert isinstance(answer, str)
         answer_sum = int(answer.strip())
         assert answer_sum == first_number + second_number
+
+
+def test_ollama_client_structured_output() -> None:
+    """Test ollama_client can return all structured fields in one response."""
+
+    class _StructuredOutput(BaseModel):
+        first: int
+        second: int
+        sum: int
+
+    model = _TEST_OLLAMA_MODEL
+
+    with ollama_client(binary_cache_path=PATH_STAGING_BINARY_CACHE) as client:
+        _ = client.pull(model)
+        response = client.chat(  # pyright: ignore[reportUnknownMemberType]
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Choose two integers from 1 to 10.\n"
+                        "Return JSON only with fields first, second, and sum.\n"
+                        "Sum should be equal to first plus second.\n"
+                    ),
+                }
+            ],
+            stream=False,
+            format=_StructuredOutput.model_json_schema(),
+        )
+
+        content = response.message.content
+        assert isinstance(content, str)
+        payload = _StructuredOutput.model_validate_json(content)
+        assert 1 <= payload.first <= 10
+        assert 1 <= payload.second <= 10
+        assert payload.sum == payload.first + payload.second
