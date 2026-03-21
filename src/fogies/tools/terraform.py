@@ -345,14 +345,24 @@ def terraform(
 
     if not exe_path.exists():
         binary_cache_path.mkdir(parents=True, exist_ok=True)
+        try:
+            url = _TERRAFORM_URL_TEMPLATE.format(version=version)
+            response = cast(HTTPResponse, urllib.request.urlopen(url))
+            with response:
+                zip_bytes: bytes = response.read()
 
-        url = _TERRAFORM_URL_TEMPLATE.format(version=version)
-        response = cast(HTTPResponse, urllib.request.urlopen(url))
-        with response:
-            zip_bytes: bytes = response.read()
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                _ = exe_path.write_bytes(zf.read("terraform.exe"))
+        except Exception:
+            exe_path.unlink(missing_ok=True)
+            raise
 
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-            _ = exe_path.write_bytes(zf.read("terraform.exe"))
+    if not exe_path.exists():
+        raise RuntimeError(
+            "Terraform executable 'terraform.exe' not found in '{}'".format(
+                binary_cache_path
+            )
+        )
 
     tf = _Terraform(version=version, path=exe_path)
 
