@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import tomllib
 from pathlib import Path
 
@@ -57,7 +58,7 @@ def aws_environ(
     *,
     raise_if_exists: bool = True,
     raise_if_changed: bool = True,
-):
+) -> contextlib.AbstractContextManager[None]:
     """Return a context manager that applies AWS variables from a TOML file.
 
     The *profiles_path* parameter specifies the AWS TOML profiles file to read;

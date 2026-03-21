@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from collections.abc import Mapping
 
@@ -87,7 +88,7 @@ def environ(
     *,
     raise_if_exists: bool = True,
     raise_if_changed: bool = True,
-) -> _EnvironContext:
+) -> contextlib.AbstractContextManager[None]:
     """Return a context manager that applies the given environment overrides.
 
     The *variables* mapping provides environment variable names and string values
