@@ -2,7 +2,7 @@
 
 import subprocess
 
-from paths import PATH_STAGING_BINARY_CACHE
+from fogies_paths import PATH_STAGING_BINARY_CACHE
 
 from fogies.tools.ollama import ollama
 

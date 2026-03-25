@@ -2,7 +2,7 @@
 
 import psutil
 import pytest
-from paths import PATH_STAGING_BINARY_CACHE
+from fogies_paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.tools.ollama import (
