@@ -1,5 +1,6 @@
 import io
 import pathlib
+import shutil
 import socket
 import subprocess
 import sys
@@ -38,7 +39,7 @@ class _PidWithCreateTime(BaseModel):
     """Persisted process identity state."""
 
     pid: int
-    create_time: float | None
+    create_time_seconds: int
 
 
 class _Ollama:
@@ -87,9 +88,7 @@ class _Ollama:
         if not pid_path.exists():
             return None
 
-        text = pid_path.read_text(encoding="utf-8").strip()
-        assert text is not None
-
+        text = pid_path.read_text(encoding="utf-8")
         state = _PidWithCreateTime.model_validate_json(text)
         assert state.pid > 0
 
@@ -149,12 +148,18 @@ class _Ollama:
         )
 
 
+def _create_time_seconds(create_time: float) -> int:
+    """Convert process create_time to truncated integer seconds."""
+    return int(create_time)
+
+
 def _terminate_pid(*, pid: _PidWithCreateTime) -> None:
     try:
         process = psutil.Process(pid.pid)
 
         # If the process has been restarted, the pid was reused, do not terminate it.
-        if pid.create_time is not None and process.create_time() != pid.create_time:
+        process_create_time_seconds = _create_time_seconds(process.create_time())
+        if process_create_time_seconds != pid.create_time_seconds:
             return
 
         children = process.children(recursive=True)
@@ -189,10 +194,22 @@ def _terminate_pid(*, pid: _PidWithCreateTime) -> None:
 
 def _wait_until_listening(
     *,
-    timeout_s: float = _OLLAMA_LISTEN_PROBE_WAIT_TIMEOUT,
+    pid: _PidWithCreateTime,
+    timeout: float = _OLLAMA_LISTEN_PROBE_WAIT_TIMEOUT,
 ) -> None:
-    end = time.time() + timeout_s
+    end = time.time() + timeout
     while time.time() < end:
+        try:
+            proc = psutil.Process(pid.pid)
+            alive = (
+                proc.is_running()
+                and proc.status() != psutil.STATUS_ZOMBIE
+                and _create_time_seconds(proc.create_time()) == pid.create_time_seconds
+            )
+        except psutil.Error:
+            alive = False
+        if not alive:
+            raise RuntimeError("Ollama server process exited before becoming ready")
         try:
             with socket.create_connection(
                 _OLLAMA_LISTEN_ADDRESS,
@@ -202,7 +219,7 @@ def _wait_until_listening(
         except OSError:
             pass
         time.sleep(_OLLAMA_LISTEN_POLL_INTERVAL)
-    raise TimeoutError("Ollama server did not become ready in time")
+    raise TimeoutError("Ollama server did not become ready")
 
 
 @contextmanager
@@ -236,19 +253,22 @@ def ollama(
 
     dir_name = "ollama_{}".format(version.replace(".", "_"))
     version_dir = binary_cache_path / dir_name
-
-    if not version_dir.exists():
-        version_dir.mkdir(parents=True, exist_ok=True)
-
-        url = _OLLAMA_URL_TEMPLATE.format(version=version)
-        response = cast(HTTPResponse, urllib.request.urlopen(url))
-        with response:
-            zip_bytes: bytes = response.read()
-
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-            zf.extractall(version_dir)
-
     exe_path = version_dir / "ollama.exe"
+
+    if not exe_path.exists():
+        version_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            url = _OLLAMA_URL_TEMPLATE.format(version=version)
+            response = cast(HTTPResponse, urllib.request.urlopen(url))
+            with response:
+                zip_bytes: bytes = response.read()
+
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                zf.extractall(version_dir)
+        except Exception:
+            shutil.rmtree(version_dir, ignore_errors=True)
+            raise
+
     if not exe_path.exists():
         raise RuntimeError(
             "Ollama executable 'ollama.exe' not found in '{}'".format(version_dir)
@@ -272,17 +292,16 @@ def ollama_client(
     """
     with ollama(version=version, binary_cache_path=binary_cache_path) as ollama_binary:
         with ollama_binary.lock():
-            running = False
-
             # First check whether a process is already running.
-            pid = ollama_binary.pid
-            if pid is not None and pid.create_time is not None:
+            running = False
+            if ollama_binary.pid is not None:
                 try:
-                    proc = psutil.Process(pid.pid)
+                    proc = psutil.Process(ollama_binary.pid.pid)
                     running = (
                         proc.is_running()
                         and proc.status() != psutil.STATUS_ZOMBIE
-                        and proc.create_time() == pid.create_time
+                        and _create_time_seconds(proc.create_time())
+                        == ollama_binary.pid.create_time_seconds
                     )
                 except psutil.Error:
                     running = False
@@ -304,17 +323,22 @@ def ollama_client(
                 ollama_binary.set_pid(
                     _PidWithCreateTime(
                         pid=server_process.pid,
-                        create_time=psutil.Process(server_process.pid).create_time(),
+                        create_time_seconds=_create_time_seconds(
+                            psutil.Process(server_process.pid).create_time()
+                        ),
                     )
                 )
+
+            # We now believe it is running.
+            assert ollama_binary.pid is not None
 
             # Increment the refcount.
             ollama_binary.set_refcount(ollama_binary.refcount + 1)
 
-        try:
             # Wait until the server is listening.
-            _wait_until_listening()
+            _wait_until_listening(pid=ollama_binary.pid)
 
+        try:
             # Create the client.
             client = _ollama_client.Client()
             yield client
@@ -322,8 +346,6 @@ def ollama_client(
             with ollama_binary.lock():
                 ollama_binary.set_refcount(ollama_binary.refcount - 1)
 
-                if ollama_binary.refcount <= 0:
-                    pid = ollama_binary.pid
-                    if pid is not None:
-                        _terminate_pid(pid=pid)
+                if ollama_binary.refcount == 0:
+                    _terminate_pid(pid=ollama_binary.pid)
                     ollama_binary.reset_state()

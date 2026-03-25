@@ -35,6 +35,11 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0.dev3] (2026-03-24)
+
+### Fixed
+- Issues of shadowing caused by `paths.py`. (#3)
+
 ## [0.0.0.dev2] (2026-03-20)
 
 ### Added

@@ -95,7 +95,7 @@ def terraform_tfbackend_s3(
             )
         )
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
+    with path.open("w", encoding="utf-8") as f:
         _ = f.write('region = "{}"\n'.format(backend.region))
         _ = f.write('bucket = "{}"\n'.format(backend.bucket_name))
         _ = f.write('key = "{}"\n'.format(backend.state_keys[state]))
@@ -126,7 +126,7 @@ def terraform_tfvars(
     if suffixes[-2:] != [".tfvars", ".json"]:
         raise ValueError("Path '{}' must end with '.tfvars.json'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
+    with path.open("w", encoding="utf-8") as f:
         json.dump(variables.model_dump(mode="json"), f, indent=2)
     try:
         yield path
@@ -345,14 +345,24 @@ def terraform(
 
     if not exe_path.exists():
         binary_cache_path.mkdir(parents=True, exist_ok=True)
+        try:
+            url = _TERRAFORM_URL_TEMPLATE.format(version=version)
+            response = cast(HTTPResponse, urllib.request.urlopen(url))
+            with response:
+                zip_bytes: bytes = response.read()
 
-        url = _TERRAFORM_URL_TEMPLATE.format(version=version)
-        response = cast(HTTPResponse, urllib.request.urlopen(url))
-        with response:
-            zip_bytes: bytes = response.read()
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                _ = exe_path.write_bytes(zf.read("terraform.exe"))
+        except Exception:
+            exe_path.unlink(missing_ok=True)
+            raise
 
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-            _ = exe_path.write_bytes(zf.read("terraform.exe"))
+    if not exe_path.exists():
+        raise RuntimeError(
+            "Terraform executable 'terraform.exe' not found in '{}'".format(
+                binary_cache_path
+            )
+        )
 
     tf = _Terraform(version=version, path=exe_path)
 

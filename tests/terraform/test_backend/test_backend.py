@@ -4,7 +4,7 @@ import pathlib
 from collections.abc import Iterator
 
 import pytest
-from paths import (
+from fogies_paths import (
     PATH_STAGING_BINARY_CACHE,
 )
 from pydantic import BaseModel

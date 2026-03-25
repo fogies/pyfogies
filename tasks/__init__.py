@@ -1,8 +1,8 @@
 """Invoke tasks for this project."""
 
 import colorama
+from fogies_paths import PATH_SECRETS_POETRY
 from invoke.collection import Collection
-from paths import PATH_SECRETS_POETRY
 
 import fogies.tasks.format
 import fogies.tasks.lint
