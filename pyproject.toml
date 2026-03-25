@@ -12,7 +12,7 @@ requires-python = ">=3.14,<4.0"
 [tool.poetry]
 packages = [
     {include = "fogies", from = "src"},
-    {include = "paths.py", from = "."},
+    {include = "fogies_paths.py", from = "."},
 ]
 
 [tool.poetry.dependencies]
@@ -39,10 +39,9 @@ semver = "^3.0.4"
 [tool.basedpyright]
 typeCheckingMode = "recommended"
 pythonVersion = "3.14"
-include = ["paths.py", "src", "tasks", "tests"]
+include = ["fogies_paths.py", "src", "tasks", "tests"]
 allowedUntypedLibraries = ["invoke"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
-

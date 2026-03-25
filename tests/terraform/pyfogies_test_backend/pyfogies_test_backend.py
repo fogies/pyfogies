@@ -7,12 +7,12 @@ from typing import cast
 
 import boto3
 import pytest
-from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
-from paths import (
+from fogies_paths import (
     AWS_PROFILE_PYFOGIES_TEST,
     PATH_SECRETS_AWS,
     PATH_STAGING_BINARY_CACHE,
 )
+from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput, BackendVars

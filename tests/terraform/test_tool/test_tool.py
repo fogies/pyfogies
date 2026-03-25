@@ -3,8 +3,8 @@
 import pathlib
 
 import pytest
+from fogies_paths import PATH_STAGING_BINARY_CACHE
 from invoke.exceptions import UnexpectedExit
-from paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.tools.command import CommandParams
