@@ -1,7 +1,7 @@
 [project]
 name = "fogies"
 # Version follows semantic versioning <https://semver.org/>.
-version = "0.0.0-dev.3"
+version = "0.0.0-dev.4"
 description = ""
 authors = [
     {name = "James Fogarty",email = "jayfo@users.noreply.github.com"}
@@ -13,6 +13,9 @@ requires-python = ">=3.14,<4.0"
 packages = [
     {include = "fogies", from = "src"},
     {include = "fogies_paths.py", from = "."},
+]
+include = [
+    {path = "src/fogies/py.typed", format = ["sdist", "wheel"]},
 ]
 
 [tool.poetry.dependencies]

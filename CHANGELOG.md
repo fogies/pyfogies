@@ -35,6 +35,11 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0.dev4] (2026-04-14)
+
+### Added
+- Added `py.typed` marker for typed distribution.
+
 ## [0.0.0.dev3] (2026-03-24)
 
 ### Fixed
