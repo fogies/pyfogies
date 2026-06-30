@@ -1,8 +1,7 @@
 terraform {
   required_version = "~> 1.14.0"
 
-  backend "s3" {
-  }
+  backend "s3" {}
 
   required_providers {
     aws = {
@@ -13,28 +12,45 @@ terraform {
 }
 
 provider "aws" {
-  region = var.backend.region
+  region = var.region
 }
 
-variable "backend" {
-  description = "Backend configuration."
-  type = object({
-    name          = string
-    region        = string
-    states        = list(string)
-    tags          = map(string)
-    force_destroy = bool
-  })
+variable "name" {
+  description = "Base prefix for backend resources."
+  type        = string
+}
+
+variable "region" {
+  description = "AWS region in which to create backend resources."
+  type        = string
+}
+
+variable "states" {
+  description = "Logical names of Terraform states to manage within this backend."
+  type        = list(string)
+  default     = []
+}
+
+variable "tags" {
+  description = "Tags to apply to backend resources."
+  type        = map(string)
+  default     = {}
+}
+
+variable "force_destroy" {
+  description = "Whether to allow force destruction of the S3 bucket."
+  type        = bool
+  default     = false
 }
 
 module "backend" {
   source = "../../../../terraform/backend"
 
-  name          = var.backend.name
-  region        = var.backend.region
-  states        = var.backend.states
-  tags          = var.backend.tags
-  force_destroy = var.backend.force_destroy
+  name          = var.name
+  region        = var.region
+  states        = var.states
+  tags          = var.tags
+  force_destroy = var.force_destroy
 }
 
 output "backend" {

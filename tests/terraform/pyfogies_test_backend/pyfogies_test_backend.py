@@ -32,10 +32,6 @@ from tests.terraform.backend import (
 )
 
 
-class _PyFogiesTestBackendVars(BaseModel):
-    backend: BackendVars
-
-
 class _PyFogiesTestBackendOutput(BaseModel):
     backend: BackendOutput
 
@@ -96,7 +92,7 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
         )
 
 
-@pytest.fixture(scope="package")
+@pytest.fixture(scope="session")
 def pyfogies_test_backend(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[BackendOutput]:
@@ -113,17 +109,15 @@ def pyfogies_test_backend(
         ),
         terraform_tfvars(
             path=tfvars_path,
-            variables=_PyFogiesTestBackendVars(
-                backend=BackendVars(
-                    name=PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
-                    region=PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
-                    states=[s.value for s in PYFOGIES_TEST_TERRAFORM_BACKEND_STATES],
-                    # force_destroy is intentionally false to require explicit cleanup of resources.
-                    # Every test module should destroy its own resources.
-                    # This fixture confirms that before destroying their states.
-                    # This ensures we do not orphan resources by deleting the state that captures their creation.
-                    force_destroy=False,
-                ),
+            variables=BackendVars(
+                name=PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
+                region=PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
+                states=[s.value for s in PYFOGIES_TEST_TERRAFORM_BACKEND_STATES],
+                # force_destroy is intentionally false to require explicit cleanup of resources.
+                # Every test module should destroy its own resources.
+                # This fixture confirms that before destroying their states.
+                # This ensures we do not orphan resources by deleting the state that captures their creation.
+                force_destroy=False,
             ),
         ) as tfvars_path,
         terraform_output(

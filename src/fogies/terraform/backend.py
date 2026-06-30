@@ -6,9 +6,9 @@ from pydantic import BaseModel
 class BackendVars(BaseModel):
     name: str
     region: str
-    states: list[str] = []
+    states: list[str]
     tags: dict[str, str] = {}
-    force_destroy: bool = False
+    force_destroy: bool
 
 
 class BackendOutput(BaseModel):
