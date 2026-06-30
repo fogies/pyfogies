@@ -1,0 +1,40 @@
+variable "region" {
+  description = "AWS region in which to create ALB resources."
+  type        = string
+}
+
+variable "name" {
+  description = "Name of the ALB."
+  type        = string
+
+  validation {
+    condition     = length(var.name) <= 32 && can(regex("^(?!internal-)[a-zA-Z0-9-]+$", var.name)) && !startswith(var.name, "-") && !endswith(var.name, "-")
+    error_message = "ALB name must be at most 32 characters, contain only alphanumeric characters and hyphens, not start or end with a hyphen, and not start with 'internal-'."
+  }
+}
+
+variable "subnet_ids" {
+  description = "Subnet IDs across which to distribute the ALB."
+  type        = set(string)
+
+  validation {
+    condition     = length(var.subnet_ids) >= 2
+    error_message = "An ALB requires subnets in at least two availability zones."
+  }
+}
+
+variable "security_group_ids" {
+  description = "Security group IDs to attach to the ALB."
+  type        = set(string)
+}
+
+variable "certificate_arn" {
+  description = "ACM certificate ARN for HTTPS."
+  type        = string
+}
+
+variable "tags" {
+  description = "Tags to apply to ALB resources."
+  type        = map(string)
+  default     = {}
+}
