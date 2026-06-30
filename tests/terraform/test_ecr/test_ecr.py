@@ -72,7 +72,10 @@ def test_ecr_output(
         expected_registry_suffix = ".dkr.ecr.{}.amazonaws.com".format(_TEST_REGION)
         assert output.ecr.registry_url.endswith(expected_registry_suffix)
 
-        assert set(output.ecr.repositories.keys()) == {"pyfogies-test-ecr-a", "pyfogies-test-ecr-b"}
+        assert set(output.ecr.repositories.keys()) == {
+            "pyfogies-test-ecr-a",
+            "pyfogies-test-ecr-b",
+        }
         for name, repo in output.ecr.repositories.items():
             assert repo.name == name
             assert repo.arn.startswith("arn:aws:ecr:")
