@@ -25,10 +25,6 @@ from tests.terraform.backend import (
 )
 
 
-class _TestBackendVars(BaseModel):
-    backend: BackendVars
-
-
 class _TestBackendOutput(BaseModel):
     backend: BackendOutput
 
@@ -67,17 +63,15 @@ def nested_backend_output(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_TestBackendVars(
-                backend=BackendVars(
-                    name=_TEST_BACKEND_NESTED_BACKEND_NAME,
-                    region=_TEST_BACKEND_REGION,
-                    states=_TEST_BACKEND_NESTED_BACKEND_STATES,
-                    tags={},
-                    # force_destroy can be used here
-                    # because their are no AWS resources created in tests.
-                    # There is nothing that could be orphaned by a deletion.
-                    force_destroy=True,
-                ),
+            variables=BackendVars(
+                name=_TEST_BACKEND_NESTED_BACKEND_NAME,
+                region=_TEST_BACKEND_REGION,
+                states=_TEST_BACKEND_NESTED_BACKEND_STATES,
+                tags={},
+                # force_destroy can be used here
+                # because there are no AWS resources created in tests.
+                # There is nothing that could be orphaned by a deletion.
+                force_destroy=True,
             ),
         ) as tfvars_path,
         terraform_output(

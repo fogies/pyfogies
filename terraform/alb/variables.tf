@@ -26,6 +26,11 @@ variable "subnet_ids" {
 variable "security_group_ids" {
   description = "Security group IDs to attach to the ALB."
   type        = set(string)
+
+  validation {
+    condition     = length(var.security_group_ids) >= 1
+    error_message = "An ALB requires at least one security group."
+  }
 }
 
 variable "certificate_arn" {

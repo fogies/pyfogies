@@ -11,7 +11,6 @@ variable "region" {
 variable "states" {
   description = "Logical names of Terraform states to manage within this backend."
   type        = list(string)
-  default     = []
 }
 
 variable "tags" {
@@ -23,6 +22,5 @@ variable "tags" {
 variable "force_destroy" {
   description = "Whether to allow force destruction of the S3 bucket."
   type        = bool
-  default     = false
 }
 
