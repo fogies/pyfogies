@@ -8,8 +8,23 @@ variable "name" {
   type        = string
 
   validation {
-    condition     = length(var.name) <= 32 && can(regex("^(?!internal-)[a-zA-Z0-9-]+$", var.name)) && !startswith(var.name, "-") && !endswith(var.name, "-")
-    error_message = "ALB name must be at most 32 characters, contain only alphanumeric characters and hyphens, not start or end with a hyphen, and not start with 'internal-'."
+    condition     = length(var.name) <= 32
+    error_message = "ALB name must be at most 32 characters."
+  }
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]+$", var.name))
+    error_message = "ALB name must contain only alphanumeric characters and hyphens."
+  }
+
+  validation {
+    condition     = !startswith(var.name, "-") && !endswith(var.name, "-")
+    error_message = "ALB name must not start or end with a hyphen."
+  }
+
+  validation {
+    condition     = !startswith(var.name, "internal-")
+    error_message = "ALB name must not start with 'internal-'."
   }
 }
 
