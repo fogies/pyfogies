@@ -9,6 +9,7 @@ from fogies.terraform.alb import AlbOutput
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.certificate import CertificateOutput
 from fogies.terraform.network import NetworkOutput
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -18,12 +19,9 @@ from fogies.tools.terraform import (
     terraform_tfbackend_s3,
     terraform_tfvars,
 )
-from tests.terraform.backend import (
-    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
-)
+from tests.terraform.backend import PYFOGIES_TEST_TERRAFORM_BACKEND_STATES
 
-_TEST_REGION = PYFOGIES_TEST_TERRAFORM_BACKEND_REGION
+
 _TEST_ALB_NAME = "pyfogies-test-alb"
 
 
@@ -39,6 +37,7 @@ class _TestAlbOutput(BaseModel):
 
 
 def test_alb_output(
+    pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
     pyfogies_test_certificate: CertificateOutput,
     tmp_path: pathlib.Path,
@@ -58,7 +57,7 @@ def test_alb_output(
         terraform_tfvars(
             path=tfvars_path,
             variables=_TestAlbVars(
-                region=_TEST_REGION,
+                region=pyfogies_test_config.aws.region,
                 alb_name=_TEST_ALB_NAME,
                 certificate_arn=pyfogies_test_certificate.certificate_arn,
             ),

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.certificate import CertificateOutput
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -18,10 +19,7 @@ from fogies.tools.terraform import (
     terraform_tfbackend_s3,
     terraform_tfvars,
 )
-from tests.terraform.backend import (
-    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
-)
+from tests.terraform.backend import PYFOGIES_TEST_TERRAFORM_BACKEND_STATES
 
 
 class _PyfogiesTestCertificateVars(BaseModel):
@@ -34,6 +32,7 @@ class _PyfogiesTestCertificateOutput(BaseModel):
 
 @pytest.fixture(scope="session")
 def pyfogies_test_certificate(
+    pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[CertificateOutput]:
@@ -53,7 +52,7 @@ def pyfogies_test_certificate(
         terraform_tfvars(
             path=tfvars_path,
             variables=_PyfogiesTestCertificateVars(
-                region=PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
+                region=pyfogies_test_config.aws.region,
             ),
         ) as tfvars_path,
         terraform_output(

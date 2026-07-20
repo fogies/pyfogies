@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.network import NetworkOutput
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -16,12 +17,7 @@ from fogies.tools.terraform import (
     terraform_tfbackend_s3,
     terraform_tfvars,
 )
-from tests.terraform.backend import (
-    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
-)
-
-_TEST_REGION = PYFOGIES_TEST_TERRAFORM_BACKEND_REGION
+from tests.terraform.backend import PYFOGIES_TEST_TERRAFORM_BACKEND_STATES
 
 
 class _TestRegionVars(BaseModel):
@@ -33,6 +29,7 @@ class _TestNetworkOutput(BaseModel):
 
 
 def test_network_output(
+    pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
     tmp_path: pathlib.Path,
 ) -> None:
@@ -50,7 +47,7 @@ def test_network_output(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_TestRegionVars(region=_TEST_REGION),
+            variables=_TestRegionVars(region=pyfogies_test_config.aws.region),
         ) as tfvars_path,
         terraform_output(
             binary_cache_path=PATH_STAGING_BINARY_CACHE,

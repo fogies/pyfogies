@@ -10,6 +10,7 @@ from fogies_paths import (
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput, BackendVars
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -19,10 +20,7 @@ from fogies.tools.terraform import (
     terraform_tfbackend_s3,
     terraform_tfvars,
 )
-from tests.terraform.backend import (
-    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
-)
+from tests.terraform.backend import PYFOGIES_TEST_TERRAFORM_BACKEND_STATES
 
 
 class _TestBackendOutput(BaseModel):
@@ -37,14 +35,13 @@ class _TestStateOutput(BaseModel):
     test_value: str
 
 
-# Create a "nested" state bucket in the same region.
-_TEST_BACKEND_REGION = PYFOGIES_TEST_TERRAFORM_BACKEND_REGION
 _TEST_BACKEND_NESTED_BACKEND_NAME = "test-backend-nested-backend"
 _TEST_BACKEND_NESTED_BACKEND_STATES = ["test-state-a", "test-state-b"]
 
 
 @pytest.fixture(scope="module")
 def nested_backend_output(
+    pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[BackendOutput]:
@@ -65,7 +62,7 @@ def nested_backend_output(
             path=tfvars_path,
             variables=BackendVars(
                 name=_TEST_BACKEND_NESTED_BACKEND_NAME,
-                region=_TEST_BACKEND_REGION,
+                region=pyfogies_test_config.aws.region,
                 states=_TEST_BACKEND_NESTED_BACKEND_STATES,
                 tags={},
                 # force_destroy can be used here
@@ -99,7 +96,7 @@ def test_backend_output(nested_backend_output: BackendOutput) -> None:
     """Backend module output matches expected bucket and state keys."""
     expected_bucket_name = "{}-bucket-{}".format(
         _TEST_BACKEND_NESTED_BACKEND_NAME,
-        _TEST_BACKEND_REGION,
+        nested_backend_output.region,
     )
     expected_state_keys = {
         s: "{}/terraform.tfstate".format(s) for s in _TEST_BACKEND_NESTED_BACKEND_STATES
