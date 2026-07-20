@@ -4,16 +4,11 @@ import pathlib
 from collections.abc import Iterator
 
 import pytest
-from fogies_paths import (
-    AWS_PROFILE_PYFOGIES_TEST,
-    PATH_SECRETS_AWS,
-    PATH_STAGING_BINARY_CACHE,
-)
+from fogies_paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.certificate import CertificateOutput
-from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -50,10 +45,6 @@ def pyfogies_test_certificate(
     tfvars_path = tmp_path / "pyfogies-test-certificate.tfvars.json"
 
     with (
-        aws_environ(
-            profiles_path=PATH_SECRETS_AWS,
-            profile=AWS_PROFILE_PYFOGIES_TEST,
-        ),
         terraform_tfbackend_s3(
             path=tfbackend_path,
             backend=pyfogies_test_backend,

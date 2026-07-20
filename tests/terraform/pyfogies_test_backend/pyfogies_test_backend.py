@@ -7,16 +7,12 @@ from typing import cast
 
 import boto3
 import pytest
-from fogies_paths import (
-    AWS_PROFILE_PYFOGIES_TEST,
-    PATH_SECRETS_AWS,
-    PATH_STAGING_BINARY_CACHE,
-)
+from fogies_paths import PATH_STAGING_BINARY_CACHE
 from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput, BackendVars
-from fogies.tools.aws_environ import aws_environ
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -94,19 +90,17 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
 
 @pytest.fixture(scope="session")
 def pyfogies_test_backend(
+    pyfogies_test_aws_environ: AwsEnviron,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[BackendOutput]:
     """Apply the backend module; yield output; destroy on teardown."""
+    _ = pyfogies_test_aws_environ
     command_params = CommandParams(in_stream=False)
     backend_module_path = pathlib.Path(__file__).resolve().parent
     tmp_path = tmp_path_factory.mktemp("pyfogies-test-backend")
     tfvars_path = tmp_path / "pyfogies-test-backend.tfvars.json"
 
     with (
-        aws_environ(
-            profiles_path=PATH_SECRETS_AWS,
-            profile=AWS_PROFILE_PYFOGIES_TEST,
-        ),
         terraform_tfvars(
             path=tfvars_path,
             variables=BackendVars(
