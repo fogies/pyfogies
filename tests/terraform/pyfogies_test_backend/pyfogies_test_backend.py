@@ -12,6 +12,7 @@ from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput, BackendVars
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
@@ -23,7 +24,6 @@ from fogies.tools.terraform import (
 )
 from tests.terraform.backend import (
     PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
     PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
 )
 
@@ -90,6 +90,7 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
 
 @pytest.fixture(scope="session")
 def pyfogies_test_backend(
+    pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_aws_environ: AwsEnviron,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[BackendOutput]:
@@ -105,7 +106,7 @@ def pyfogies_test_backend(
             path=tfvars_path,
             variables=BackendVars(
                 name=PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
-                region=PYFOGIES_TEST_TERRAFORM_BACKEND_REGION,
+                region=pyfogies_test_config.aws.region,
                 states=[s.value for s in PYFOGIES_TEST_TERRAFORM_BACKEND_STATES],
                 # force_destroy is intentionally false to require explicit cleanup of resources.
                 # Every test module should destroy its own resources.

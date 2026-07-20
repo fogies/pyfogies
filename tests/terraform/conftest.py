@@ -9,8 +9,12 @@ from tests.terraform.pyfogies_test_backend import (
 from tests.terraform.pyfogies_test_certificate import (
     pyfogies_test_certificate as _pyfogies_test_certificate,
 )
+from tests.pyfogies_tests_config import (
+    pyfogies_test_config as _pyfogies_test_config,
+)
 
 # Exported for pytest discovery.
 pyfogies_test_aws_environ = _pyfogies_test_aws_environ
 pyfogies_test_backend = _pyfogies_test_backend
 pyfogies_test_certificate = _pyfogies_test_certificate
+pyfogies_test_config = _pyfogies_test_config
