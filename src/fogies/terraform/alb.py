@@ -8,7 +8,7 @@ class AlbVars(BaseModel):
     name: str
     subnet_ids: list[str]
     security_group_ids: list[str]
-    certificate_arn: str
+    certificate_arn: str | None = None
     tags: dict[str, str] = {}
 
 
@@ -18,3 +18,4 @@ class AlbOutput(BaseModel):
     alb_zone_id: str
     listener_http_arn: str
     listener_https_arn: str
+    certificate_pem: str | None

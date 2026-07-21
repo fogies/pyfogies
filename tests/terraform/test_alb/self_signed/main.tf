@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
@@ -25,26 +29,20 @@ variable "alb_name" {
   type        = string
 }
 
-variable "certificate_arn" {
-  description = "ACM certificate ARN for HTTPS."
-  type        = string
-}
-
 module "network" {
-  source = "../../../terraform/network"
+  source = "../../../../terraform/network"
 
-  region                 = var.region
+  region                  = var.region
   availability_zone_count = 2
 }
 
 module "alb" {
-  source = "../../../terraform/alb"
+  source = "../../../../terraform/alb"
 
   region             = var.region
   name               = var.alb_name
   subnet_ids         = module.network.subnet_ids
   security_group_ids = module.network.security_group_ids
-  certificate_arn    = var.certificate_arn
 }
 
 output "network" {
