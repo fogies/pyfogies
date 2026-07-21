@@ -22,3 +22,8 @@ output "listener_https_arn" {
   description = "ARN of the HTTPS listener."
   value       = aws_lb_listener.listener_https.arn
 }
+
+output "certificate_pem" {
+  description = "PEM of the certificate. Non-null only when a self-signed certificate was created."
+  value       = local.certificate_pem
+}

@@ -49,8 +49,9 @@ variable "security_group_ids" {
 }
 
 variable "certificate_arn" {
-  description = "ACM certificate ARN for HTTPS."
+  description = "ACM certificate ARN for HTTPS. If null, a self-signed certificate is created using the ALB's DNS name."
   type        = string
+  default     = null
 }
 
 variable "tags" {

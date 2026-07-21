@@ -1,0 +1,15 @@
+# pyfogies test configuration
+#
+# Copy this file to secrets/pyfogies-tests.toml and fill in the values.
+# The secrets/ directory is not versioned.
+
+[aws]
+# AWS profile name to use for tests (as defined in secrets/aws.toml).
+profile = "pyfogies-test"
+# AWS region in which to create all test resources.
+region = "us-west-2"
+
+# Optional: provide a domain hosted in Route 53 to enable DNS-validated certificate tests.
+# [domain]
+# zone_name = "example.com"
+

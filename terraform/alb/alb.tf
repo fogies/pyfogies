@@ -33,7 +33,7 @@ resource "aws_lb_listener" "listener_https" {
   load_balancer_arn = aws_lb.alb.arn
   port              = "443"
   protocol          = "HTTPS"
-  certificate_arn   = var.certificate_arn
+  certificate_arn   = local.certificate_arn
 
   default_action {
     type = "fixed-response"
@@ -41,7 +41,7 @@ resource "aws_lb_listener" "listener_https" {
     fixed_response {
       content_type = "text/plain"
       status_code  = "503"
-      message_body = "Request not matched."
+      message_body = "No listener rule matched this request."
     }
   }
 
