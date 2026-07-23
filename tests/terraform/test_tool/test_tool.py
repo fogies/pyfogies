@@ -3,7 +3,6 @@
 import pathlib
 
 import pytest
-from fogies_paths import PATH_STAGING_BINARY_CACHE
 from invoke.exceptions import UnexpectedExit
 from pydantic import BaseModel
 
@@ -16,6 +15,7 @@ from fogies.tools.terraform import (
     terraform_output,
     terraform_tfvars,
 )
+from tasks.paths import PATH_STAGING_BINARY_CACHE
 
 
 class _ToolVars(BaseModel):

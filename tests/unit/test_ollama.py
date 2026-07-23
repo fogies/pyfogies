@@ -2,7 +2,6 @@
 
 import psutil
 import pytest
-from fogies_paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.tools.ollama import (
@@ -12,6 +11,7 @@ from fogies.tools.ollama import (
     ollama,
     ollama_client,
 )
+from tasks.paths import PATH_STAGING_BINARY_CACHE
 
 _TEST_OLLAMA_MODEL = "llama3.1:8b"
 

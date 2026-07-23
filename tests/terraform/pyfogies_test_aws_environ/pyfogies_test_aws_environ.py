@@ -3,10 +3,10 @@
 from collections.abc import Iterator
 
 import pytest
-from fogies_paths import PATH_SECRETS_AWS
 
-from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.aws_environ import AwsEnviron, aws_environ
+from tasks.paths import PATH_SECRETS_AWS
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 
 
 @pytest.fixture(scope="session")

@@ -4,8 +4,9 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from fogies_paths import PATH_SECRETS_PYFOGIES_TESTS
 from pydantic import BaseModel
+
+from tasks.paths import PATH_SECRETS_PYFOGIES_TESTS
 
 
 class _AwsConfig(BaseModel):

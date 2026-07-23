@@ -2,9 +2,8 @@
 
 import subprocess
 
-from fogies_paths import PATH_STAGING_BINARY_CACHE
-
 from fogies.tools.terraform import terraform
+from tasks.paths import PATH_STAGING_BINARY_CACHE
 
 
 def test_terraform_is_available() -> None:

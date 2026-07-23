@@ -12,7 +12,6 @@ requires-python = ">=3.14,<4.0"
 [tool.poetry]
 packages = [
     {include = "fogies", from = "src"},
-    {include = "fogies_paths.py", from = "."},
 ]
 include = [
     {path = "src/fogies/py.typed", format = ["sdist", "wheel"]},
@@ -48,7 +47,7 @@ types-requests = "~2.33.0.20260712"
 [tool.basedpyright]
 typeCheckingMode = "recommended"
 pythonVersion = "3.14"
-include = ["fogies_paths.py", "src", "tasks", "tests"]
+include = ["src", "tasks", "tests"]
 allowedUntypedLibraries = ["invoke"]
 
 [build-system]

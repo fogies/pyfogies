@@ -1,13 +1,13 @@
 """Invoke tasks for this project."""
 
 import colorama
-from fogies_paths import PATH_SECRETS_POETRY
 from invoke.collection import Collection
 
 import fogies.tasks.format
 import fogies.tasks.lint
 import fogies.tasks.poetry
 import fogies.tasks.test
+from tasks.paths import PATH_SECRETS_POETRY
 
 # Root namespace for tasks.
 namespace: Collection = Collection()
