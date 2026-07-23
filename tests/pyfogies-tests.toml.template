@@ -9,7 +9,8 @@ profile = "pyfogies-test"
 # AWS region in which to create all test resources.
 region = "us-west-2"
 
-# Optional: provide a domain hosted in Route 53 to enable DNS-validated certificate tests.
+# Optional: provide a domain to enable DNS-validated certificate tests.
+# A Route 53 hosted zone for this domain must already exist (apply terraform/hosted_zone once).
 # [domain]
 # zone_name = "example.com"
 

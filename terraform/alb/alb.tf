@@ -41,7 +41,7 @@ resource "aws_lb_listener" "listener_https" {
     fixed_response {
       content_type = "text/plain"
       status_code  = "503"
-      message_body = "No listener rule matched this request."
+      message_body = "No listener rule matched this request.\nname: ${aws_lb.alb.name}\narn: ${aws_lb.alb.arn}"
     }
   }
 
