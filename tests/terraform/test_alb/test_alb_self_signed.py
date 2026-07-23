@@ -7,13 +7,11 @@ from collections.abc import Iterator
 import pytest
 import requests
 import requests.exceptions
-from fogies_paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.terraform.alb import AlbOutput
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.network import NetworkOutput
-from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -23,8 +21,9 @@ from fogies.tools.terraform import (
     terraform_tfbackend_s3,
     terraform_tfvars,
 )
+from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PYFOGIES_TEST_TERRAFORM_BACKEND_STATES
-
 
 _TEST_ALB_NAME = "pyfogies-test-alb"
 
@@ -88,7 +87,9 @@ def _wait_for_alb(dns_name: str, timeout_seconds: int = 120) -> None:
     deadline = time.monotonic() + timeout_seconds
     while True:
         try:
-            _ = requests.get("http://{}".format(dns_name), timeout=5, allow_redirects=False)
+            _ = requests.get(
+                "http://{}".format(dns_name), timeout=5, allow_redirects=False
+            )
             return
         except requests.exceptions.ConnectionError:
             if time.monotonic() >= deadline:
@@ -112,13 +113,13 @@ def test_alb_http_redirects_to_https(alb_output: _TestAlbOutput) -> None:
         "http://{}".format(alb_output.alb.alb_dns_name),
         allow_redirects=False,
     )
-    assert http_response.status_code == 301, (
-        "Expected 301 redirect, got: {}".format(http_response.status_code)
+    assert http_response.status_code == 301, "Expected 301 redirect, got: {}".format(
+        http_response.status_code
     )
     location = http_response.headers.get("Location", "")
-    assert location.startswith("https://"), (
-        "Expected redirect to HTTPS, got Location: {}".format(location)
-    )
+    assert location.startswith(
+        "https://"
+    ), "Expected redirect to HTTPS, got Location: {}".format(location)
 
 
 def test_alb_https_reachable(
@@ -134,9 +135,13 @@ def test_alb_https_reachable(
         "https://{}".format(alb_output.alb.alb_dns_name),
         verify=str(pem_path),
     )
-    assert https_response.status_code == 503, (
-        "Expected fixed-response 503, got: {}".format(https_response.status_code)
+    assert (
+        https_response.status_code == 503
+    ), "Expected fixed-response 503, got: {}".format(https_response.status_code)
+    expected_body = "No listener rule matched this request.\nname: {}\narn: {}".format(
+        _TEST_ALB_NAME,
+        alb_output.alb.alb_arn,
     )
-    assert https_response.text == "No listener rule matched this request.", (
-        "Expected fixed-response body, got: {}".format(https_response.text)
+    assert https_response.text == expected_body, "Expected fixed-response body, got: {}".format(
+        https_response.text
     )
