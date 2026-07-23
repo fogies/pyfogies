@@ -7,12 +7,10 @@ from typing import cast
 
 import boto3
 import pytest
-from fogies_paths import PATH_STAGING_BINARY_CACHE
 from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput, BackendVars
-from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
@@ -22,6 +20,8 @@ from fogies.tools.terraform import (
     terraform_output,
     terraform_tfvars,
 )
+from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import (
     PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
     PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,

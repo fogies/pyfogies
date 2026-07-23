@@ -2,12 +2,10 @@
 
 import pathlib
 
-from fogies_paths import PATH_STAGING_BINARY_CACHE
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.network import NetworkOutput
-from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -17,6 +15,8 @@ from fogies.tools.terraform import (
     terraform_tfbackend_s3,
     terraform_tfvars,
 )
+from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PYFOGIES_TEST_TERRAFORM_BACKEND_STATES
 
 
