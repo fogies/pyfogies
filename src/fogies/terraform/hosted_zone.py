@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class HostedZoneVars(BaseModel):
     zone_name: str
+    create_zone: bool
 
 
 class HostedZoneOutput(BaseModel):
