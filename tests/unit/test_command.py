@@ -1,13 +1,15 @@
 """Tests for fogies.tools.command."""
 
+import io
 import os
 import pathlib
+import sys
 from unittest.mock import patch
 
 import pytest
 
 from fogies.tools.command import _resolve_command  # pyright: ignore[reportPrivateUsage]
-from fogies.tools.command import CommandParams
+from fogies.tools.command import CommandParams, command_run
 
 
 def test_require_cwd_sets_cwd() -> None:
@@ -62,3 +64,25 @@ def test_resolve_command_with_cwd_executable(
     _ = cmd_executable.write_bytes(b"")
     expected = os.path.relpath(str(cmd_executable), str(cwd))
     assert _resolve_command(cmd_executable, cwd) == expected
+
+
+@pytest.mark.parametrize("in_stream", [True, False])
+def test_command_run_in_stream(
+    in_stream: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """command_run succeeds for both in_stream values.
+
+    Regression test: command_run previously passed in_stream=True 
+    to invoke's context.run(), crashing when it tried to read() from True.
+
+    Uses an immediately-EOF stdin because
+    pytest's stdin intentionally raises on read().
+    """
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    result = command_run(
+        command=pathlib.Path(sys.executable),
+        command_params=CommandParams(in_stream=in_stream),
+        args=["-c", "print('test_command_run_in_stream')"],
+    )
+    assert result.stdout.strip() == "test_command_run_in_stream"

@@ -71,7 +71,13 @@ def command_run(
         else contextlib.nullcontext()
     )
     with cd_context:
-        result = context.run(command_str, in_stream=command_params.in_stream)
+        # invoke's in_stream default sentinel is None, which forwards sys.stdin.
+        # Passing True treats True as the stream object itself, crashing on read().
+        # Translate our Boolean in_stream into invoke's None/False contract.
+        result = context.run(
+            command_str,
+            in_stream=None if command_params.in_stream else False,
+        )
 
     # invoke's Context.run() returns None when run with disown=True.
     # Ensure future revisions to this code never introduce the parameter.
