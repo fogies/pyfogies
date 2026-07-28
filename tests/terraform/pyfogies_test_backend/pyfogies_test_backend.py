@@ -127,7 +127,7 @@ def pyfogies_test_backend(
             ),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
-            delete_on_exit=True,
+            destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
             output_model=_PyFogiesTestBackendOutput,
         ) as output,

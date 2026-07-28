@@ -133,7 +133,7 @@ def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
             init_params=InitParams(upgrade=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
-            delete_on_exit=True,
+            destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
         ) as tf,
     ):
@@ -179,7 +179,7 @@ def test_terraform_output(tmp_path: pathlib.Path) -> None:
             init_params=InitParams(upgrade=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
-            delete_on_exit=True,
+            destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
             output_model=_ToolOutput,
         ) as tool_output,
@@ -217,7 +217,7 @@ def test_terraform_output_invalid_module_raises(tmp_path: pathlib.Path) -> None:
                 init_params=InitParams(upgrade=True),
                 apply_on_entry=True,
                 apply_params=ApplyParams(auto_approve=True),
-                delete_on_exit=True,
+                destroy_on_exit=True,
                 destroy_params=DestroyParams(auto_approve=True),
                 output_model=_ToolOutput,
             ) as _:
