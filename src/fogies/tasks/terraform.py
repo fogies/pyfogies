@@ -18,7 +18,6 @@ from fogies.tools.terraform import (
 )
 
 
-
 def get_task_apply(
     *,
     module_path: pathlib.Path,
@@ -59,7 +58,11 @@ def get_task_apply(
             raise ValueError("--init-reconfigure requires --init")
 
         command_params = CommandParams(context=context)
-        init_params = InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure) if init else None
+        init_params = (
+            InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure)
+            if init
+            else None
+        )
 
         with aws_environ(
             profiles_path=aws_profiles_path,
@@ -79,7 +82,9 @@ def get_task_apply(
                 if output:
                     print(output_result.model_dump_json(indent=2))
 
-    return cast(Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_apply)
+    return cast(
+        Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_apply
+    )
 
 
 def get_task_destroy(
@@ -118,7 +123,11 @@ def get_task_destroy(
             raise ValueError("--init-reconfigure requires --init")
 
         command_params = CommandParams(context=context)
-        init_params = InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure) if init else None
+        init_params = (
+            InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure)
+            if init
+            else None
+        )
 
         with aws_environ(
             profiles_path=aws_profiles_path,
