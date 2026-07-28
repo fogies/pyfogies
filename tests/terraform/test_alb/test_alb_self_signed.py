@@ -74,7 +74,7 @@ def alb_output(
             init_params=InitParams(upgrade=True, reconfigure=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
-            delete_on_exit=True,
+            destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
             output_model=_TestAlbOutput,
         ) as output,
@@ -142,6 +142,6 @@ def test_alb_https_reachable(
         _TEST_ALB_NAME,
         alb_output.alb.alb_arn,
     )
-    assert https_response.text == expected_body, "Expected fixed-response body, got: {}".format(
-        https_response.text
-    )
+    assert (
+        https_response.text == expected_body
+    ), "Expected fixed-response body, got: {}".format(https_response.text)

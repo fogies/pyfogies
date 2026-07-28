@@ -304,7 +304,7 @@ def terraform(
     init_params: InitParams | None = None,
     apply_on_entry: bool = False,
     apply_params: ApplyParams | None = None,
-    delete_on_exit: bool = False,
+    destroy_on_exit: bool = False,
     destroy_params: DestroyParams | None = None,
 ) -> Iterator[_Terraform]:
     """Download a Terraform binary and yield a Terraform handle.
@@ -314,7 +314,7 @@ def terraform(
     apply after init; requires *command_params* and *module_path*.
     *tfbackend_path* is optional for init and, when set, is passed as
     -backend-config=<path>. *tfvars_path* is optional for apply. If
-    *delete_on_exit* is true, run destroy when exiting the context; requires
+    *destroy_on_exit* is true, run destroy when exiting the context; requires
     *command_params* and *module_path*. *tfvars_path* is optional for destroy.
     *version* when None uses the bundled default Terraform version.
     """
@@ -337,8 +337,8 @@ def terraform(
         raise ValueError("init_on_entry requires command_params and module_path")
     if apply_on_entry and (command_params is None or module_path is None):
         raise ValueError("apply_on_entry requires command_params and module_path")
-    if delete_on_exit and (command_params is None or module_path is None):
-        raise ValueError("delete_on_exit requires command_params and module_path")
+    if destroy_on_exit and (command_params is None or module_path is None):
+        raise ValueError("destroy_on_exit requires command_params and module_path")
 
     exe_name = "terraform_{}.exe".format(version.replace(".", "_"))
     exe_path = binary_cache_path / exe_name
@@ -389,7 +389,7 @@ def terraform(
     try:
         yield tf
     finally:
-        if delete_on_exit:
+        if destroy_on_exit:
             assert command_params is not None
             assert module_path is not None
             _ = tf.destroy(
@@ -413,15 +413,15 @@ def terraform_output(
     init_params: InitParams | None = None,
     apply_on_entry: bool = False,
     apply_params: ApplyParams | None = None,
-    delete_on_exit: bool = False,
+    destroy_on_exit: bool = False,
     destroy_params: DestroyParams | None = None,
     output_model: type[TerraformOutputModel],
 ) -> Iterator[TerraformOutputModel]:
     """Run the terraform context manager, call output() internally, and yield the parsed result.
 
     All entry/exit parameters are passed through to terraform(); the caller
-    sets *init_on_entry*, *apply_on_entry*, and *delete_on_exit* as needed.
-    Yields the output model; destroy runs on exit when *delete_on_exit* is true.
+    sets *init_on_entry*, *apply_on_entry*, and *destroy_on_exit* as needed.
+    Yields the output model; destroy runs on exit when *destroy_on_exit* is true.
     *version* when None uses the bundled default Terraform version.
     """
     with terraform(
@@ -435,7 +435,7 @@ def terraform_output(
         init_params=init_params,
         apply_on_entry=apply_on_entry,
         apply_params=apply_params,
-        delete_on_exit=delete_on_exit,
+        destroy_on_exit=destroy_on_exit,
         destroy_params=destroy_params,
     ) as tf:
         yield tf.output(
