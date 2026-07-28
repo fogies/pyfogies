@@ -73,7 +73,7 @@ def test_command_run_in_stream(
 ) -> None:
     """command_run succeeds for both in_stream values.
 
-    Regression test: command_run previously passed in_stream=True 
+    Regression test: command_run previously passed in_stream=True
     to invoke's context.run(), crashing when it tried to read() from True.
 
     Uses an immediately-EOF stdin because
