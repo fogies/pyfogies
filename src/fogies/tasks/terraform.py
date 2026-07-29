@@ -1,6 +1,7 @@
 """Generic tasks for applying and destroying a Terraform configuration."""
 
 import pathlib
+from contextlib import ExitStack
 from typing import Callable, cast
 
 from invoke.context import Context
@@ -22,8 +23,8 @@ def get_task_apply(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    aws_profiles_path: pathlib.Path,
-    aws_profile: str,
+    aws_profiles_path: pathlib.Path | None = None,
+    aws_profile: str | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
@@ -64,11 +65,11 @@ def get_task_apply(
             else None
         )
 
-        with aws_environ(
-            profiles_path=aws_profiles_path,
-            profile=aws_profile,
-        ):
-            with terraform_output(
+        with ExitStack() as stack:
+            if aws_profiles_path is not None and aws_profile is not None:
+                _ = stack.enter_context(aws_environ(profiles_path=aws_profiles_path, profile=aws_profile))
+
+            output_result = stack.enter_context(terraform_output(
                 binary_cache_path=binary_cache_path,
                 command_params=command_params,
                 module_path=module_path,
@@ -78,9 +79,10 @@ def get_task_apply(
                 apply_params=ApplyParams(auto_approve=apply_auto_approve),
                 destroy_on_exit=False,
                 output_model=output_model,
-            ) as output_result:
-                if output:
-                    print(output_result.model_dump_json(indent=2))
+            ))
+
+            if output:
+                print(output_result.model_dump_json(indent=2))
 
     return cast(
         Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_apply
@@ -91,8 +93,8 @@ def get_task_destroy(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    aws_profiles_path: pathlib.Path,
-    aws_profile: str,
+    aws_profiles_path: pathlib.Path | None = None,
+    aws_profile: str | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
@@ -129,21 +131,22 @@ def get_task_destroy(
             else None
         )
 
-        with aws_environ(
-            profiles_path=aws_profiles_path,
-            profile=aws_profile,
-        ):
-            with terraform(
+        with ExitStack() as stack:
+            if aws_profiles_path is not None and aws_profile is not None:
+                _ = stack.enter_context(aws_environ(profiles_path=aws_profiles_path, profile=aws_profile))
+
+            tf = stack.enter_context(terraform(
                 binary_cache_path=binary_cache_path,
                 command_params=command_params,
                 module_path=module_path,
                 init_on_entry=init,
                 init_params=init_params,
-            ) as tf:
-                _ = tf.destroy(
-                    command_params=command_params,
-                    module_path=module_path,
-                    destroy_params=DestroyParams(auto_approve=destroy_auto_approve),
-                )
+            ))
+
+            _ = tf.destroy(
+                command_params=command_params,
+                module_path=module_path,
+                destroy_params=DestroyParams(auto_approve=destroy_auto_approve),
+            )
 
     return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_destroy)
