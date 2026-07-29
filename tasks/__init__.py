@@ -26,13 +26,11 @@ namespace.add_collection(
 _task_all = fogies.tasks.test.get_task_test()
 _task_integration = fogies.tasks.test.get_task_test("tests/integration")
 _task_terraform = fogies.tasks.test.get_task_test("tests/terraform")
-_task_tools = fogies.tasks.test.get_task_test("tests/tools")
 _task_unit = fogies.tasks.test.get_task_test("tests/unit")
 
 _collection_tests = Collection("test")
 _collection_tests.add_task(_task_all, name="all")
 _collection_tests.add_task(_task_integration, name="integration")
 _collection_tests.add_task(_task_terraform, name="terraform")
-_collection_tests.add_task(_task_tools, name="tools")
 _collection_tests.add_task(_task_unit, name="unit")
 namespace.add_collection(_collection_tests)
