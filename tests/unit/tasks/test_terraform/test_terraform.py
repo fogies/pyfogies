@@ -46,5 +46,3 @@ def test_task_apply_and_destroy(
     finally:
         _ = task_destroy(Context())
         assert not expected_file_path.exists()
-
-
