@@ -67,19 +67,23 @@ def get_task_apply(
 
         with ExitStack() as stack:
             if aws_profiles_path is not None and aws_profile is not None:
-                _ = stack.enter_context(aws_environ(profiles_path=aws_profiles_path, profile=aws_profile))
+                _ = stack.enter_context(
+                    aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
+                )
 
-            output_result = stack.enter_context(terraform_output(
-                binary_cache_path=binary_cache_path,
-                command_params=command_params,
-                module_path=module_path,
-                init_on_entry=init,
-                init_params=init_params,
-                apply_on_entry=True,
-                apply_params=ApplyParams(auto_approve=apply_auto_approve),
-                destroy_on_exit=False,
-                output_model=output_model,
-            ))
+            output_result = stack.enter_context(
+                terraform_output(
+                    binary_cache_path=binary_cache_path,
+                    command_params=command_params,
+                    module_path=module_path,
+                    init_on_entry=init,
+                    init_params=init_params,
+                    apply_on_entry=True,
+                    apply_params=ApplyParams(auto_approve=apply_auto_approve),
+                    destroy_on_exit=False,
+                    output_model=output_model,
+                )
+            )
 
             if output:
                 print(output_result.model_dump_json(indent=2))
@@ -133,15 +137,19 @@ def get_task_destroy(
 
         with ExitStack() as stack:
             if aws_profiles_path is not None and aws_profile is not None:
-                _ = stack.enter_context(aws_environ(profiles_path=aws_profiles_path, profile=aws_profile))
+                _ = stack.enter_context(
+                    aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
+                )
 
-            tf = stack.enter_context(terraform(
-                binary_cache_path=binary_cache_path,
-                command_params=command_params,
-                module_path=module_path,
-                init_on_entry=init,
-                init_params=init_params,
-            ))
+            tf = stack.enter_context(
+                terraform(
+                    binary_cache_path=binary_cache_path,
+                    command_params=command_params,
+                    module_path=module_path,
+                    init_on_entry=init,
+                    init_params=init_params,
+                )
+            )
 
             _ = tf.destroy(
                 command_params=command_params,
