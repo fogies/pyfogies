@@ -19,11 +19,13 @@ from pydantic import BaseModel
 
 from fogies.retry import readiness_poll_short
 
+# Most recent first; _KNOWN_VERSIONS[0] is the default.
 _KNOWN_VERSIONS = [
+    "0.32.5",
     "0.17.7",
 ]
 
-_DEFAULT_VERSION = _KNOWN_VERSIONS[-1]
+_DEFAULT_VERSION = _KNOWN_VERSIONS[0]
 
 _OLLAMA_URL_TEMPLATE = (
     "https://github.com/ollama/ollama/releases/download"
