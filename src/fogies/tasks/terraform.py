@@ -7,6 +7,7 @@ from typing import Callable, cast
 from invoke.context import Context
 from invoke.tasks import Task, task
 
+from fogies.terraform.backend import BackendConfigS3
 from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
@@ -16,6 +17,7 @@ from fogies.tools.terraform import (
     TerraformOutputModel,
     terraform,
     terraform_output,
+    terraform_tfbackend_s3,
 )
 
 
@@ -23,8 +25,10 @@ def get_task_apply(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
+    staging_path: pathlib.Path | None = None,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
+    backend: BackendConfigS3 | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
@@ -32,6 +36,9 @@ def get_task_apply(
     default_output: bool = False,
     output_model: type[TerraformOutputModel],
 ) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
+    if backend is not None and staging_path is None:
+        raise ValueError("staging_path is required when backend is set")
+
     @task(name="apply")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
         context: Context,
@@ -71,11 +78,22 @@ def get_task_apply(
                     aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
                 )
 
+            tfbackend_path = None
+            if backend is not None:
+                assert staging_path is not None
+                tfbackend_path = stack.enter_context(
+                    terraform_tfbackend_s3(
+                        path=staging_path / "terraform.s3.tfbackend",
+                        backend=backend,
+                    )
+                )
+
             output_result = stack.enter_context(
                 terraform_output(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
                     module_path=module_path,
+                    tfbackend_path=tfbackend_path,
                     init_on_entry=init,
                     init_params=init_params,
                     apply_on_entry=True,
@@ -97,13 +115,18 @@ def get_task_destroy(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
+    staging_path: pathlib.Path | None = None,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
+    backend: BackendConfigS3 | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
+    if backend is not None and staging_path is None:
+        raise ValueError("staging_path is required when backend is set")
+
     @task(name="destroy")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(
         context: Context,
@@ -141,11 +164,22 @@ def get_task_destroy(
                     aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
                 )
 
+            tfbackend_path = None
+            if backend is not None:
+                assert staging_path is not None
+                tfbackend_path = stack.enter_context(
+                    terraform_tfbackend_s3(
+                        path=staging_path / "terraform.s3.tfbackend",
+                        backend=backend,
+                    )
+                )
+
             tf = stack.enter_context(
                 terraform(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
                     module_path=module_path,
+                    tfbackend_path=tfbackend_path,
                     init_on_entry=init,
                     init_params=init_params,
                 )

@@ -13,7 +13,7 @@ from typing import TypeVar, cast
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel
 
-from fogies.terraform.backend import BackendOutput
+from fogies.terraform.backend import BackendConfigS3
 from fogies.tools.command import CommandParams, command_run
 
 
@@ -72,8 +72,7 @@ class _TerraformCommandOutputModel(
 def terraform_tfbackend_s3(
     *,
     path: pathlib.Path,
-    backend: BackendOutput,
-    state: str,
+    backend: BackendConfigS3,
     delete_on_exit: bool = True,
 ) -> Generator[pathlib.Path]:
     """Write S3 backend configuration to a file and yield the path.
@@ -87,18 +86,11 @@ def terraform_tfbackend_s3(
     """
     if path.suffixes[-2:] != [".s3", ".tfbackend"]:
         raise ValueError("Path '{}' must end with '.s3.tfbackend'".format(path))
-    if state not in backend.state_keys:
-        raise ValueError(
-            "State '{}' is not declared as part of backend. Declared states: {}.".format(
-                state,
-                ", ".join(sorted(backend.state_keys)),
-            )
-        )
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         _ = f.write('region = "{}"\n'.format(backend.region))
         _ = f.write('bucket = "{}"\n'.format(backend.bucket_name))
-        _ = f.write('key = "{}"\n'.format(backend.state_keys[state]))
+        _ = f.write('key = "{}"\n'.format(backend.key))
         _ = f.write("use_lockfile = true\n")
     try:
         yield path

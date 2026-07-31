@@ -65,8 +65,9 @@ def alb_dns_output(
     with (
         terraform_tfbackend_s3(
             path=tfbackend_path,
-            backend=pyfogies_test_backend,
-            state=PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_ALB_DNS.value,
+            backend=pyfogies_test_backend[
+                PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_ALB_DNS.value
+            ],
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
