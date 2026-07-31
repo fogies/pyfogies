@@ -36,7 +36,7 @@ tenacity = "^9.1.4"
 basedpyright = "^1.36.1"
 black = "~26.5.1" # Black does not semver.
 boto3 = "^1.42.68"
-boto3-stubs-full = "^1.42.68"
+boto3-stubs = {version = "^1.43.60", extras = ["s3"]}
 invoke = "^2.2.1"
 isort = "^8.0.1"
 poetry = "^2.2.1"

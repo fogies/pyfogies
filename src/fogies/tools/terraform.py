@@ -5,7 +5,7 @@ import pathlib
 import sys
 import urllib.request
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from http.client import HTTPResponse
 from typing import TypeVar, cast
@@ -75,7 +75,7 @@ def terraform_tfbackend_s3(
     backend: BackendOutput,
     state: str,
     delete_on_exit: bool = True,
-) -> Iterator[pathlib.Path]:
+) -> Generator[pathlib.Path]:
     """Write S3 backend configuration to a file and yield the path.
 
     The file is written as flat key/value entries, one per line, e.g.:
@@ -113,7 +113,7 @@ def terraform_tfvars(
     path: pathlib.Path,
     variables: BaseModel,
     delete_on_exit: bool = True,
-) -> Iterator[pathlib.Path]:
+) -> Generator[pathlib.Path]:
     """Write in-memory variables to a file and yield the path for use with apply/destroy.
 
     *path* is where the .tfvars.json file is written. *variables* must be a
@@ -306,7 +306,7 @@ def terraform(
     apply_params: ApplyParams | None = None,
     destroy_on_exit: bool = False,
     destroy_params: DestroyParams | None = None,
-) -> Iterator[_Terraform]:
+) -> Generator[_Terraform]:
     """Download a Terraform binary and yield a Terraform handle.
 
     If *init_on_entry* is true, run init after preparing the binary; requires
@@ -416,7 +416,7 @@ def terraform_output(
     destroy_on_exit: bool = False,
     destroy_params: DestroyParams | None = None,
     output_model: type[TerraformOutputModel],
-) -> Iterator[TerraformOutputModel]:
+) -> Generator[TerraformOutputModel]:
     """Run the terraform context manager, call output() internally, and yield the parsed result.
 
     All entry/exit parameters are passed through to terraform(); the caller

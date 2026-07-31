@@ -7,6 +7,7 @@ from typing import cast
 
 import boto3
 import pytest
+from mypy_boto3_s3.client import S3Client
 from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 from pydantic import BaseModel
 
@@ -37,7 +38,11 @@ def _verify_backend_states_destroyed(backend: BackendOutput) -> None:
 
     # If any bucket still has something in it, we cannot delete the bucket.
     # Obtain a client to iterate through the state buckets.
-    client = boto3.client("s3", region_name=backend.region)
+    # boto3.client()'s overload set spans every AWS service regardless of which
+    # mypy-boto3-* stubs are installed, which basedpyright can't fully resolve.
+    client: S3Client = boto3.client(  # pyright: ignore[reportUnknownMemberType]
+        "s3", region_name=backend.region
+    )
     for state_name, state_key in backend.state_keys.items():
         # Obtain the current state of the key.
         try:
