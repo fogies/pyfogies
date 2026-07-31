@@ -6,7 +6,7 @@ import subprocess
 import sys
 import urllib.request
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from http.client import HTTPResponse
 from typing import cast
@@ -112,7 +112,7 @@ class _Ollama:
         return int(text)
 
     @contextmanager
-    def lock(self) -> Iterator[None]:
+    def lock(self) -> Generator[None]:
         """Acquire and hold the file lock."""
         with self._file_lock:
             yield
@@ -228,7 +228,7 @@ def ollama(
     *,
     version: str | None = None,
     binary_cache_path: pathlib.Path,
-) -> Iterator[_Ollama]:
+) -> Generator[_Ollama]:
     """Download an Ollama Windows CLI release and yield an Ollama handle.
 
     *version* is the Ollama release tag version (e.g., "0.17.7"). The archive is
@@ -284,7 +284,7 @@ def ollama_client(
     version: str | None = None,
     binary_cache_path: pathlib.Path,
     show_window: bool = False,
-) -> Iterator[_ollama_client.Client]:
+) -> Generator[_ollama_client.Client]:
     """Provide an Ollama Python client with a running local server.
 
     Starts Ollama server in background and yields a configured
