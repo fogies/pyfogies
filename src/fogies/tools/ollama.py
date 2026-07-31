@@ -4,7 +4,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import time
 import urllib.request
 import zipfile
 from collections.abc import Iterator
@@ -14,8 +13,11 @@ from typing import cast
 
 import ollama as _ollama_client
 import psutil
+import tenacity
 from filelock import BaseFileLock, FileLock
 from pydantic import BaseModel
+
+from fogies.retry import readiness_poll_short
 
 _KNOWN_VERSIONS = [
     "0.17.7",
@@ -30,8 +32,6 @@ _OLLAMA_URL_TEMPLATE = (
 
 _OLLAMA_LISTEN_ADDRESS: tuple[str, int] = ("127.0.0.1", 11434)
 _OLLAMA_LISTEN_PROBE_TIMEOUT = 0.25
-_OLLAMA_LISTEN_POLL_INTERVAL = 0.1
-_OLLAMA_LISTEN_PROBE_WAIT_TIMEOUT = 10.0
 _OLLAMA_TERMINATE_WAIT_TIMEOUT = 10.0
 
 
@@ -192,34 +192,33 @@ def _terminate_pid(*, pid: _PidWithCreateTime) -> None:
         pass
 
 
-def _wait_until_listening(
-    *,
-    pid: _PidWithCreateTime,
-    timeout: float = _OLLAMA_LISTEN_PROBE_WAIT_TIMEOUT,
-) -> None:
-    end = time.time() + timeout
-    while time.time() < end:
-        try:
-            proc = psutil.Process(pid.pid)
-            alive = (
-                proc.is_running()
-                and proc.status() != psutil.STATUS_ZOMBIE
-                and _create_time_seconds(proc.create_time()) == pid.create_time_seconds
-            )
-        except psutil.Error:
-            alive = False
-        if not alive:
-            raise RuntimeError("Ollama server process exited before becoming ready")
-        try:
-            with socket.create_connection(
-                _OLLAMA_LISTEN_ADDRESS,
-                timeout=_OLLAMA_LISTEN_PROBE_TIMEOUT,
-            ):
-                return
-        except OSError:
-            pass
-        time.sleep(_OLLAMA_LISTEN_POLL_INTERVAL)
-    raise TimeoutError("Ollama server did not become ready")
+def _assert_process_alive(pid: _PidWithCreateTime) -> None:
+    try:
+        proc = psutil.Process(pid.pid)
+        alive = (
+            proc.is_running()
+            and proc.status() != psutil.STATUS_ZOMBIE
+            and _create_time_seconds(proc.create_time()) == pid.create_time_seconds
+        )
+    except psutil.Error:
+        alive = False
+    if not alive:
+        raise RuntimeError("Ollama server process exited before becoming ready")
+
+
+def _wait_until_listening(*, pid: _PidWithCreateTime) -> None:
+    try:
+        for attempt in readiness_poll_short(exceptions=OSError, reraise=False):
+            with attempt:
+                # If the server process has already died, fail fast.
+                _assert_process_alive(pid)
+                with socket.create_connection(
+                    _OLLAMA_LISTEN_ADDRESS,
+                    timeout=_OLLAMA_LISTEN_PROBE_TIMEOUT,
+                ):
+                    return
+    except tenacity.RetryError:
+        raise TimeoutError("Ollama server did not become ready") from None
 
 
 @contextmanager
