@@ -55,8 +55,9 @@ def nested_backend_output(
     with (
         terraform_tfbackend_s3(
             path=tfbackend_path,
-            backend=pyfogies_test_backend,
-            state=PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_BACKEND.value,
+            backend=pyfogies_test_backend[
+                PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_BACKEND.value
+            ],
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
@@ -130,13 +131,11 @@ def test_state_a_and_state_b(
     with (
         terraform_tfbackend_s3(
             path=tfbackend_a_path,
-            backend=nested_backend_output,
-            state="test-state-a",
+            backend=nested_backend_output["test-state-a"],
         ) as tfbackend_a_path,
         terraform_tfbackend_s3(
             path=tfbackend_b_path,
-            backend=nested_backend_output,
-            state="test-state-b",
+            backend=nested_backend_output["test-state-b"],
         ) as tfbackend_b_path,
         terraform_tfvars(
             path=tfvars_a,
@@ -201,8 +200,7 @@ def test_invalid_state_c(
         with (
             terraform_tfbackend_s3(
                 path=tfbackend_c_path,
-                backend=nested_backend_output,
-                state="invalid_state_c",
+                backend=nested_backend_output["invalid_state_c"],
             ) as tfbackend_c_path,
         ):
             # Apply should fail.
