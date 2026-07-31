@@ -1,14 +1,13 @@
 """Test Terraform ALB module with a self-signed certificate."""
 
 import pathlib
-import time
 from collections.abc import Iterator
 
 import pytest
 import requests
-import requests.exceptions
 from pydantic import BaseModel
 
+from fogies.retry import readiness_poll_long
 from fogies.terraform.alb import AlbOutput
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.network import NetworkOutput
@@ -83,18 +82,12 @@ def alb_output(
         yield output
 
 
-def _wait_for_alb(dns_name: str, timeout_seconds: int = 120) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        try:
+def _wait_for_alb(dns_name: str) -> None:
+    for attempt in readiness_poll_long(exceptions=requests.exceptions.ConnectionError):
+        with attempt:
             _ = requests.get(
                 "http://{}".format(dns_name), timeout=5, allow_redirects=False
             )
-            return
-        except requests.exceptions.ConnectionError:
-            if time.monotonic() >= deadline:
-                raise
-            time.sleep(5)
 
 
 def test_alb_output(alb_output: _TestAlbOutput) -> None:
