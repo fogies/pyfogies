@@ -60,9 +60,9 @@ def _load_aws_profile_from_toml(profiles_path: Path, profile: str) -> _AwsProfil
 
 @contextlib.contextmanager
 def aws_environ(
+    *,
     profiles_path: Path,
     profile: str,
-    *,
     raise_if_exists: bool = True,
     raise_if_changed: bool = True,
 ) -> Generator[AwsEnviron, None, None]:

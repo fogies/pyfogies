@@ -2,6 +2,7 @@ import contextlib
 import dataclasses
 import os
 import pathlib
+import subprocess
 from typing import cast
 
 from invoke.context import Context
@@ -63,7 +64,7 @@ def command_run(
 
     resolved_command = _resolve_command(command, command_params.cwd)
     args_combined = [resolved_command] + (args or [])
-    command_str = " ".join(args_combined)
+    command_str = subprocess.list2cmdline(args_combined)
 
     cd_context = (
         context.cd(str(command_params.cwd))  # pyright: ignore[reportUnknownMemberType]

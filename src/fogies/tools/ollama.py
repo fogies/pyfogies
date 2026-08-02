@@ -194,17 +194,20 @@ def _terminate_pid(*, pid: _PidWithCreateTime) -> None:
         pass
 
 
-def _assert_process_alive(pid: _PidWithCreateTime) -> None:
+def _process_is_alive(pid: _PidWithCreateTime) -> bool:
     try:
         proc = psutil.Process(pid.pid)
-        alive = (
+        return (
             proc.is_running()
             and proc.status() != psutil.STATUS_ZOMBIE
             and _create_time_seconds(proc.create_time()) == pid.create_time_seconds
         )
     except psutil.Error:
-        alive = False
-    if not alive:
+        return False
+
+
+def _assert_process_alive(pid: _PidWithCreateTime) -> None:
+    if not _process_is_alive(pid):
         raise RuntimeError("Ollama server process exited before becoming ready")
 
 
@@ -294,18 +297,9 @@ def ollama_client(
     with ollama(version=version, binary_cache_path=binary_cache_path) as ollama_binary:
         with ollama_binary.lock():
             # First check whether a process is already running.
-            running = False
-            if ollama_binary.pid is not None:
-                try:
-                    proc = psutil.Process(ollama_binary.pid.pid)
-                    running = (
-                        proc.is_running()
-                        and proc.status() != psutil.STATUS_ZOMBIE
-                        and _create_time_seconds(proc.create_time())
-                        == ollama_binary.pid.create_time_seconds
-                    )
-                except psutil.Error:
-                    running = False
+            running = ollama_binary.pid is not None and _process_is_alive(
+                ollama_binary.pid
+            )
 
             # If needed, start the server.
             if not running:

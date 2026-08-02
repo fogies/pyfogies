@@ -45,11 +45,12 @@ class DestroyParams:
     auto_approve: bool = False
 
 
+# Most recent first; _KNOWN_VERSIONS[0] is the default.
 _KNOWN_VERSIONS = [
     "1.14.4",
 ]
 
-_DEFAULT_VERSION = _KNOWN_VERSIONS[-1]
+_DEFAULT_VERSION = _KNOWN_VERSIONS[0]
 
 _TERRAFORM_URL_TEMPLATE = (
     "https://releases.hashicorp.com/terraform"
@@ -315,7 +316,7 @@ def terraform(
     -backend-config=<path>.
 
     *backend_status_path* and *backend*, when provided together, check
-    whether backend.state's object exists in the backend bucket after a
+    whether backend.state has any resources in the backend bucket after a
     successful apply_on_entry, and again after a successful destroy_on_exit,
     recording the result in backend_status_path's backend status file. See
     fogies.terraform.backend.
