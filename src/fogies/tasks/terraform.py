@@ -39,8 +39,8 @@ def get_task_apply(
 ) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
     if backend is not None and staging_path is None:
         raise ValueError("staging_path is required when backend is set")
-    if backend_status_path is not None and backend is None:
-        raise ValueError("backend_status_path requires backend to be set")
+    if (backend_status_path is None) != (backend is None):
+        raise ValueError("backend_status_path and backend must be provided together")
 
     @task(name="apply")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
@@ -132,8 +132,8 @@ def get_task_destroy(
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     if backend is not None and staging_path is None:
         raise ValueError("staging_path is required when backend is set")
-    if backend_status_path is not None and backend is None:
-        raise ValueError("backend_status_path requires backend to be set")
+    if (backend_status_path is None) != (backend is None):
+        raise ValueError("backend_status_path and backend must be provided together")
 
     @task(name="destroy")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(

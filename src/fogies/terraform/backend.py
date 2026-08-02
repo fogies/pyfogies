@@ -164,7 +164,7 @@ class BackendStatus(BaseModel):
 
         status = BackendStatus.load(path=path)
         status.backend.applied = True
-        status.states.get(name, BackendStatusEntry()).applied
+        applied = status.states.get(name, BackendStatusEntry()).applied
         status.states[name] = BackendStatusEntry(applied=True)
         status.save(path=path)
     """
