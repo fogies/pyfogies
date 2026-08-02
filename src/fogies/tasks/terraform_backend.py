@@ -1,4 +1,4 @@
-"""Generic tasks for applying and destroying a Terraform configuration."""
+"""Tasks for applying and destroying a Terraform backend configuration."""
 
 import pathlib
 from contextlib import ExitStack
@@ -7,41 +7,28 @@ from typing import Callable, cast
 from invoke.context import Context
 from invoke.tasks import Task, task
 
-from fogies.terraform.backend import BackendConfigS3
 from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
-from fogies.tools.terraform import (
-    ApplyParams,
-    DestroyParams,
-    InitParams,
-    TerraformOutputModel,
-    terraform,
-    terraform_output,
-    terraform_tfbackend_s3,
+from fogies.tools.terraform import ApplyParams, DestroyParams, InitParams
+from fogies.tools.terraform_backend import (
+    terraform_backend_apply,
+    terraform_backend_destroy,
 )
 
 
-def get_task_apply(
+def get_task_backend_apply(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    staging_path: pathlib.Path | None = None,
+    backend_status_path: pathlib.Path,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
-    backend: BackendConfigS3 | None = None,
-    backend_status_path: pathlib.Path | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
     default_output: bool = False,
-    output_model: type[TerraformOutputModel],
 ) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
-    if backend is not None and staging_path is None:
-        raise ValueError("staging_path is required when backend is set")
-    if backend_status_path is not None and backend is None:
-        raise ValueError("backend_status_path requires backend to be set")
-
     @task(name="apply")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
         context: Context,
@@ -52,7 +39,7 @@ def get_task_apply(
         output: bool = default_output,
     ) -> None:
         """
-        Apply a Terraform configuration.
+        Apply a Terraform backend configuration, and record it as applied.
 
         Flags:
           --init                Run terraform init before apply (downloads providers, sets up backend).
@@ -81,30 +68,15 @@ def get_task_apply(
                     aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
                 )
 
-            tfbackend_path = None
-            if backend is not None:
-                assert staging_path is not None
-                tfbackend_path = stack.enter_context(
-                    terraform_tfbackend_s3(
-                        path=staging_path / "terraform.s3.tfbackend",
-                        backend=backend,
-                    )
-                )
-
             output_result = stack.enter_context(
-                terraform_output(
+                terraform_backend_apply(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
                     module_path=module_path,
-                    backend=backend,
                     backend_status_path=backend_status_path,
-                    tfbackend_path=tfbackend_path,
                     init_on_entry=init,
                     init_params=init_params,
-                    apply_on_entry=True,
                     apply_params=ApplyParams(auto_approve=apply_auto_approve),
-                    destroy_on_exit=False,
-                    output_model=output_model,
                 )
             )
 
@@ -116,25 +88,18 @@ def get_task_apply(
     )
 
 
-def get_task_destroy(
+def get_task_backend_destroy(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    staging_path: pathlib.Path | None = None,
+    backend_status_path: pathlib.Path,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
-    backend: BackendConfigS3 | None = None,
-    backend_status_path: pathlib.Path | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    if backend is not None and staging_path is None:
-        raise ValueError("staging_path is required when backend is set")
-    if backend_status_path is not None and backend is None:
-        raise ValueError("backend_status_path requires backend to be set")
-
     @task(name="destroy")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(
         context: Context,
@@ -144,7 +109,12 @@ def get_task_destroy(
         destroy_auto_approve: bool = default_destroy_auto_approve,
     ) -> None:
         """
-        Destroy a Terraform configuration.
+        Destroy a Terraform backend configuration, and record it as destroyed.
+
+        Reads the backend module's own output, verifies every state it
+        declares is empty of resources, then clears the bucket's state
+        objects before destroying it. Refuses (raises) if any declared state
+        still has resources, regardless of how this task is invoked.
 
         Flags:
           --init                 Run terraform init before destroy (downloads providers, sets up backend).
@@ -172,29 +142,14 @@ def get_task_destroy(
                     aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
                 )
 
-            tfbackend_path = None
-            if backend is not None:
-                assert staging_path is not None
-                tfbackend_path = stack.enter_context(
-                    terraform_tfbackend_s3(
-                        path=staging_path / "terraform.s3.tfbackend",
-                        backend=backend,
-                    )
-                )
-
-            _ = stack.enter_context(
-                terraform(
-                    binary_cache_path=binary_cache_path,
-                    command_params=command_params,
-                    module_path=module_path,
-                    backend=backend,
-                    backend_status_path=backend_status_path,
-                    tfbackend_path=tfbackend_path,
-                    init_on_entry=init,
-                    init_params=init_params,
-                    destroy_on_exit=True,
-                    destroy_params=DestroyParams(auto_approve=destroy_auto_approve),
-                )
+            terraform_backend_destroy(
+                binary_cache_path=binary_cache_path,
+                command_params=command_params,
+                module_path=module_path,
+                backend_status_path=backend_status_path,
+                init_on_entry=init,
+                init_params=init_params,
+                destroy_params=DestroyParams(auto_approve=destroy_auto_approve),
             )
 
     return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_destroy)

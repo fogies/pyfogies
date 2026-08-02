@@ -13,7 +13,12 @@ from typing import TypeVar, cast
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel
 
-from fogies.terraform.backend import BackendConfigS3
+from fogies.terraform.backend import (
+    BackendConfigS3,
+    BackendStatus,
+    BackendStatusEntry,
+    backend_state_resources,
+)
 from fogies.tools.command import CommandParams, command_run
 
 
@@ -290,6 +295,8 @@ def terraform(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams | None = None,
     module_path: pathlib.Path | None = None,
+    backend: BackendConfigS3 | None = None,
+    backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
     tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
     init_on_entry: bool = False,
@@ -305,10 +312,18 @@ def terraform(
     *command_params* and *module_path*. If *apply_on_entry* is true, run
     apply after init; requires *command_params* and *module_path*.
     *tfbackend_path* is optional for init and, when set, is passed as
-    -backend-config=<path>. *tfvars_path* is optional for apply. If
-    *destroy_on_exit* is true, run destroy when exiting the context; requires
-    *command_params* and *module_path*. *tfvars_path* is optional for destroy.
-    *version* when None uses the bundled default Terraform version.
+    -backend-config=<path>.
+
+    *backend_status_path* and *backend*, when provided together, check
+    whether backend.state's object exists in the backend bucket after a
+    successful apply_on_entry, and again after a successful destroy_on_exit,
+    recording the result in backend_status_path's backend status file. See
+    fogies.terraform.backend.
+
+    *tfvars_path* is optional for apply. If *destroy_on_exit* is true, run
+    destroy when exiting the context; requires *command_params* and
+    *module_path*. *tfvars_path* is optional for destroy. *version* when
+    None uses the bundled default Terraform version.
     """
     if sys.platform != "win32":
         raise RuntimeError("Only implemented on Windows")
@@ -331,6 +346,8 @@ def terraform(
         raise ValueError("apply_on_entry requires command_params and module_path")
     if destroy_on_exit and (command_params is None or module_path is None):
         raise ValueError("destroy_on_exit requires command_params and module_path")
+    if (backend_status_path is None) != (backend is None):
+        raise ValueError("backend_status_path and backend must be provided together")
 
     exe_name = "terraform_{}.exe".format(version.replace(".", "_"))
     exe_path = binary_cache_path / exe_name
@@ -377,6 +394,13 @@ def terraform(
             tfvars_path=tfvars_path,
             apply_params=apply_params,
         )
+        if backend_status_path is not None:
+            assert backend is not None
+            backend_status = BackendStatus.load(path=backend_status_path)
+            backend_status.states[backend.state] = BackendStatusEntry(
+                applied=bool(backend_state_resources(config=backend))
+            )
+            backend_status.save(path=backend_status_path)
 
     try:
         yield tf
@@ -390,6 +414,13 @@ def terraform(
                 tfvars_path=tfvars_path,
                 destroy_params=destroy_params,
             )
+            if backend_status_path is not None:
+                assert backend is not None
+                backend_status = BackendStatus.load(path=backend_status_path)
+                backend_status.states[backend.state] = BackendStatusEntry(
+                    applied=bool(backend_state_resources(config=backend))
+                )
+                backend_status.save(path=backend_status_path)
 
 
 @contextmanager
@@ -399,6 +430,8 @@ def terraform_output(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams,
     module_path: pathlib.Path,
+    backend: BackendConfigS3 | None = None,
+    backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
     tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
     init_on_entry: bool = False,
@@ -415,12 +448,17 @@ def terraform_output(
     sets *init_on_entry*, *apply_on_entry*, and *destroy_on_exit* as needed.
     Yields the output model; destroy runs on exit when *destroy_on_exit* is true.
     *version* when None uses the bundled default Terraform version.
+
+    *backend_status_path* and *backend* are passed through to terraform();
+    see its docstring.
     """
     with terraform(
         version=version,
         binary_cache_path=binary_cache_path,
         command_params=command_params,
         module_path=module_path,
+        backend=backend,
+        backend_status_path=backend_status_path,
         tfbackend_path=tfbackend_path,
         tfvars_path=tfvars_path,
         init_on_entry=init_on_entry,
