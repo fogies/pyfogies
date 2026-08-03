@@ -6,7 +6,7 @@ import pytest
 from invoke.exceptions import UnexpectedExit
 from pydantic import BaseModel
 
-from fogies.terraform.backend import BackendConfigS3
+from fogies.terraform.backend import BackendConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -14,7 +14,7 @@ from fogies.tools.terraform import (
     InitParams,
     terraform,
     terraform_output,
-    terraform_tfbackend_s3,
+    terraform_tfbackend,
     terraform_tfvars,
 )
 from tasks.paths import PATH_STAGING_BINARY_CACHE
@@ -47,16 +47,16 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
     assert not path.exists()
 
 
-def test_terraform_tfbackend_s3(tmp_path: pathlib.Path) -> None:
-    """terraform_tfbackend_s3 writes the file and yields the path; delete_on_exit removes the file."""
-    backend = BackendConfigS3(
+def test_terraform_tfbackend(tmp_path: pathlib.Path) -> None:
+    """terraform_tfbackend writes the file and yields the path; delete_on_exit removes the file."""
+    backend = BackendConfig(
         state="test-state",
         bucket_name="my-bucket",
         region="us-west-2",
         key="test-state/terraform.tfstate",
     )
-    path = tmp_path / "backend.s3.tfbackend"
-    with terraform_tfbackend_s3(path=path, backend=backend) as backend_path:
+    path = tmp_path / "backend.tfbackend"
+    with terraform_tfbackend(path=path, backend=backend) as backend_path:
         text = backend_path.read_text(encoding="utf-8")
         assert 'region = "us-west-2"' in text
         assert 'bucket = "my-bucket"' in text

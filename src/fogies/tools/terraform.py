@@ -14,7 +14,7 @@ from invoke.runners import Result
 from pydantic import BaseModel, RootModel
 
 from fogies.terraform.backend import (
-    BackendConfigS3,
+    BackendConfig,
     BackendStatus,
     BackendStatusEntry,
     backend_state_resources,
@@ -75,10 +75,10 @@ class _TerraformCommandOutputModel(
 
 
 @contextmanager
-def terraform_tfbackend_s3(
+def terraform_tfbackend(
     *,
     path: pathlib.Path,
-    backend: BackendConfigS3,
+    backend: BackendConfig,
     delete_on_exit: bool = True,
 ) -> Generator[pathlib.Path]:
     """Write S3 backend configuration to a file and yield the path.
@@ -90,8 +90,8 @@ def terraform_tfbackend_s3(
     key = "test-state-a/terraform.tfstate"
     use_lockfile = true
     """
-    if path.suffixes[-2:] != [".s3", ".tfbackend"]:
-        raise ValueError("Path '{}' must end with '.s3.tfbackend'".format(path))
+    if path.suffixes[-1:] != [".tfbackend"]:
+        raise ValueError("Path '{}' must end with '.tfbackend'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         _ = f.write('region = "{}"\n'.format(backend.region))
@@ -312,7 +312,7 @@ def terraform(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams | None = None,
     module_path: pathlib.Path | None = None,
-    backend: BackendConfigS3 | None = None,
+    backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
     tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
@@ -447,7 +447,7 @@ def terraform_output(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams,
     module_path: pathlib.Path,
-    backend: BackendConfigS3 | None = None,
+    backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
     tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,

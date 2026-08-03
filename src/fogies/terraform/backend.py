@@ -20,7 +20,7 @@ class BackendVars(BaseModel):
     force_destroy: bool
 
 
-class BackendConfigS3(BaseModel):
+class BackendConfig(BaseModel):
     """Connection info for a single state within an S3 Terraform backend.
 
     Unlike a Terraform backend module's output, this does not describe every
@@ -34,14 +34,14 @@ class BackendConfigS3(BaseModel):
     key: str
 
     @staticmethod
-    def for_state(*, name: str, region: str, state: str) -> "BackendConfigS3":
+    def for_state(*, name: str, region: str, state: str) -> "BackendConfig":
         """Return connection config for a state, without applying the backend module.
 
         Mirrors the bucket and key naming the backend Terraform module derives
         internally, so a tenant can point at an already-applied backend without
         knowing about any other state sharing its bucket.
         """
-        return BackendConfigS3(
+        return BackendConfig(
             state=state,
             bucket_name="{}-bucket-{}".format(name, region),
             region=region,
@@ -54,7 +54,7 @@ class BackendOutput(BaseModel):
     region: str
     state_keys: dict[str, str]
 
-    def config(self, *, state: str) -> BackendConfigS3:
+    def config(self, *, state: str) -> BackendConfig:
         """Return connection config for one of this backend's declared states.
 
         Raises ValueError if state is not declared as part of the backend.
@@ -67,14 +67,14 @@ class BackendOutput(BaseModel):
                 )
             )
 
-        return BackendConfigS3(
+        return BackendConfig(
             state=state,
             bucket_name=self.bucket_name,
             region=self.region,
             key=self.state_keys[state],
         )
 
-    def __getitem__(self, state: str) -> BackendConfigS3:
+    def __getitem__(self, state: str) -> BackendConfig:
         return self.config(state=state)
 
 
@@ -111,7 +111,7 @@ def backend_delete_state_objects(*, output: BackendOutput) -> None:
     )
 
 
-def backend_state_resources(*, config: BackendConfigS3) -> list[object]:
+def backend_state_resources(*, config: BackendConfig) -> list[object]:
     """Return config's resources from the backend bucket.
 
     Returns an empty list if the state's object is absent (never applied) or
