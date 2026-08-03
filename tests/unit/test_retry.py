@@ -1,6 +1,7 @@
 """Unit tests for fogies.retry."""
 
 import pathlib
+
 import pytest
 
 from fogies.retry import readiness_poll, retry_transient
@@ -16,18 +17,22 @@ class _OtherError(Exception):
 
 def test_readiness_poll_succeeds() -> None:
     calls = 0
-    for attempt in readiness_poll(exceptions=_TestError, timeout=10.0, poll_interval=0.1):
+    for attempt in readiness_poll(
+        exceptions=_TestError, timeout=10.0, poll_interval=0.1
+    ):
         with attempt:
             calls += 1
             if calls < 5:
                 raise _TestError("Not Yet")
-    
+
     assert calls == 5
 
 
 def test_readiness_poll_ignores_other_exceptions() -> None:
     with pytest.raises(_OtherError):
-        for attempt in readiness_poll(exceptions=_TestError, timeout=10.0, poll_interval=0.1):
+        for attempt in readiness_poll(
+            exceptions=_TestError, timeout=10.0, poll_interval=0.1
+        ):
             with attempt:
                 raise _OtherError("Unrelated")
 
@@ -58,7 +63,7 @@ def test_retry_transient_reraises() -> None:
 
     with pytest.raises(_TestError, match="Always"):
         always_fails()
-    
+
     # Current implementation retries 5 times by default.
     assert calls == 5
 
