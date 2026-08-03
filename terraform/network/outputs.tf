@@ -18,6 +18,6 @@ output "security_group_ids" {
   value = [
     aws_vpc.vpc.default_security_group_id,
     aws_security_group.allow_egress_to_anywhere.id,
-    aws_security_group.allow_ingress_http_from_anywhere.id,
+    aws_security_group.allow_ingress_http_https_from_anywhere.id,
   ]
 }
