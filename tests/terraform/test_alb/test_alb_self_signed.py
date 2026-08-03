@@ -17,7 +17,7 @@ from fogies.tools.terraform import (
     DestroyParams,
     InitParams,
     terraform_output,
-    terraform_tfbackend_s3,
+    terraform_tfbackend,
     terraform_tfvars,
 )
 from tasks.paths import PATH_STAGING_BINARY_CACHE
@@ -47,11 +47,11 @@ def alb_output(
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent / "self_signed"
     tmp_path = tmp_path_factory.mktemp("test-alb-self-signed")
-    tfbackend_path = tmp_path / "test-alb-self-signed.s3.tfbackend"
+    tfbackend_path = tmp_path / "test-alb-self-signed.tfbackend"
     tfvars_path = tmp_path / "test-alb-self-signed.tfvars.json"
 
     with (
-        terraform_tfbackend_s3(
+        terraform_tfbackend(
             path=tfbackend_path,
             backend=pyfogies_test_backend[
                 PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_ALB_SELF_SIGNED.value

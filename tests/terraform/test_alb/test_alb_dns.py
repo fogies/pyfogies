@@ -17,7 +17,7 @@ from fogies.tools.terraform import (
     DestroyParams,
     InitParams,
     terraform_output,
-    terraform_tfbackend_s3,
+    terraform_tfbackend,
     terraform_tfvars,
 )
 from tasks.paths import PATH_STAGING_BINARY_CACHE
@@ -58,12 +58,12 @@ def alb_dns_output(
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent / "dns"
     tmp_path = tmp_path_factory.mktemp("test-alb-dns")
-    tfbackend_path = tmp_path / "test-alb-dns.s3.tfbackend"
+    tfbackend_path = tmp_path / "test-alb-dns.tfbackend"
     tfvars_path = tmp_path / "test-alb-dns.tfvars.json"
 
     assert pyfogies_test_config.domain is not None
     with (
-        terraform_tfbackend_s3(
+        terraform_tfbackend(
             path=tfbackend_path,
             backend=pyfogies_test_backend[
                 PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_ALB_DNS.value

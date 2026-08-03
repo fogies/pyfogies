@@ -7,7 +7,7 @@ from typing import Callable, cast
 from invoke.context import Context
 from invoke.tasks import Task, task
 
-from fogies.terraform.backend import BackendConfigS3
+from fogies.terraform.backend import BackendConfig
 from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
@@ -17,7 +17,7 @@ from fogies.tools.terraform import (
     TerraformOutputModel,
     terraform,
     terraform_output,
-    terraform_tfbackend_s3,
+    terraform_tfbackend,
 )
 
 
@@ -28,7 +28,7 @@ def get_task_apply(
     staging_path: pathlib.Path | None = None,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
-    backend: BackendConfigS3 | None = None,
+    backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
@@ -85,8 +85,8 @@ def get_task_apply(
             if backend is not None:
                 assert staging_path is not None
                 tfbackend_path = stack.enter_context(
-                    terraform_tfbackend_s3(
-                        path=staging_path / "terraform.s3.tfbackend",
+                    terraform_tfbackend(
+                        path=staging_path / "terraform.tfbackend",
                         backend=backend,
                     )
                 )
@@ -123,7 +123,7 @@ def get_task_destroy(
     staging_path: pathlib.Path | None = None,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
-    backend: BackendConfigS3 | None = None,
+    backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
@@ -176,8 +176,8 @@ def get_task_destroy(
             if backend is not None:
                 assert staging_path is not None
                 tfbackend_path = stack.enter_context(
-                    terraform_tfbackend_s3(
-                        path=staging_path / "terraform.s3.tfbackend",
+                    terraform_tfbackend(
+                        path=staging_path / "terraform.tfbackend",
                         backend=backend,
                     )
                 )

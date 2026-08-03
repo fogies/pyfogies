@@ -12,7 +12,7 @@ from fogies.tools.terraform import (
     DestroyParams,
     InitParams,
     terraform_output,
-    terraform_tfbackend_s3,
+    terraform_tfbackend,
     terraform_tfvars,
 )
 from tasks.paths import PATH_STAGING_BINARY_CACHE
@@ -36,11 +36,11 @@ def test_network_output(
     """Network module creates VPC, subnets, and security groups with expected output."""
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent
-    tfbackend_path = tmp_path / "test-network.s3.tfbackend"
+    tfbackend_path = tmp_path / "test-network.tfbackend"
     tfvars_path = tmp_path / "test-network.tfvars.json"
 
     with (
-        terraform_tfbackend_s3(
+        terraform_tfbackend(
             path=tfbackend_path,
             backend=pyfogies_test_backend[
                 PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_NETWORK.value

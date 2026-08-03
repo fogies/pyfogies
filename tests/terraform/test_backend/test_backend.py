@@ -13,7 +13,7 @@ from fogies.tools.terraform import (
     DestroyParams,
     InitParams,
     terraform_output,
-    terraform_tfbackend_s3,
+    terraform_tfbackend,
     terraform_tfvars,
 )
 from tasks.paths import (
@@ -49,11 +49,11 @@ def nested_backend_output(
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent / "backend"
     tmp_path = tmp_path_factory.mktemp("test-backend")
-    tfbackend_path = tmp_path / "test-backend.s3.tfbackend"
+    tfbackend_path = tmp_path / "test-backend.tfbackend"
     tfvars_path = tmp_path / "test-backend.tfvars.json"
 
     with (
-        terraform_tfbackend_s3(
+        terraform_tfbackend(
             path=tfbackend_path,
             backend=pyfogies_test_backend[
                 PYFOGIES_TEST_TERRAFORM_BACKEND_STATES.TEST_BACKEND.value
@@ -121,19 +121,19 @@ def test_state_a_and_state_b(
     state_a_module_path = backend_path / "state_a"
     state_b_module_path = backend_path / "state_b"
 
-    tfbackend_a_path = tmp_path / "state_a.s3.tfbackend"
-    tfbackend_b_path = tmp_path / "state_b.s3.tfbackend"
+    tfbackend_a_path = tmp_path / "state_a.tfbackend"
+    tfbackend_b_path = tmp_path / "state_b.tfbackend"
     tfvars_a = tmp_path / "state_a.tfvars.json"
     tfvars_b = tmp_path / "state_b.tfvars.json"
     expected_value_a = "test-state-a"
     expected_value_b = "test-state-b"
 
     with (
-        terraform_tfbackend_s3(
+        terraform_tfbackend(
             path=tfbackend_a_path,
             backend=nested_backend_output["test-state-a"],
         ) as tfbackend_a_path,
-        terraform_tfbackend_s3(
+        terraform_tfbackend(
             path=tfbackend_b_path,
             backend=nested_backend_output["test-state-b"],
         ) as tfbackend_b_path,
@@ -194,11 +194,11 @@ def test_invalid_state_c(
     # Ensure backend fixture.
     assert nested_backend_output is not None
 
-    tfbackend_c_path = tmp_path / "invalid_state_c.s3.tfbackend"
+    tfbackend_c_path = tmp_path / "invalid_state_c.tfbackend"
 
     with pytest.raises(ValueError):
         with (
-            terraform_tfbackend_s3(
+            terraform_tfbackend(
                 path=tfbackend_c_path,
                 backend=nested_backend_output["invalid_state_c"],
             ) as tfbackend_c_path,
