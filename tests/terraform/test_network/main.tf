@@ -23,7 +23,7 @@ variable "region" {
 module "network" {
   source = "../../../terraform/network"
 
-  region                 = var.region
+  region                  = var.region
   availability_zone_count = 2
 }
 
