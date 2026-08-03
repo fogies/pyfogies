@@ -153,41 +153,6 @@ class _Terraform:
         """The path to the Terraform executable."""
         return self._path
 
-    def init(
-        self,
-        *,
-        command_params: CommandParams,
-        module_path: pathlib.Path,
-        tfbackend_path: pathlib.Path | None = None,
-        init_params: InitParams | None = None,
-    ) -> Result:
-        """Run terraform init.
-
-        *module_path* is the folder containing the Terraform files.
-        *init_params.migrate_state* when true passes -migrate-state to terraform init.
-        *init_params.reconfigure* when true passes -reconfigure to terraform init.
-        *init_params.upgrade* when true passes -upgrade to terraform init.
-        *tfbackend_path* when set passes -backend-config=<path> to terraform
-        init, where <path> is a backend configuration file.
-        """
-        command_params = command_params.require_cwd(module_path)
-        if init_params is None:
-            init_params = InitParams()
-        init_args = ["init"]
-        if tfbackend_path is not None:
-            init_args.extend(["-backend-config", str(tfbackend_path)])
-        if init_params.migrate_state:
-            init_args.append("-migrate-state")
-        if init_params.reconfigure:
-            init_args.append("-reconfigure")
-        if init_params.upgrade:
-            init_args.append("-upgrade")
-        return command_run(
-            command=self.binary_path,
-            command_params=command_params,
-            args=init_args,
-        )
-
     def apply(
         self,
         *,
@@ -256,6 +221,57 @@ class _Terraform:
             command=self.binary_path,
             command_params=command_params,
             args=destroy_args,
+        )
+
+    def format(
+        self,
+        *,
+        command_params: CommandParams,
+        path: pathlib.Path,
+    ) -> Result:
+        """Run terraform fmt -recursive against path, rewriting .tf files in place.
+
+        Not scoped to a single module: formats every .tf file found under path.
+        """
+        return command_run(
+            command=self.binary_path,
+            command_params=command_params,
+            args=["fmt", "-recursive", str(path)],
+        )
+
+    def init(
+        self,
+        *,
+        command_params: CommandParams,
+        module_path: pathlib.Path,
+        tfbackend_path: pathlib.Path | None = None,
+        init_params: InitParams | None = None,
+    ) -> Result:
+        """Run terraform init.
+
+        *module_path* is the folder containing the Terraform files.
+        *init_params.migrate_state* when true passes -migrate-state to terraform init.
+        *init_params.reconfigure* when true passes -reconfigure to terraform init.
+        *init_params.upgrade* when true passes -upgrade to terraform init.
+        *tfbackend_path* when set passes -backend-config=<path> to terraform
+        init, where <path> is a backend configuration file.
+        """
+        command_params = command_params.require_cwd(module_path)
+        if init_params is None:
+            init_params = InitParams()
+        init_args = ["init"]
+        if tfbackend_path is not None:
+            init_args.extend(["-backend-config", str(tfbackend_path)])
+        if init_params.migrate_state:
+            init_args.append("-migrate-state")
+        if init_params.reconfigure:
+            init_args.append("-reconfigure")
+        if init_params.upgrade:
+            init_args.append("-upgrade")
+        return command_run(
+            command=self.binary_path,
+            command_params=command_params,
+            args=init_args,
         )
 
     def output(

@@ -7,7 +7,7 @@ import fogies.tasks.format
 import fogies.tasks.lint
 import fogies.tasks.poetry
 import fogies.tasks.test
-from tasks.paths import PATH_SECRETS_POETRY
+from tasks.paths import PATH_SECRETS_POETRY, PATH_STAGING_BINARY_CACHE
 
 # Root namespace for tasks.
 namespace: Collection = Collection()
@@ -16,7 +16,14 @@ namespace: Collection = Collection()
 colorama.init()
 
 # Tasks in the root collection.
-namespace.add_task(fogies.tasks.format.get_task_format())
+namespace.add_task(
+    fogies.tasks.format.get_task_format(
+        fmt_black=True,
+        fmt_isort=True,
+        fmt_terraform=True,
+        terraform_binary_cache_path=PATH_STAGING_BINARY_CACHE,
+    )
+)
 namespace.add_task(fogies.tasks.lint.get_task_lint())
 namespace.add_collection(
     fogies.tasks.poetry.get_collection(path_secrets_poetry=PATH_SECRETS_POETRY)
