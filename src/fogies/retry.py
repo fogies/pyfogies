@@ -39,13 +39,12 @@ def _log_retry(log_path: pathlib.Path) -> Callable[[tenacity.RetryCallState], No
     return log_it
 
 
-def _readiness_poll(
+def readiness_poll(
     *,
     exceptions: type[BaseException] | tuple[type[BaseException], ...],
     timeout: float,
     poll_interval: float,
     reraise: bool = True,
-    log_path: pathlib.Path | None = None,
 ) -> tenacity.Retrying:
     """Retry policy for polling until a resource becomes ready or *timeout* elapses.
 
@@ -58,7 +57,6 @@ def _readiness_poll(
         wait=tenacity.wait_fixed(poll_interval),
         stop=tenacity.stop_after_delay(timeout),
         reraise=reraise,
-        before_sleep=_log_retry(log_path) if log_path is not None else None,
     )
 
 
@@ -66,15 +64,13 @@ def readiness_poll_short(
     *,
     exceptions: type[BaseException] | tuple[type[BaseException], ...],
     reraise: bool = True,
-    log_path: pathlib.Path | None = None,
 ) -> tenacity.Retrying:
     """Readiness poll profile for something expected ready within seconds."""
-    return _readiness_poll(
+    return readiness_poll(
         exceptions=exceptions,
         timeout=10.0,
         poll_interval=0.1,
         reraise=reraise,
-        log_path=log_path,
     )
 
 
@@ -82,15 +78,13 @@ def readiness_poll_long(
     *,
     exceptions: type[BaseException] | tuple[type[BaseException], ...],
     reraise: bool = True,
-    log_path: pathlib.Path | None = None,
 ) -> tenacity.Retrying:
     """Readiness poll profile for something that can take minutes to become ready."""
-    return _readiness_poll(
+    return readiness_poll(
         exceptions=exceptions,
         timeout=300.0,
         poll_interval=5.0,
         reraise=reraise,
-        log_path=log_path,
     )
 
 
