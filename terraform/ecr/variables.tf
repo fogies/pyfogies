@@ -13,13 +13,13 @@ variable "force_delete" {
   type        = bool
 }
 
-variable "lifecycle_keep_count" {
-  description = "Number of most-recent tagged images to retain per repository."
+variable "lifecycle_keep_count_limit" {
+  description = "Limit on number of images kept per repository."
   type        = number
 }
 
-variable "lifecycle_keep_days" {
-  description = "Number of days to retain images per repository."
+variable "lifecycle_keep_days_limit" {
+  description = "Limit on age of images kept per repository."
   type        = number
 }
 

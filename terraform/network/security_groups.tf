@@ -17,8 +17,8 @@ resource "aws_security_group" "allow_egress_to_anywhere" {
   }
 }
 
-resource "aws_security_group" "allow_ingress_http_from_anywhere" {
-  name_prefix = "allow_ingress_http_from_anywhere-"
+resource "aws_security_group" "allow_ingress_http_https_from_anywhere" {
+  name_prefix = "allow_ingress_http_https_from_anywhere-"
   vpc_id      = aws_vpc.vpc.id
 
   ingress {

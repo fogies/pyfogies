@@ -19,7 +19,7 @@ data "aws_ecr_lifecycle_policy_document" "policy_document" {
 
   rule {
     priority    = 2
-    description = "Preserve ${var.lifecycle_keep_count} previous images."
+    description = "Expire tagged images beyond the most recent ${var.lifecycle_keep_count_limit}. Combines with the age rule below: an image needs to satisfy both to survive."
 
     action {
       type = "expire"
@@ -29,13 +29,13 @@ data "aws_ecr_lifecycle_policy_document" "policy_document" {
       tag_status       = "tagged"
       tag_pattern_list = ["*"]
       count_type       = "imageCountMoreThan"
-      count_number     = var.lifecycle_keep_count
+      count_number     = var.lifecycle_keep_count_limit
     }
   }
 
   rule {
     priority    = 3
-    description = "Preserve ${var.lifecycle_keep_days} days of previous images."
+    description = "Expire any image, tagged or not, older than ${var.lifecycle_keep_days_limit} days. Applies even to images within the count limit above."
 
     action {
       type = "expire"
@@ -45,7 +45,7 @@ data "aws_ecr_lifecycle_policy_document" "policy_document" {
       tag_status   = "any"
       count_type   = "sinceImagePushed"
       count_unit   = "days"
-      count_number = var.lifecycle_keep_days
+      count_number = var.lifecycle_keep_days_limit
     }
   }
 }
