@@ -1,26 +1,27 @@
 """Tasks for applying and destroying a Terraform backend configuration."""
 
 import pathlib
+from collections.abc import Callable
 from contextlib import ExitStack
-from typing import Callable, cast
+from typing import cast
 
 from invoke.context import Context
 from invoke.tasks import Task, task
 
+from fogies.terraform.backend import BackendOutput
 from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
-from fogies.tools.terraform import ApplyParams, DestroyParams, InitParams
-from fogies.tools.terraform_backend import (
-    terraform_backend_apply,
-    terraform_backend_destroy,
-)
+from fogies.tools.terraform import ApplyParams, DestroyParams, InitParams, TerraformOutputModel
+from fogies.tools.terraform_backend import terraform_backend
 
 
 def get_task_backend_apply(
     *,
-    module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
+    module_path: pathlib.Path,
     backend_status_path: pathlib.Path,
+    tfbackend_path: pathlib.Path,
+    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
     default_init: bool = True,
@@ -28,6 +29,8 @@ def get_task_backend_apply(
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
     default_output: bool = False,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
 ) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
     @task(name="apply")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
@@ -69,19 +72,25 @@ def get_task_backend_apply(
                 )
 
             output_result = stack.enter_context(
-                terraform_backend_apply(
+                terraform_backend(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
                     module_path=module_path,
                     backend_status_path=backend_status_path,
+                    tfbackend_path=tfbackend_path,
+                    tfvars_path=tfvars_path,
                     init_on_entry=init,
                     init_params=init_params,
+                    apply_on_entry=True,
                     apply_params=ApplyParams(auto_approve=apply_auto_approve),
+                    destroy_on_exit=False,
+                    output_model=output_model,
+                    output_model_get_backend=output_model_get_backend,
                 )
             )
 
             if output:
-                print(output_result.model_dump_json(indent=2))
+                print(output_model_get_backend(output_result).model_dump_json(indent=2))
 
     return cast(
         Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_apply
@@ -90,15 +99,19 @@ def get_task_backend_apply(
 
 def get_task_backend_destroy(
     *,
-    module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
+    module_path: pathlib.Path,
     backend_status_path: pathlib.Path,
+    tfbackend_path: pathlib.Path,
+    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
     aws_profiles_path: pathlib.Path | None = None,
     aws_profile: str | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     @task(name="destroy")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(
@@ -142,14 +155,22 @@ def get_task_backend_destroy(
                     aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
                 )
 
-            terraform_backend_destroy(
-                binary_cache_path=binary_cache_path,
-                command_params=command_params,
-                module_path=module_path,
-                backend_status_path=backend_status_path,
-                init_on_entry=init,
-                init_params=init_params,
-                destroy_params=DestroyParams(auto_approve=destroy_auto_approve),
+            _ = stack.enter_context(
+                terraform_backend(
+                    binary_cache_path=binary_cache_path,
+                    command_params=command_params,
+                    module_path=module_path,
+                    backend_status_path=backend_status_path,
+                    tfbackend_path=tfbackend_path,
+                    tfvars_path=tfvars_path,
+                    init_on_entry=init,
+                    init_params=init_params,
+                    apply_on_entry=False,
+                    destroy_on_exit=True,
+                    destroy_params=DestroyParams(auto_approve=destroy_auto_approve),
+                    output_model=output_model,
+                    output_model_get_backend=output_model_get_backend,
+                )
             )
 
     return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_destroy)
