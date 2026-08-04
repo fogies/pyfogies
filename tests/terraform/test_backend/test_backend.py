@@ -6,7 +6,7 @@ from collections.abc import Iterator
 import pytest
 from pydantic import BaseModel
 
-from fogies.terraform.backend import BackendOutput, BackendVars
+from fogies.terraform.backend import BackendOutput, BackendStatus, BackendVars
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -16,6 +16,7 @@ from fogies.tools.terraform import (
     terraform_tfbackend,
     terraform_tfvars,
 )
+from fogies.tools.terraform_backend import terraform_backend
 from tasks.paths import (
     PATH_STAGING_BINARY_CACHE,
 )
@@ -40,12 +41,21 @@ _TEST_BACKEND_NESTED_BACKEND_STATES = ["test-state-a", "test-state-b"]
 
 
 @pytest.fixture(scope="module")
+def nested_backend_status_path(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> pathlib.Path:
+    tmp_path = tmp_path_factory.mktemp("test-backend-status")
+    return tmp_path / "backend_status.toml"
+
+
+@pytest.fixture(scope="module")
 def nested_backend_output(
     pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
+    nested_backend_status_path: pathlib.Path,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[BackendOutput]:
-    """Apply the backend module; yield output; destroy on teardown."""
+    """Apply the backend module; yield BackendOutput; destroy on teardown."""
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent / "backend"
     tmp_path = tmp_path_factory.mktemp("test-backend")
@@ -72,25 +82,33 @@ def nested_backend_output(
                 force_destroy=True,
             ),
         ) as tfvars_path,
-        terraform_output(
+        terraform_backend(
             binary_cache_path=PATH_STAGING_BINARY_CACHE,
             command_params=command_params,
             module_path=module_path,
-            tfvars_path=tfvars_path,
+            backend_status_path=nested_backend_status_path,
             tfbackend_path=tfbackend_path,
+            tfvars_path=tfvars_path,
             init_on_entry=True,
-            init_params=InitParams(
-                upgrade=True,
-                reconfigure=True,
-            ),
+            init_params=InitParams(upgrade=True, reconfigure=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
             output_model=_TestBackendOutput,
+            output_model_get_backend=lambda o: o.backend,
         ) as output,
     ):
         yield output.backend
+
+
+def test_backend_status_applied(
+    nested_backend_output: BackendOutput,
+    nested_backend_status_path: pathlib.Path,
+) -> None:
+    """terraform_backend_apply records backend as applied in the status file."""
+    _ = nested_backend_output
+    assert BackendStatus.load(path=nested_backend_status_path).backend.applied is True
 
 
 def test_backend_output(nested_backend_output: BackendOutput) -> None:
@@ -110,12 +128,10 @@ def test_backend_output(nested_backend_output: BackendOutput) -> None:
 
 def test_state_a_and_state_b(
     nested_backend_output: BackendOutput,
+    nested_backend_status_path: pathlib.Path,
     tmp_path: pathlib.Path,
 ) -> None:
     """Apply state_a and state_b, using backend bucket."""
-    # Ensure backend fixture.
-    assert nested_backend_output is not None
-
     command_params = CommandParams(in_stream=False)
     backend_path = pathlib.Path(__file__).parent
     state_a_module_path = backend_path / "state_a"
@@ -127,6 +143,10 @@ def test_state_a_and_state_b(
     tfvars_b = tmp_path / "state_b.tfvars.json"
     expected_value_a = "test-state-a"
     expected_value_b = "test-state-b"
+
+    status = BackendStatus.load(path=nested_backend_status_path)
+    assert "test-state-a" not in status.states
+    assert "test-state-b" not in status.states
 
     with (
         terraform_tfbackend(
@@ -149,13 +169,12 @@ def test_state_a_and_state_b(
             binary_cache_path=PATH_STAGING_BINARY_CACHE,
             command_params=command_params,
             module_path=state_a_module_path,
+            backend=nested_backend_output["test-state-a"],
+            backend_status_path=nested_backend_status_path,
             tfvars_path=tfvars_a,
             tfbackend_path=tfbackend_a_path,
             init_on_entry=True,
-            init_params=InitParams(
-                upgrade=True,
-                reconfigure=True,
-            ),
+            init_params=InitParams(upgrade=True, reconfigure=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
@@ -166,13 +185,12 @@ def test_state_a_and_state_b(
             binary_cache_path=PATH_STAGING_BINARY_CACHE,
             command_params=command_params,
             module_path=state_b_module_path,
+            backend=nested_backend_output["test-state-b"],
+            backend_status_path=nested_backend_status_path,
             tfvars_path=tfvars_b,
             tfbackend_path=tfbackend_b_path,
             init_on_entry=True,
-            init_params=InitParams(
-                upgrade=True,
-                reconfigure=True,
-            ),
+            init_params=InitParams(upgrade=True, reconfigure=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
@@ -185,15 +203,20 @@ def test_state_a_and_state_b(
         assert isinstance(output_b, _TestStateOutput)
         assert output_b.test_value == expected_value_b
 
+        status = BackendStatus.load(path=nested_backend_status_path)
+        assert status.states["test-state-a"].applied is True
+        assert status.states["test-state-b"].applied is True
+
+    status = BackendStatus.load(path=nested_backend_status_path)
+    assert status.states["test-state-a"].applied is False
+    assert status.states["test-state-b"].applied is False
+
 
 def test_invalid_state_c(
     nested_backend_output: BackendOutput,
     tmp_path: pathlib.Path,
 ) -> None:
     """Applying invalid_state_c fails due to disallowed key prefix."""
-    # Ensure backend fixture.
-    assert nested_backend_output is not None
-
     tfbackend_c_path = tmp_path / "invalid_state_c.tfbackend"
 
     with pytest.raises(ValueError):
