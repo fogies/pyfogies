@@ -76,10 +76,6 @@ def nested_backend_output(
                 region=pyfogies_test_config.aws.region,
                 states=_TEST_BACKEND_NESTED_BACKEND_STATES,
                 tags={},
-                # force_destroy can be used here
-                # because there are no AWS resources created in tests.
-                # There is nothing that could be orphaned by a deletion.
-                force_destroy=True,
             ),
         ) as tfvars_path,
         terraform_backend(

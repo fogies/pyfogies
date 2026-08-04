@@ -4,8 +4,13 @@ resource "aws_s3_bucket" "state" {
   # We include the region in the bucket name
   # because of the large delays associated with deleting and creating a bucket in a different region.
   # This ensures a unique name in any region.
-  bucket        = "${var.name}-bucket-${var.region}"
-  force_destroy = var.force_destroy
+  bucket = "${var.name}-bucket-${var.region}"
+
+  # Explicitly and intentionally false. 
+  # Resources with every state must be explicitly destroyed before the bucket can be deleted.
+  # This ensures no resources are orphaned by deleting the state that captures their creation.
+  # Use backend_delete_state_objects to clear state files after confirming all resources are destroyed.
+  force_destroy = false
 
   tags = merge(
     {

@@ -52,11 +52,6 @@ def pyfogies_test_backend(
                 name=PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
                 region=pyfogies_test_config.aws.region,
                 states=[s.value for s in PYFOGIES_TEST_TERRAFORM_BACKEND_STATES],
-                # force_destroy is intentionally false to require explicit cleanup of resources.
-                # Every test module should destroy its own resources.
-                # This fixture confirms that before destroying their states.
-                # This ensures we do not orphan resources by deleting the state that captures their creation.
-                force_destroy=False,
             ),
         ) as tfvars_path,
         terraform_output(
