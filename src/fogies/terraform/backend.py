@@ -17,7 +17,6 @@ class BackendVars(BaseModel):
     region: str
     states: list[str]
     tags: dict[str, str] = {}
-    force_destroy: bool
 
 
 class BackendConfig(BaseModel):

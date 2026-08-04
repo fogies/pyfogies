@@ -19,8 +19,3 @@ variable "tags" {
   default     = {}
 }
 
-variable "force_destroy" {
-  description = "Whether to allow force destruction of the S3 bucket."
-  type        = bool
-}
-
