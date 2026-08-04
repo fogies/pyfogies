@@ -11,7 +11,12 @@ from invoke.tasks import Task, task
 from fogies.terraform.backend import BackendOutput
 from fogies.tools.aws_environ import aws_environ
 from fogies.tools.command import CommandParams
-from fogies.tools.terraform import ApplyParams, DestroyParams, InitParams, TerraformOutputModel
+from fogies.tools.terraform import (
+    ApplyParams,
+    DestroyParams,
+    InitParams,
+    TerraformOutputModel,
+)
 from fogies.tools.terraform_backend import terraform_backend
 
 
