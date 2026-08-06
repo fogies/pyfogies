@@ -86,3 +86,21 @@ def test_command_run_in_stream(
         args=["-c", "print('test_command_run_in_stream')"],
     )
     assert result.stdout.strip() == "test_command_run_in_stream"
+
+
+@pytest.mark.parametrize("hide", [True, False])
+def test_command_run_hide(
+    hide: bool,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """hide=True suppresses the live echo of a command's stdout; result.stdout still captures it either way."""
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    result = command_run(
+        command=pathlib.Path(sys.executable),
+        command_params=CommandParams(hide=hide),
+        args=["-c", "print('test_command_run_hide')"],
+    )
+    assert result.stdout.strip() == "test_command_run_hide"
+    echoed = "test_command_run_hide" in capsys.readouterr().out
+    assert echoed == (not hide)
