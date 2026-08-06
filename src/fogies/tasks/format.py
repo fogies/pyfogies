@@ -24,9 +24,7 @@ def get_task_format(
             "terraform_binary_cache_path is required when fmt_terraform is set"
         )
     if not (fmt_black or fmt_isort or fmt_terraform):
-        raise ValueError(
-            "At least one fmt flag must be set."
-        )
+        raise ValueError("At least one fmt flag must be set.")
 
     @task(name="format")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_format(context: Context) -> None:
