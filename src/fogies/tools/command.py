@@ -15,6 +15,7 @@ class CommandParams:
 
     context: Context | None = None
     cwd: pathlib.Path | None = None
+    hide: bool = False
     in_stream: bool = True
 
     def require_cwd(self, path: pathlib.Path) -> "CommandParams":
@@ -56,8 +57,18 @@ def command_run(
 ) -> Result:
     """Run a command via invoke run().
 
-    If *context* is provided, use context.run(). Otherwise create a new
-    Context and run the command there.
+    If *command_params.context* is provided, use context.run(). Otherwise
+    create a new Context and run the command there.
+
+    *command_params.hide* when true suppresses the live console echo of the
+    command's stdout; stderr is always echoed regardless, so failures stay
+    visible. Either way, stdout is still captured into the returned Result -
+    hide only affects what is printed live, not what callers can read back.
+
+    *command_params.in_stream* when true forwards this process's stdin to
+    the command, so it can prompt interactively (e.g. Terraform's apply
+    confirmation). When false, the command's stdin is closed, so a command
+    that tries to prompt will fail or hang instead of waiting on a human.
     """
     command_params = command_params or CommandParams()
     context = command_params.context or Context()
@@ -72,11 +83,14 @@ def command_run(
         else contextlib.nullcontext()
     )
     with cd_context:
-        # invoke's in_stream default sentinel is None, which forwards sys.stdin.
-        # Passing True treats True as the stream object itself, crashing on read().
-        # Translate our Boolean in_stream into invoke's None/False contract.
         result = context.run(
             command_str,
+            # "out" hides only stdout; invoke's False shows both streams.
+            hide="out" if command_params.hide else False,
+            # invoke's own sentinel for "forward sys.stdin" is None, not
+            # True - passing True verbatim makes invoke treat True itself as
+            # the stream object and crash calling .read() on it. Translate
+            # our bool into invoke's actual None/False contract.
             in_stream=None if command_params.in_stream else False,
         )
 
