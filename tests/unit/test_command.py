@@ -104,3 +104,23 @@ def test_command_run_hide(
     assert result.stdout.strip() == "test_command_run_hide"
     echoed = "test_command_run_hide" in capsys.readouterr().out
     assert echoed == (not hide)
+
+
+@pytest.mark.parametrize("echo_stdin", [True, False])
+def test_command_run_echo_stdin(
+    echo_stdin: bool,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """echo_stdin=True mirrors forwarded stdin back to output; False (the default) does not."""
+    monkeypatch.setattr(sys, "stdin", io.StringIO("test_command_run_echo_stdin\n"))
+    result = command_run(
+        command=pathlib.Path(sys.executable),
+        command_params=CommandParams(echo_stdin=echo_stdin),
+        # Reads and discards a line; prints nothing itself, so any occurrence
+        # of the input text in captured output can only be invoke's mirroring.
+        args=["-c", "import sys; sys.stdin.readline()"],
+    )
+    _ = result
+    echoed = "test_command_run_echo_stdin" in capsys.readouterr().out
+    assert echoed == echo_stdin
