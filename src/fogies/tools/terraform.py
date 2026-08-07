@@ -287,9 +287,14 @@ class _Terraform:
         working directory). *output_model* is the Pydantic BaseModel subclass
         used to validate the outputs. The JSON produced by
         `terraform output -json` is simplified to a mapping from output names
-        to their `value` fields before validation.
+        to their `value` fields before validation. Always hides the raw JSON's
+        live echo, since this method exists to parse it into output_model,
+        not to display it -- callers that want to show values print
+        output_model themselves.
         """
-        command_params = command_params.require_cwd(module_path)
+        command_params = dataclasses.replace(
+            command_params.require_cwd(module_path), hide=True
+        )
         result = command_run(
             command=self.binary_path,
             command_params=command_params,

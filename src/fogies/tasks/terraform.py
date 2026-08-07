@@ -14,9 +14,7 @@ from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
-    TerraformOutputModel,
     terraform,
-    terraform_output,
     terraform_tfbackend,
 )
 
@@ -34,9 +32,7 @@ def get_task_apply(
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
-    default_output: bool = False,
-    output_model: type[TerraformOutputModel],
-) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
+) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     if backend is not None and staging_path is None:
         raise ValueError("staging_path is required when backend is set")
     if (backend_status_path is None) != (backend is None):
@@ -49,7 +45,6 @@ def get_task_apply(
         init_upgrade: bool = default_init_upgrade,
         init_reconfigure: bool = default_init_reconfigure,
         apply_auto_approve: bool = default_apply_auto_approve,
-        output: bool = default_output,
     ) -> None:
         """
         Apply a Terraform configuration.
@@ -59,7 +54,6 @@ def get_task_apply(
           --init-upgrade        Pass -upgrade to init; checks for newer provider versions within constraints.
           --init-reconfigure    Pass -reconfigure to init; re-initializes backend from scratch.
           --apply-auto-approve  Skip Terraform's interactive confirmation prompt.
-          --output              Print terraform output as JSON after apply.
 
         --init-upgrade and --init-reconfigure require --init.
         """
@@ -91,8 +85,8 @@ def get_task_apply(
                     )
                 )
 
-            output_result = stack.enter_context(
-                terraform_output(
+            _ = stack.enter_context(
+                terraform(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
                     module_path=module_path,
@@ -104,16 +98,10 @@ def get_task_apply(
                     apply_on_entry=True,
                     apply_params=ApplyParams(auto_approve=apply_auto_approve),
                     destroy_on_exit=False,
-                    output_model=output_model,
                 )
             )
 
-            if output:
-                print(output_result.model_dump_json(indent=2))
-
-    return cast(
-        Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_apply
-    )
+    return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_apply)
 
 
 def get_task_destroy(
