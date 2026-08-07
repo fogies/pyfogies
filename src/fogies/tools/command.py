@@ -15,6 +15,7 @@ class CommandParams:
 
     context: Context | None = None
     cwd: pathlib.Path | None = None
+    echo_stdin: bool = False
     hide: bool = False
     in_stream: bool = True
 
@@ -60,6 +61,14 @@ def command_run(
     If *command_params.context* is provided, use context.run(). Otherwise
     create a new Context and run the command there.
 
+    *command_params.echo_stdin* when true mirrors captured stdin back to
+    stdout as it's read, on top of whatever local echo the terminal itself
+    already does. Without a pty, invoke would otherwise auto-enable this
+    whenever a real terminal is attached, which double-prints what was
+    typed (e.g. a "yes" at Terraform's apply confirmation appears twice, and
+    it can look like input needs entering again). Defaults to false since
+    the terminal already echoes keystrokes on its own.
+
     *command_params.hide* when true suppresses the live console echo of the
     command's stdout; stderr is always echoed regardless, so failures stay
     visible. Either way, stdout is still captured into the returned Result -
@@ -85,6 +94,7 @@ def command_run(
     with cd_context:
         result = context.run(
             command_str,
+            echo_stdin=command_params.echo_stdin,
             # "out" hides only stdout; invoke's False shows both streams.
             hide="out" if command_params.hide else False,
             # invoke's own sentinel for "forward sys.stdin" is None, not
