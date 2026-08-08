@@ -35,20 +35,13 @@ variable "tags" {
   default     = {}
 }
 
-variable "force_destroy" {
-  description = "Whether to allow force destruction of the S3 bucket."
-  type        = bool
-  default     = false
-}
-
 module "backend" {
   source = "../../../terraform/backend"
 
-  name          = var.name
-  region        = var.region
-  states        = var.states
-  tags          = var.tags
-  force_destroy = var.force_destroy
+  name   = var.name
+  region = var.region
+  states = var.states
+  tags   = var.tags
 }
 
 output "backend" {
