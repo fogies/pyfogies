@@ -6,9 +6,9 @@ import sys
 import urllib.request
 import zipfile
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from http.client import HTTPResponse
-from typing import TypeVar, cast
+from typing import NewType, TypeVar, cast
 
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel
@@ -74,13 +74,29 @@ class _TerraformCommandOutputModel(
     """Root model for the full `terraform output -json` payload."""
 
 
+# Distinct from plain pathlib.Path (and from each other) only for static
+# typing: lets callers of get_task_apply()-style factories be required to
+# pass a context manager built specifically from terraform_tfbackend() or
+# terraform_tfvars() respectively, not an arbitrary Path-yielding context
+# manager that happens to fit the same shape. Identical to pathlib.Path at
+# runtime.
+TfbackendPath = NewType("TfbackendPath", pathlib.Path)
+TfvarsPath = NewType("TfvarsPath", pathlib.Path)
+
+# Types for passing a pre-built terraform_tfbackend()/terraform_tfvars()
+# context manager into a task factory, to be entered when (and only when)
+# the task actually runs.
+TfbackendContextManager = AbstractContextManager[TfbackendPath]
+TfvarsContextManager = AbstractContextManager[TfvarsPath]
+
+
 @contextmanager
 def terraform_tfbackend(
     *,
     path: pathlib.Path,
     backend: BackendConfig,
     delete_on_exit: bool = True,
-) -> Generator[pathlib.Path]:
+) -> Generator[TfbackendPath]:
     """Write S3 backend configuration to a file and yield the path.
 
     The file is written as flat key/value entries, one per line, e.g.:
@@ -99,7 +115,7 @@ def terraform_tfbackend(
         _ = f.write('key = "{}"\n'.format(backend.key))
         _ = f.write("use_lockfile = true\n")
     try:
-        yield path
+        yield TfbackendPath(path)
     finally:
         if delete_on_exit and path.exists():
             path.unlink()
@@ -111,7 +127,7 @@ def terraform_tfvars(
     path: pathlib.Path,
     variables: BaseModel,
     delete_on_exit: bool = True,
-) -> Generator[pathlib.Path]:
+) -> Generator[TfvarsPath]:
     """Write in-memory variables to a file and yield the path for use with apply/destroy.
 
     *path* is where the .tfvars.json file is written. *variables* must be a
@@ -127,7 +143,7 @@ def terraform_tfvars(
     with path.open("w", encoding="utf-8") as f:
         json.dump(variables.model_dump(mode="json"), f, indent=2)
     try:
-        yield path
+        yield TfvarsPath(path)
     finally:
         if delete_on_exit and path.exists():
             path.unlink()
@@ -158,15 +174,14 @@ class _Terraform:
         *,
         command_params: CommandParams,
         module_path: pathlib.Path,
-        tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
+        tfvars_path: pathlib.Path | None = None,
         apply_params: ApplyParams | None = None,
     ) -> Result:
         """Run terraform apply.
 
         *module_path* is the folder containing the Terraform files (used as
         working directory). If *apply_params.auto_approve* is true, pass
-        -auto-approve. *tfvars_path* is optional; when set, pass -var-file for
-        each path.
+        -auto-approve. *tfvars_path* is optional; when set, pass -var-file.
         """
         command_params = command_params.require_cwd(module_path)
         if apply_params is None:
@@ -176,11 +191,7 @@ class _Terraform:
         if apply_params.auto_approve:
             apply_args.append("-auto-approve")
         if tfvars_path is not None:
-            paths = (
-                [tfvars_path] if isinstance(tfvars_path, pathlib.Path) else tfvars_path
-            )
-            for p in paths:
-                apply_args.extend(["-var-file", str(p)])
+            apply_args.extend(["-var-file", str(tfvars_path)])
 
         return command_run(
             command=self.binary_path,
@@ -193,15 +204,14 @@ class _Terraform:
         *,
         command_params: CommandParams,
         module_path: pathlib.Path,
-        tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
+        tfvars_path: pathlib.Path | None = None,
         destroy_params: DestroyParams | None = None,
     ) -> Result:
         """Run terraform destroy.
 
         *module_path* is the folder containing the Terraform files (used as
         working directory). If *destroy_params.auto_approve* is true, pass
-        -auto-approve. *tfvars_path* is optional; when set, pass -var-file for
-        each path.
+        -auto-approve. *tfvars_path* is optional; when set, pass -var-file.
         """
         command_params = command_params.require_cwd(module_path)
         if destroy_params is None:
@@ -211,11 +221,7 @@ class _Terraform:
         if destroy_params.auto_approve:
             destroy_args.append("-auto-approve")
         if tfvars_path is not None:
-            paths = (
-                [tfvars_path] if isinstance(tfvars_path, pathlib.Path) else tfvars_path
-            )
-            for p in paths:
-                destroy_args.extend(["-var-file", str(p)])
+            destroy_args.extend(["-var-file", str(tfvars_path)])
 
         return command_run(
             command=self.binary_path,
@@ -320,7 +326,7 @@ def terraform(
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
-    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
+    tfvars_path: pathlib.Path | None = None,
     init_on_entry: bool = False,
     init_params: InitParams | None = None,
     apply_on_entry: bool = False,
@@ -455,7 +461,7 @@ def terraform_output(
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
-    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
+    tfvars_path: pathlib.Path | None = None,
     init_on_entry: bool = False,
     init_params: InitParams | None = None,
     apply_on_entry: bool = False,

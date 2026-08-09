@@ -9,11 +9,13 @@ terraform {
   }
 }
 
-# No variables: get_task_apply/get_task_destroy do not support passing
-# tfvars, so this fixture must be self-contained.
+variable "content" {
+  type = string
+}
+
 resource "local_file" "test_file" {
   filename = "${path.module}/test_resource.txt"
-  content  = "test_task_apply_and_destroy"
+  content  = var.content
 }
 
 output "file_path" {

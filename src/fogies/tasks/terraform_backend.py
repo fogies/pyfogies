@@ -2,20 +2,21 @@
 
 import pathlib
 from collections.abc import Callable
-from contextlib import ExitStack
+from contextlib import AbstractContextManager, ExitStack
 from typing import cast
 
 from invoke.context import Context
 from invoke.tasks import Task, task
 
 from fogies.terraform.backend import BackendOutput
-from fogies.tools.aws_environ import aws_environ
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
     TerraformOutputModel,
+    TfvarsContextManager,
 )
 from fogies.tools.terraform_backend import terraform_backend
 
@@ -26,9 +27,8 @@ def get_task_backend_apply(
     module_path: pathlib.Path,
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
-    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
-    aws_profiles_path: pathlib.Path | None = None,
-    aws_profile: str | None = None,
+    tfvars: TfvarsContextManager | None = None,
+    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
@@ -71,10 +71,10 @@ def get_task_backend_apply(
         )
 
         with ExitStack() as stack:
-            if aws_profiles_path is not None and aws_profile is not None:
-                _ = stack.enter_context(
-                    aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
-                )
+            if aws_environ is not None:
+                _ = stack.enter_context(aws_environ)
+
+            tfvars_path = stack.enter_context(tfvars) if tfvars else None
 
             output_result = stack.enter_context(
                 terraform_backend(
@@ -108,9 +108,8 @@ def get_task_backend_destroy(
     module_path: pathlib.Path,
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
-    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
-    aws_profiles_path: pathlib.Path | None = None,
-    aws_profile: str | None = None,
+    tfvars: TfvarsContextManager | None = None,
+    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
@@ -155,10 +154,10 @@ def get_task_backend_destroy(
         )
 
         with ExitStack() as stack:
-            if aws_profiles_path is not None and aws_profile is not None:
-                _ = stack.enter_context(
-                    aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
-                )
+            if aws_environ is not None:
+                _ = stack.enter_context(aws_environ)
+
+            tfvars_path = stack.enter_context(tfvars) if tfvars else None
 
             _ = stack.enter_context(
                 terraform_backend(
