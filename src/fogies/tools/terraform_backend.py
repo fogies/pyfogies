@@ -28,7 +28,7 @@ def terraform_backend(
     module_path: pathlib.Path,
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
-    tfvars_path: pathlib.Path | list[pathlib.Path] | None = None,
+    tfvars_path: pathlib.Path | None = None,
     init_on_entry: bool = False,
     init_params: InitParams | None = None,
     apply_on_entry: bool = False,

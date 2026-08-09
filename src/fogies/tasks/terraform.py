@@ -1,21 +1,22 @@
 """Generic tasks for applying and destroying a Terraform configuration."""
 
 import pathlib
-from contextlib import ExitStack
+from contextlib import AbstractContextManager, ExitStack
 from typing import Callable, cast
 
 from invoke.context import Context
 from invoke.tasks import Task, task
 
 from fogies.terraform.backend import BackendConfig
-from fogies.tools.aws_environ import aws_environ
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
+    TfbackendContextManager,
+    TfvarsContextManager,
     terraform,
-    terraform_tfbackend,
 )
 
 
@@ -23,18 +24,18 @@ def get_task_apply(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    staging_path: pathlib.Path | None = None,
-    aws_profiles_path: pathlib.Path | None = None,
-    aws_profile: str | None = None,
+    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
+    tfbackend: TfbackendContextManager | None = None,
+    tfvars: TfvarsContextManager | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    if backend is not None and staging_path is None:
-        raise ValueError("staging_path is required when backend is set")
+    if backend is not None and tfbackend is None:
+        raise ValueError("tfbackend is required when backend is set")
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
@@ -70,20 +71,11 @@ def get_task_apply(
         )
 
         with ExitStack() as stack:
-            if aws_profiles_path is not None and aws_profile is not None:
-                _ = stack.enter_context(
-                    aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
-                )
+            if aws_environ is not None:
+                _ = stack.enter_context(aws_environ)
 
-            tfbackend_path = None
-            if backend is not None:
-                assert staging_path is not None
-                tfbackend_path = stack.enter_context(
-                    terraform_tfbackend(
-                        path=staging_path / "terraform.tfbackend",
-                        backend=backend,
-                    )
-                )
+            tfbackend_path = stack.enter_context(tfbackend) if tfbackend else None
+            tfvars_path = stack.enter_context(tfvars) if tfvars else None
 
             _ = stack.enter_context(
                 terraform(
@@ -93,6 +85,7 @@ def get_task_apply(
                     backend=backend,
                     backend_status_path=backend_status_path,
                     tfbackend_path=tfbackend_path,
+                    tfvars_path=tfvars_path,
                     init_on_entry=init,
                     init_params=init_params,
                     apply_on_entry=True,
@@ -108,18 +101,18 @@ def get_task_destroy(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    staging_path: pathlib.Path | None = None,
-    aws_profiles_path: pathlib.Path | None = None,
-    aws_profile: str | None = None,
+    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
+    tfbackend: TfbackendContextManager | None = None,
+    tfvars: TfvarsContextManager | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    if backend is not None and staging_path is None:
-        raise ValueError("staging_path is required when backend is set")
+    if backend is not None and tfbackend is None:
+        raise ValueError("tfbackend is required when backend is set")
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
@@ -155,20 +148,11 @@ def get_task_destroy(
         )
 
         with ExitStack() as stack:
-            if aws_profiles_path is not None and aws_profile is not None:
-                _ = stack.enter_context(
-                    aws_environ(profiles_path=aws_profiles_path, profile=aws_profile)
-                )
+            if aws_environ is not None:
+                _ = stack.enter_context(aws_environ)
 
-            tfbackend_path = None
-            if backend is not None:
-                assert staging_path is not None
-                tfbackend_path = stack.enter_context(
-                    terraform_tfbackend(
-                        path=staging_path / "terraform.tfbackend",
-                        backend=backend,
-                    )
-                )
+            tfbackend_path = stack.enter_context(tfbackend) if tfbackend else None
+            tfvars_path = stack.enter_context(tfvars) if tfvars else None
 
             _ = stack.enter_context(
                 terraform(
@@ -178,6 +162,7 @@ def get_task_destroy(
                     backend=backend,
                     backend_status_path=backend_status_path,
                     tfbackend_path=tfbackend_path,
+                    tfvars_path=tfvars_path,
                     init_on_entry=init,
                     init_params=init_params,
                     destroy_on_exit=True,
