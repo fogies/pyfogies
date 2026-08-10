@@ -39,10 +39,11 @@ module "network" {
 module "alb" {
   source = "../../../../terraform/alb"
 
-  region             = var.region
-  name               = var.alb_name
-  subnet_ids         = module.network.subnet_ids
-  security_group_ids = module.network.security_group_ids
+  region                  = var.region
+  name                    = var.alb_name
+  subnet_ids              = module.network.subnet_ids
+  security_group_ids      = module.network.security_group_ids
+  self_signed_certificate = true
 }
 
 output "network" {

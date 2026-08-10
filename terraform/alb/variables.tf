@@ -48,10 +48,21 @@ variable "security_group_ids" {
   }
 }
 
+variable "self_signed_certificate" {
+  description = "If true, create a self-signed certificate using the ALB's DNS name instead of using certificate_arn."
+  type        = bool
+  default     = false
+}
+
 variable "certificate_arn" {
-  description = "ACM certificate ARN for HTTPS. If null, a self-signed certificate is created using the ALB's DNS name."
+  description = "ACM certificate ARN for HTTPS. Required unless self_signed_certificate is true."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.self_signed_certificate || var.certificate_arn != null
+    error_message = "certificate_arn is required unless self_signed_certificate is true."
+  }
 }
 
 variable "tags" {
