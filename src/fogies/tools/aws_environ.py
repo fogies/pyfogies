@@ -39,7 +39,9 @@ def _load_aws_profile_from_toml(profiles_path: Path, profile: str) -> _AwsProfil
         )
     if not profiles_path.exists():
         raise FileNotFoundError(
-            "AWS profiles file '{}' does not exist".format(profiles_path)
+            "AWS profiles file '{}' does not exist.\nSee provided template.".format(
+                profiles_path
+            )
         )
 
     with profiles_path.open("rb") as profiles_file:

@@ -31,8 +31,8 @@ class PyfogiesTestsConfig(BaseModel):
         """
         if not path.exists():
             raise FileNotFoundError(
-                "pyfogies test configuration file not found: '{}'.\n Copy tests/pyfogies-tests.toml.template to '{}' and fill in the values.".format(
-                    path, path
+                "pyfogies test configuration file not found: '{}'.\nSee provided template.".format(
+                    path
                 )
             )
         with path.open("rb") as f:
