@@ -31,9 +31,9 @@ namespace.add_collection(
 
 # A collection for subsets of tests.
 _task_all = fogies.tasks.test.get_task_test()
-_task_integration = fogies.tasks.test.get_task_test("tests/integration")
-_task_terraform = fogies.tasks.test.get_task_test("tests/terraform")
-_task_unit = fogies.tasks.test.get_task_test("tests/unit")
+_task_integration = fogies.tasks.test.get_task_test(path_tests="tests/integration")
+_task_terraform = fogies.tasks.test.get_task_test(path_tests="tests/terraform")
+_task_unit = fogies.tasks.test.get_task_test(path_tests="tests/unit")
 
 _collection_tests = Collection("test")
 _collection_tests.add_task(_task_all, name="all")

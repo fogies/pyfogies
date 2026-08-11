@@ -23,11 +23,10 @@ class PyfogiesTestsConfig(BaseModel):
     domain: _DomainConfig | None = None
 
     @staticmethod
-    def load(path: Path) -> "PyfogiesTestsConfig":
+    def load(*, path: Path) -> "PyfogiesTestsConfig":
         """Load and validate configuration from a TOML file.
 
-        Raises FileNotFoundError if the file does not exist, with a message
-        pointing to the template.
+        Raises FileNotFoundError if the file does not exist.
         """
         if not path.exists():
             raise FileNotFoundError(
@@ -43,4 +42,4 @@ class PyfogiesTestsConfig(BaseModel):
 @pytest.fixture(scope="session")
 def pyfogies_test_config() -> PyfogiesTestsConfig:
     """Load and return pyfogies test configuration from pyfogies-tests.toml."""
-    return PyfogiesTestsConfig.load(PATH_SECRETS_PYFOGIES_TESTS)
+    return PyfogiesTestsConfig.load(path=PATH_SECRETS_PYFOGIES_TESTS)
