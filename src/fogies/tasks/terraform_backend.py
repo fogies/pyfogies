@@ -25,17 +25,17 @@ def get_task_backend_apply(
     *,
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
+    aws_environ: AwsEnvironContextManager | None = None,
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
     tfvars: TfvarsContextManager | None = None,
-    aws_environ: AwsEnvironContextManager | None = None,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
     default_output: bool = False,
-    output_model: type[TerraformOutputModel],
-    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
 ) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
     @task(name="apply")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
@@ -106,16 +106,16 @@ def get_task_backend_destroy(
     *,
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
+    aws_environ: AwsEnvironContextManager | None = None,
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
     tfvars: TfvarsContextManager | None = None,
-    aws_environ: AwsEnvironContextManager | None = None,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
-    output_model: type[TerraformOutputModel],
-    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     @task(name="destroy")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(

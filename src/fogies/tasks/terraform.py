@@ -22,8 +22,8 @@ from fogies.tools.terraform import (
 
 def get_task_apply(
     *,
-    module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
+    module_path: pathlib.Path,
     aws_environ: AwsEnvironContextManager | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
@@ -99,8 +99,8 @@ def get_task_apply(
 
 def get_task_destroy(
     *,
-    module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
+    module_path: pathlib.Path,
     aws_environ: AwsEnvironContextManager | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
