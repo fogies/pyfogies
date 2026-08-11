@@ -5,7 +5,7 @@ from enum import Enum
 PYFOGIES_TEST_TERRAFORM_BACKEND_NAME: str = "pyfogies-test-backend"
 
 
-class PYFOGIES_TEST_TERRAFORM_BACKEND_STATES(str, Enum):
+class PyfogiesTestTerraformBackendStates(str, Enum):
     TEST_ALB_DNS = "test-alb-dns"
     TEST_ALB_SELF_SIGNED = "test-alb-self-signed"
     TEST_BACKEND = "test-backend"
