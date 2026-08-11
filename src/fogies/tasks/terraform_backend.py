@@ -2,14 +2,14 @@
 
 import pathlib
 from collections.abc import Callable
-from contextlib import AbstractContextManager, ExitStack
+from contextlib import ExitStack
 from typing import cast
 
 from invoke.context import Context
 from invoke.tasks import Task, task
 
 from fogies.terraform.backend import BackendOutput
-from fogies.tools.aws_environ import AwsEnviron
+from fogies.tools.aws_environ import AwsEnvironContextManager
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -28,7 +28,7 @@ def get_task_backend_apply(
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
     tfvars: TfvarsContextManager | None = None,
-    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
+    aws_environ: AwsEnvironContextManager | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
@@ -109,7 +109,7 @@ def get_task_backend_destroy(
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
     tfvars: TfvarsContextManager | None = None,
-    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
+    aws_environ: AwsEnvironContextManager | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
