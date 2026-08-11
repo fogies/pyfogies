@@ -6,9 +6,9 @@ from pydantic import BaseModel
 class EcrVars(BaseModel):
     region: str
     repositories: list[str]
+    force_delete: bool
     lifecycle_keep_count_limit: int
     lifecycle_keep_days_limit: int
-    force_delete: bool
     tags: dict[str, str] = {}
 
 
