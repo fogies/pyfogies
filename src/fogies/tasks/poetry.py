@@ -63,7 +63,7 @@ def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], N
     return cast(Task[Callable[[Context], None]], task_publish)
 
 
-def get_collection(path_secrets_poetry: Path) -> Collection:
+def get_collection(*, path_secrets_poetry: Path) -> Collection:
     """
     Get a collection of tasks.
     """

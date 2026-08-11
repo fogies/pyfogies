@@ -10,7 +10,7 @@ from invoke.context import Context
 from invoke.tasks import Task, task
 
 
-def get_task_test(path_tests: str | None = None) -> Task[Callable[[Context], None]]:
+def get_task_test(*, path_tests: str | None = None) -> Task[Callable[[Context], None]]:
     @task(name="test")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_test(context: Context) -> None:
         """
