@@ -72,7 +72,7 @@ def aws_environ(
     profile: str,
     raise_if_exists: bool = True,
     raise_if_changed: bool = True,
-) -> Generator[AwsEnviron, None, None]:
+) -> Generator[AwsEnviron]:
     """Context manager that applies AWS variables from a TOML file.
 
     The *profiles_path* parameter specifies the AWS TOML profiles file to read;
