@@ -17,6 +17,11 @@ class AwsEnviron(BaseModel):
     aws_access_key_id: str
 
 
+# Type for passing a pre-built aws_environ() context manager into a task
+# factory, to be entered when (and only when) the task actually runs.
+AwsEnvironContextManager = contextlib.AbstractContextManager[AwsEnviron]
+
+
 class _AwsProfile(BaseModel):
     aws_access_key_id: str
     aws_secret_access_key: str

@@ -1,14 +1,14 @@
 """Generic tasks for applying and destroying a Terraform configuration."""
 
 import pathlib
-from contextlib import AbstractContextManager, ExitStack
+from contextlib import ExitStack
 from typing import Callable, cast
 
 from invoke.context import Context
 from invoke.tasks import Task, task
 
 from fogies.terraform.backend import BackendConfig
-from fogies.tools.aws_environ import AwsEnviron
+from fogies.tools.aws_environ import AwsEnvironContextManager
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -24,7 +24,7 @@ def get_task_apply(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
+    aws_environ: AwsEnvironContextManager | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend: TfbackendContextManager | None = None,
@@ -101,7 +101,7 @@ def get_task_destroy(
     *,
     module_path: pathlib.Path,
     binary_cache_path: pathlib.Path,
-    aws_environ: AbstractContextManager[AwsEnviron] | None = None,
+    aws_environ: AwsEnvironContextManager | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend: TfbackendContextManager | None = None,
