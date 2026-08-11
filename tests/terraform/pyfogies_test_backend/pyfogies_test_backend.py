@@ -24,7 +24,7 @@ from tasks.paths import PATH_STAGING_BINARY_CACHE
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import (
     PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
-    PYFOGIES_TEST_TERRAFORM_BACKEND_STATES,
+    PyfogiesTestTerraformBackendStates,
 )
 
 
@@ -51,7 +51,7 @@ def pyfogies_test_backend(
             variables=BackendVars(
                 name=PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
                 region=pyfogies_test_config.aws.region,
-                states=[s.value for s in PYFOGIES_TEST_TERRAFORM_BACKEND_STATES],
+                states=[s.value for s in PyfogiesTestTerraformBackendStates],
             ),
         ) as tfvars_path,
         terraform_output(
