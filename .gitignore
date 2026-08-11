@@ -8,8 +8,22 @@ __pycache__/
 # Build artifacts.
 /dist
 
-# Staging directory.
+# Local staging space
+# (e.g., downloaded binaries, generated files).
 /.staging
 
-# Secrets directory.
+# Local credentials and secrets.
 /secrets
+
+# Terraform state, cache, and crash logs.
+**/.terraform/
+*.tfbackend
+*.tfstate
+*.tfstate.*
+*.tfvars.json
+crash.log
+crash.*.log
+
+# Terraform test fixtures apply/destroy repeatedly with loose version constraints.
+# Unlike a real deployment, no reproducibility benefit to locking.
+tests/**/.terraform.lock.hcl
