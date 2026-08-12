@@ -1,10 +1,14 @@
 """Unit tests for Ollama helpers."""
 
+import pathlib
+
+import httpx
 import psutil
 import pytest
-from fogies_paths import PATH_STAGING_BINARY_CACHE
+from ollama import ChatResponse
 from pydantic import BaseModel
 
+from fogies.retry import retry_transient
 from fogies.tools.ollama import (
     _create_time_seconds,  # pyright: ignore[reportPrivateUsage]
 )
@@ -12,8 +16,15 @@ from fogies.tools.ollama import (
     ollama,
     ollama_client,
 )
+from tasks.paths import PATH_STAGING_BINARY_CACHE
 
 _TEST_OLLAMA_MODEL = "llama3.1:8b"
+
+# TODO: We have seen WinError 10054 connection resets,
+# but do not understand why or how this would happen.
+# Retry with logging to see what can be learned over time.
+# Logging could be removed when resolved or not reproduced.
+_CHAT_RETRY_LOG_PATH = pathlib.Path(__file__).parent / "test_ollama_chat_retry.log"
 
 
 def test_ollama_lock_context() -> None:
@@ -135,21 +146,30 @@ def test_ollama_client_structured_output() -> None:
 
     with ollama_client(binary_cache_path=PATH_STAGING_BINARY_CACHE) as client:
         _ = client.pull(model)
-        response = client.chat(  # pyright: ignore[reportUnknownMemberType]
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "Choose two integers from 1 to 10.\n"
-                        "Return JSON only with fields first, second, and sum.\n"
-                        "Sum should be equal to first plus second.\n"
-                    ),
-                }
-            ],
-            stream=False,
-            format=_StructuredOutput.model_json_schema(),
+
+        # Retries transient connection resets (observed as WinError 10054).
+        @retry_transient(
+            exceptions=(ConnectionError, httpx.TransportError),
+            log_path=_CHAT_RETRY_LOG_PATH,
         )
+        def _chat() -> ChatResponse:
+            return client.chat(  # pyright: ignore[reportUnknownMemberType]
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            "Choose two integers from 1 to 10.\n"
+                            "Return JSON only with fields first, second, and sum.\n"
+                            "Sum should be equal to first plus second.\n"
+                        ),
+                    }
+                ],
+                stream=False,
+                format=_StructuredOutput.model_json_schema(),
+            )
+
+        response = _chat()
 
         content = response.message.content
         assert isinstance(content, str)

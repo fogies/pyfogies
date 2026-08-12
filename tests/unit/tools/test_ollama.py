@@ -2,9 +2,8 @@
 
 import subprocess
 
-from fogies_paths import PATH_STAGING_BINARY_CACHE
-
 from fogies.tools.ollama import ollama
+from tasks.paths import PATH_STAGING_BINARY_CACHE
 
 
 def test_ollama_is_available() -> None:

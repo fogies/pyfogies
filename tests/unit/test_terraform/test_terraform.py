@@ -3,10 +3,10 @@
 import pathlib
 
 import pytest
-from fogies_paths import PATH_STAGING_BINARY_CACHE
 from invoke.exceptions import UnexpectedExit
 from pydantic import BaseModel
 
+from fogies.terraform.backend import BackendConfig
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -14,8 +14,10 @@ from fogies.tools.terraform import (
     InitParams,
     terraform,
     terraform_output,
+    terraform_tfbackend,
     terraform_tfvars,
 )
+from tasks.paths import PATH_STAGING_BINARY_CACHE
 
 
 class _ToolVars(BaseModel):
@@ -42,6 +44,24 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
         assert var_path.exists()
         assert Vars.model_validate_json(var_path.read_text()) == Vars(key="value")
 
+    assert not path.exists()
+
+
+def test_terraform_tfbackend(tmp_path: pathlib.Path) -> None:
+    """terraform_tfbackend writes the file and yields the path; delete_on_exit removes the file."""
+    backend = BackendConfig(
+        state="test-state",
+        bucket_name="my-bucket",
+        region="us-west-2",
+        key="test-state/terraform.tfstate",
+    )
+    path = tmp_path / "backend.tfbackend"
+    with terraform_tfbackend(path=path, backend=backend) as backend_path:
+        text = backend_path.read_text(encoding="utf-8")
+        assert 'region = "us-west-2"' in text
+        assert 'bucket = "my-bucket"' in text
+        assert 'key = "test-state/terraform.tfstate"' in text
+        assert "use_lockfile = true" in text
     assert not path.exists()
 
 
@@ -133,7 +153,7 @@ def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
             init_params=InitParams(upgrade=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
-            delete_on_exit=True,
+            destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
         ) as tf,
     ):
@@ -179,7 +199,7 @@ def test_terraform_output(tmp_path: pathlib.Path) -> None:
             init_params=InitParams(upgrade=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
-            delete_on_exit=True,
+            destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
             output_model=_ToolOutput,
         ) as tool_output,
@@ -217,7 +237,7 @@ def test_terraform_output_invalid_module_raises(tmp_path: pathlib.Path) -> None:
                 init_params=InitParams(upgrade=True),
                 apply_on_entry=True,
                 apply_params=ApplyParams(auto_approve=True),
-                delete_on_exit=True,
+                destroy_on_exit=True,
                 destroy_params=DestroyParams(auto_approve=True),
                 output_model=_ToolOutput,
             ) as _:

@@ -52,7 +52,8 @@ def test_aws_environ_raises_for_missing_file(tmp_path: Path) -> None:
     profiles_path = tmp_path / "missing.toml"
 
     with pytest.raises(FileNotFoundError):
-        _ = aws_environ(profiles_path=profiles_path, profile="test")
+        with aws_environ(profiles_path=profiles_path, profile="test"):
+            pass
 
 
 def test_aws_environ_raises_for_toml_extension(tmp_path: Path) -> None:
@@ -60,4 +61,5 @@ def test_aws_environ_raises_for_toml_extension(tmp_path: Path) -> None:
     profiles_path = tmp_path / "aws.env"
 
     with pytest.raises(ValueError, match=r"must have \.toml extension"):
-        _ = aws_environ(profiles_path=profiles_path, profile="test")
+        with aws_environ(profiles_path=profiles_path, profile="test"):
+            pass

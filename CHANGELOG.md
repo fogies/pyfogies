@@ -35,10 +35,26 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0.dev5] (2026-08-11)
+
+### Added
+- Added Terraform modules for `alb`, `backend`, `ecr`, `hosted_zone`, `network`. (#5)
+- Added tools and tasks for `terraform` and related `terraform_backend`. (#5)
+- Added tool for `aws_environ`. (#5)
+- Added templates for `secrets/aws.toml`, `secrets/poetry.toml`, `secrets/pyfogies-tests.toml`. (#5)
+
+### Changed
+- Improved task for `format`. (#5)
+- Improved tool for `command`. (#5)
+
+### Tests
+- Re-organized tests (#5).
+- Added testing for Terraform modules. (#5)
+
 ## [0.0.0.dev4] (2026-04-14)
 
 ### Added
-- Added `py.typed` marker for typed distribution.
+- Added `py.typed` marker for typed distribution. (#4)
 
 ## [0.0.0.dev3] (2026-03-24)
 

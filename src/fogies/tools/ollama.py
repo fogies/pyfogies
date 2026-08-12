@@ -4,24 +4,28 @@ import shutil
 import socket
 import subprocess
 import sys
-import time
 import urllib.request
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from http.client import HTTPResponse
 from typing import cast
 
 import ollama as _ollama_client
 import psutil
+import tenacity
 from filelock import BaseFileLock, FileLock
 from pydantic import BaseModel
 
+from fogies.retry import readiness_poll_short
+
+# Most recent first; _KNOWN_VERSIONS[0] is the default.
 _KNOWN_VERSIONS = [
+    "0.32.5",
     "0.17.7",
 ]
 
-_DEFAULT_VERSION = _KNOWN_VERSIONS[-1]
+_DEFAULT_VERSION = _KNOWN_VERSIONS[0]
 
 _OLLAMA_URL_TEMPLATE = (
     "https://github.com/ollama/ollama/releases/download"
@@ -30,8 +34,6 @@ _OLLAMA_URL_TEMPLATE = (
 
 _OLLAMA_LISTEN_ADDRESS: tuple[str, int] = ("127.0.0.1", 11434)
 _OLLAMA_LISTEN_PROBE_TIMEOUT = 0.25
-_OLLAMA_LISTEN_POLL_INTERVAL = 0.1
-_OLLAMA_LISTEN_PROBE_WAIT_TIMEOUT = 10.0
 _OLLAMA_TERMINATE_WAIT_TIMEOUT = 10.0
 
 
@@ -110,7 +112,7 @@ class _Ollama:
         return int(text)
 
     @contextmanager
-    def lock(self) -> Iterator[None]:
+    def lock(self) -> Generator[None]:
         """Acquire and hold the file lock."""
         with self._file_lock:
             yield
@@ -192,34 +194,36 @@ def _terminate_pid(*, pid: _PidWithCreateTime) -> None:
         pass
 
 
-def _wait_until_listening(
-    *,
-    pid: _PidWithCreateTime,
-    timeout: float = _OLLAMA_LISTEN_PROBE_WAIT_TIMEOUT,
-) -> None:
-    end = time.time() + timeout
-    while time.time() < end:
-        try:
-            proc = psutil.Process(pid.pid)
-            alive = (
-                proc.is_running()
-                and proc.status() != psutil.STATUS_ZOMBIE
-                and _create_time_seconds(proc.create_time()) == pid.create_time_seconds
-            )
-        except psutil.Error:
-            alive = False
-        if not alive:
-            raise RuntimeError("Ollama server process exited before becoming ready")
-        try:
-            with socket.create_connection(
-                _OLLAMA_LISTEN_ADDRESS,
-                timeout=_OLLAMA_LISTEN_PROBE_TIMEOUT,
-            ):
-                return
-        except OSError:
-            pass
-        time.sleep(_OLLAMA_LISTEN_POLL_INTERVAL)
-    raise TimeoutError("Ollama server did not become ready")
+def _process_is_alive(pid: _PidWithCreateTime) -> bool:
+    try:
+        proc = psutil.Process(pid.pid)
+        return (
+            proc.is_running()
+            and proc.status() != psutil.STATUS_ZOMBIE
+            and _create_time_seconds(proc.create_time()) == pid.create_time_seconds
+        )
+    except psutil.Error:
+        return False
+
+
+def _assert_process_alive(pid: _PidWithCreateTime) -> None:
+    if not _process_is_alive(pid):
+        raise RuntimeError("Ollama server process exited before becoming ready")
+
+
+def _wait_until_listening(*, pid: _PidWithCreateTime) -> None:
+    try:
+        for attempt in readiness_poll_short(exceptions=OSError, reraise=False):
+            with attempt:
+                # If the server process has already died, fail fast.
+                _assert_process_alive(pid)
+                with socket.create_connection(
+                    _OLLAMA_LISTEN_ADDRESS,
+                    timeout=_OLLAMA_LISTEN_PROBE_TIMEOUT,
+                ):
+                    return
+    except tenacity.RetryError:
+        raise TimeoutError("Ollama server did not become ready") from None
 
 
 @contextmanager
@@ -227,7 +231,7 @@ def ollama(
     *,
     version: str | None = None,
     binary_cache_path: pathlib.Path,
-) -> Iterator[_Ollama]:
+) -> Generator[_Ollama]:
     """Download an Ollama Windows CLI release and yield an Ollama handle.
 
     *version* is the Ollama release tag version (e.g., "0.17.7"). The archive is
@@ -283,7 +287,7 @@ def ollama_client(
     version: str | None = None,
     binary_cache_path: pathlib.Path,
     show_window: bool = False,
-) -> Iterator[_ollama_client.Client]:
+) -> Generator[_ollama_client.Client]:
     """Provide an Ollama Python client with a running local server.
 
     Starts Ollama server in background and yields a configured
@@ -293,18 +297,9 @@ def ollama_client(
     with ollama(version=version, binary_cache_path=binary_cache_path) as ollama_binary:
         with ollama_binary.lock():
             # First check whether a process is already running.
-            running = False
-            if ollama_binary.pid is not None:
-                try:
-                    proc = psutil.Process(ollama_binary.pid.pid)
-                    running = (
-                        proc.is_running()
-                        and proc.status() != psutil.STATUS_ZOMBIE
-                        and _create_time_seconds(proc.create_time())
-                        == ollama_binary.pid.create_time_seconds
-                    )
-                except psutil.Error:
-                    running = False
+            running = ollama_binary.pid is not None and _process_is_alive(
+                ollama_binary.pid
+            )
 
             # If needed, start the server.
             if not running:

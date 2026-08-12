@@ -36,17 +36,24 @@ def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], N
         """
         Publish package to PyPI.
         """
+        if not path_secrets_poetry.exists():
+            raise FileNotFoundError(
+                "Poetry secrets file '{}' does not exist.\nSee provided template.".format(
+                    path_secrets_poetry
+                )
+            )
+
         with path_secrets_poetry.open("rb") as handle:
             secrets_poetry = tomllib.load(handle)
 
-        api_key: str = cast(str, secrets_poetry["api"]["api_key"])
+        api_key: str = cast(str, secrets_poetry["pypi"]["api_key"])
 
         _ = context.run(
             command=" ".join(
                 [
                     "poetry",
                     "publish",
-                    "--username {}".format("__token__"),
+                    "--username __token__",
                     "--password {}".format(api_key),
                 ]
             ),
@@ -56,7 +63,7 @@ def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], N
     return cast(Task[Callable[[Context], None]], task_publish)
 
 
-def get_collection(path_secrets_poetry: Path) -> Collection:
+def get_collection(*, path_secrets_poetry: Path) -> Collection:
     """
     Get a collection of tasks.
     """

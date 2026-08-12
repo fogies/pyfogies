@@ -2,6 +2,7 @@ import contextlib
 import dataclasses
 import os
 import pathlib
+import subprocess
 from typing import cast
 
 from invoke.context import Context
@@ -14,6 +15,8 @@ class CommandParams:
 
     context: Context | None = None
     cwd: pathlib.Path | None = None
+    echo_stdin: bool = False
+    hide: bool = False
     in_stream: bool = True
 
     def require_cwd(self, path: pathlib.Path) -> "CommandParams":
@@ -55,15 +58,33 @@ def command_run(
 ) -> Result:
     """Run a command via invoke run().
 
-    If *context* is provided, use context.run(). Otherwise create a new
-    Context and run the command there.
+    If *command_params.context* is provided, use context.run(). Otherwise
+    create a new Context and run the command there.
+
+    *command_params.echo_stdin* when true mirrors captured stdin back to
+    stdout as it's read, on top of whatever local echo the terminal itself
+    already does. Without a pty, invoke would otherwise auto-enable this
+    whenever a real terminal is attached, which double-prints what was
+    typed (e.g. a "yes" at Terraform's apply confirmation appears twice, and
+    it can look like input needs entering again). Defaults to false since
+    the terminal already echoes keystrokes on its own.
+
+    *command_params.hide* when true suppresses the live console echo of the
+    command's stdout; stderr is always echoed regardless, so failures stay
+    visible. Either way, stdout is still captured into the returned Result -
+    hide only affects what is printed live, not what callers can read back.
+
+    *command_params.in_stream* when true forwards this process's stdin to
+    the command, so it can prompt interactively (e.g. Terraform's apply
+    confirmation). When false, the command's stdin is closed, so a command
+    that tries to prompt will fail or hang instead of waiting on a human.
     """
     command_params = command_params or CommandParams()
     context = command_params.context or Context()
 
     resolved_command = _resolve_command(command, command_params.cwd)
     args_combined = [resolved_command] + (args or [])
-    command_str = " ".join(args_combined)
+    command_str = subprocess.list2cmdline(args_combined)
 
     cd_context = (
         context.cd(str(command_params.cwd))  # pyright: ignore[reportUnknownMemberType]
@@ -71,7 +92,17 @@ def command_run(
         else contextlib.nullcontext()
     )
     with cd_context:
-        result = context.run(command_str, in_stream=command_params.in_stream)
+        result = context.run(
+            command_str,
+            echo_stdin=command_params.echo_stdin,
+            # "out" hides only stdout; invoke's False shows both streams.
+            hide="out" if command_params.hide else False,
+            # invoke's own sentinel for "forward sys.stdin" is None, not
+            # True - passing True verbatim makes invoke treat True itself as
+            # the stream object and crash calling .read() on it. Translate
+            # our bool into invoke's actual None/False contract.
+            in_stream=None if command_params.in_stream else False,
+        )
 
     # invoke's Context.run() returns None when run with disown=True.
     # Ensure future revisions to this code never introduce the parameter.
