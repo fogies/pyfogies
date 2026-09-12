@@ -10,6 +10,8 @@ from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
+from fogies.templates import ensure_from_template, poetry_toml_template_factory
+
 
 def get_task_build() -> Task[Callable[[Context], None]]:
     @task(name="build")  # pyright: ignore[reportUntypedFunctionDecorator]
@@ -36,12 +38,9 @@ def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], N
         """
         Publish package to PyPI.
         """
-        if not path_secrets_poetry.exists():
-            raise FileNotFoundError(
-                "Poetry secrets file '{}' does not exist.\nSee provided template.".format(
-                    path_secrets_poetry
-                )
-            )
+        ensure_from_template(
+            path=path_secrets_poetry, template_factory=poetry_toml_template_factory
+        )
 
         with path_secrets_poetry.open("rb") as handle:
             secrets_poetry = tomllib.load(handle)

@@ -11,6 +11,7 @@ from typing import cast
 import botocore.exceptions
 from pydantic import BaseModel
 
+from fogies.templates import aws_toml_template_factory, ensure_from_template
 from fogies.tools.environ import environ
 from fogies.typing import boto_client_sts
 
@@ -42,6 +43,8 @@ def load_aws_profile_from_toml(profiles_path: Path, profile_name: str) -> AwsPro
     [test]
     aws_access_key_id = "value-id"
     aws_secret_access_key = "value-secret"
+
+    Created from a template if it doesn't exist yet.
     """
     if profiles_path.suffix != ".toml":
         raise ValueError(
@@ -49,12 +52,7 @@ def load_aws_profile_from_toml(profiles_path: Path, profile_name: str) -> AwsPro
                 profiles_path
             )
         )
-    if not profiles_path.exists():
-        raise FileNotFoundError(
-            "AWS profiles file '{}' does not exist.\nSee provided template.".format(
-                profiles_path
-            )
-        )
+    ensure_from_template(path=profiles_path, template_factory=aws_toml_template_factory)
 
     with profiles_path.open("rb") as profiles_file:
         data: dict[str, object] = tomllib.load(profiles_file)
