@@ -13,9 +13,9 @@ import pytest
 
 from fogies.tools.aws_environ import (
     AwsProfile,
+    aws_environ_from_config,
     aws_environ_from_profile,
-    aws_environ_from_toml,
-    load_aws_profile_from_toml,
+    load_aws_profile_from_config,
 )
 from tasks.paths import PATH_SECRETS_AWS
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
@@ -28,8 +28,8 @@ def test_aws_environ_from_profile_sets_variables(
     monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
     monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
 
-    profile = load_aws_profile_from_toml(
-        profiles_path=PATH_SECRETS_AWS, profile_name=pyfogies_test_config.aws.profile
+    profile = load_aws_profile_from_config(
+        config_path=PATH_SECRETS_AWS, profile_name=pyfogies_test_config.aws.profile
     )
 
     with aws_environ_from_profile(profile=profile) as env:
@@ -67,28 +67,28 @@ def test_aws_environ_from_profile_raises_for_invalid_credentials(
     assert "AWS_SECRET_ACCESS_KEY" not in os.environ
 
 
-def test_aws_environ_from_toml_reads_selected_profile(
+def test_aws_environ_from_config_reads_selected_profile(
     monkeypatch: pytest.MonkeyPatch,
     pyfogies_test_config: PyfogiesTestsConfig,
     tmp_path: Path,
 ) -> None:
-    """aws_environ_from_toml loads the named profile's credentials from the file.
+    """aws_environ_from_config loads the named profile's credentials from the file.
 
     Env-var set/restore mechanics are covered by
-    test_aws_environ_from_profile_sets_variables; aws_environ_from_toml
+    test_aws_environ_from_profile_sets_variables; aws_environ_from_config
     delegates to aws_environ_from_profile for that. This test only covers
-    what's specific to aws_environ_from_toml: reading the right profile out
+    what's specific to aws_environ_from_config: reading the right profile out
     of a multi-profile file. The unselected "decoy" profile's credentials are
     never validated, so they don't need to be real.
     """
     monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
     monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
 
-    profile = load_aws_profile_from_toml(
-        profiles_path=PATH_SECRETS_AWS, profile_name=pyfogies_test_config.aws.profile
+    profile = load_aws_profile_from_config(
+        config_path=PATH_SECRETS_AWS, profile_name=pyfogies_test_config.aws.profile
     )
 
-    profiles_path = tmp_path / "test_aws_environ.toml"
+    config_path = tmp_path / "test_aws_environ.toml"
     config_text = "\n".join(
         [
             "[decoy]",
@@ -101,10 +101,10 @@ def test_aws_environ_from_toml_reads_selected_profile(
             "",
         ]
     )
-    _ = profiles_path.write_text(config_text, encoding="utf-8")
+    _ = config_path.write_text(config_text, encoding="utf-8")
 
-    with aws_environ_from_toml(
-        profiles_path=profiles_path, profile_name="selected"
+    with aws_environ_from_config(
+        config_path=config_path, profile_name="selected"
     ) as env:
         assert env.profile == "selected"
         assert env.aws_access_key_id == profile.aws_access_key_id
@@ -113,19 +113,20 @@ def test_aws_environ_from_toml_reads_selected_profile(
     assert "AWS_ACCESS_KEY_ID" not in os.environ
 
 
-def test_aws_environ_from_toml_raises_for_missing_file(tmp_path: Path) -> None:
-    """aws_environ_from_toml raises FileNotFoundError when profiles file does not exist."""
-    profiles_path = tmp_path / "missing.toml"
+def test_load_aws_profile_from_config_raises_for_missing_profile(
+    tmp_path: Path,
+) -> None:
+    """load_aws_profile_from_config raises KeyError when the profile isn't in the file."""
+    config_path = tmp_path / "config.toml"
+    config_text = "\n".join(
+        [
+            "[other]",
+            'aws_access_key_id = "not-a-real-key"',
+            'aws_secret_access_key = "not-a-real-secret"',
+            "",
+        ]
+    )
+    _ = config_path.write_text(config_text, encoding="utf-8")
 
-    with pytest.raises(FileNotFoundError):
-        with aws_environ_from_toml(profiles_path=profiles_path, profile_name="test"):
-            pass
-
-
-def test_aws_environ_from_toml_raises_for_toml_extension(tmp_path: Path) -> None:
-    """aws_environ_from_toml raises ValueError when profiles path lacks .toml extension."""
-    profiles_path = tmp_path / "aws.env"
-
-    with pytest.raises(ValueError, match=r"must have \.toml extension"):
-        with aws_environ_from_toml(profiles_path=profiles_path, profile_name="test"):
-            pass
+    with pytest.raises(KeyError, match="not found"):
+        _ = load_aws_profile_from_config(config_path=config_path, profile_name="test")
