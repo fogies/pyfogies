@@ -8,7 +8,7 @@ import fogies.tasks.format
 import fogies.tasks.lint
 import fogies.tasks.poetry
 import fogies.tasks.test
-from fogies.tools.aws_environ import AwsEnvironContextManager, aws_environ_from_toml
+from fogies.tools.aws_environ import AwsEnvironContextManager, aws_environ_from_config
 from tasks.paths import (
     PATH_SECRETS_AWS,
     PATH_SECRETS_POETRY,
@@ -26,8 +26,8 @@ def _aws_environ_factory() -> AwsEnvironContextManager:
     five tasks, and a context manager built by @contextlib.contextmanager can
     only be entered once.
     """
-    return aws_environ_from_toml(
-        profiles_path=PATH_SECRETS_AWS, profile_name=_ACCESS_KEY_PROFILE
+    return aws_environ_from_config(
+        config_path=PATH_SECRETS_AWS, profile_name=_ACCESS_KEY_PROFILE
     )
 
 
