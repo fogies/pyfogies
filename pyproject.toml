@@ -15,6 +15,9 @@ packages = [
 ]
 include = [
     {path = "src/fogies/py.typed", format = ["sdist", "wheel"]},
+    {path = "src/fogies/includes/templates/aws.toml.template", format = ["sdist", "wheel"]},
+    {path = "src/fogies/includes/templates/poetry.toml.template", format = ["sdist", "wheel"]},
+    {path = "src/fogies/includes/templates/backend_status.toml.template", format = ["sdist", "wheel"]},
 ]
 
 [tool.poetry.dependencies]

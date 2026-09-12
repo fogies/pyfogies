@@ -1,0 +1,6 @@
+# Tracks whether this Terraform backend, and the states using it, are
+# currently applied. Auto-managed by backend.apply/backend.destroy and
+# infrastructure.apply/infrastructure.destroy -- do not edit by hand.
+
+[backend]
+applied = false
