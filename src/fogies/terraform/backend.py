@@ -2,12 +2,13 @@
 
 import json
 import pathlib
-import tomllib
 from typing import ClassVar, cast
 
-import tomli_w
+import tomlkit
 from pydantic import BaseModel, ConfigDict
+from tomlkit.items import Table
 
+from fogies.templates import backend_status_toml_template_factory, ensure_from_template
 from fogies.tools.boto import s3_delete_keys
 from fogies.typing import boto_client_s3
 
@@ -155,8 +156,11 @@ class BackendStatus(BaseModel):
     of several. This is not a source of truth: it goes stale if applied or
     destroyed some other way than the tasks that maintain it. Intended to
     be committed: changes are rare, since they only happen on a successful
-    apply or destroy. Not round-trip preserving: saving always regenerates
-    the file from this schema.
+    apply or destroy. Round-trip preserving: saving updates only the keys
+    this schema knows about, leaving any other comments or content in the
+    file untouched. A brand new file is seeded from a template with an
+    explanatory header, since it's committed and meant to be read by people
+    browsing the repo, not just tooling.
 
     Load once, read or mutate the fields directly, and save when done -
     rather than re-reading the file for every question. For example:
@@ -180,12 +184,35 @@ class BackendStatus(BaseModel):
         """
         if not path.exists():
             return BackendStatus()
-        with path.open("rb") as f:
-            data = tomllib.load(f)
-        return BackendStatus.model_validate(data)
+        with path.open("r", encoding="utf-8") as f:
+            doc = tomlkit.parse(f.read())
+        return BackendStatus.model_validate(doc.unwrap())
 
     def save(self, *, path: pathlib.Path) -> None:
-        """Write self to path as TOML, creating parent directories as needed."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("wb") as f:
-            tomli_w.dump(self.model_dump(mode="json"), f)
+        """Write self to path as TOML, preserving comments and formatting.
+
+        Updates the existing file's document in place if path already
+        exists, so any comments (including a hand-added one) survive.
+        Otherwise seeds a new file from backend_status_toml_template_factory().
+        """
+        ensure_from_template(path=path, template_factory=backend_status_toml_template_factory)
+        with path.open("r", encoding="utf-8") as f:
+            doc = tomlkit.parse(f.read())
+
+        if "backend" not in doc:
+            doc["backend"] = tomlkit.table()
+        backend_table = cast(Table, doc["backend"])
+        backend_table["applied"] = self.backend.applied
+
+        if self.states:
+            if "states" not in doc:
+                doc["states"] = tomlkit.table(is_super_table=True)
+            states_table = cast(Table, doc["states"])
+            for name, entry in self.states.items():
+                if name not in states_table:
+                    states_table[name] = tomlkit.table()
+                state_table = cast(Table, states_table[name])
+                state_table["applied"] = entry.applied
+
+        with path.open("w", encoding="utf-8") as f:
+            _ = f.write(tomlkit.dumps(doc))
