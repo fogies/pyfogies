@@ -195,7 +195,9 @@ class BackendStatus(BaseModel):
         exists, so any comments (including a hand-added one) survive.
         Otherwise seeds a new file from backend_status_toml_template_factory().
         """
-        ensure_from_template(path=path, template_factory=backend_status_toml_template_factory)
+        ensure_from_template(
+            path=path, template_factory=backend_status_toml_template_factory
+        )
         with path.open("r", encoding="utf-8") as f:
             doc = tomlkit.parse(f.read())
 

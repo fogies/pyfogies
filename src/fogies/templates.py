@@ -11,7 +11,9 @@ import pathlib
 from collections.abc import Callable
 
 
-def ensure_from_template(*, path: pathlib.Path, template_factory: Callable[[], str]) -> None:
+def ensure_from_template(
+    *, path: pathlib.Path, template_factory: Callable[[], str]
+) -> None:
     """Create path from template_factory() if it doesn't exist yet.
 
     template_factory is called only when path is missing, so callers can

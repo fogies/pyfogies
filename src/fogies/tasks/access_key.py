@@ -119,7 +119,9 @@ def get_task_create(
           --username  IAM username.
         """
         _ = context
-        with _resolve_admin_environ(aws_environ_factory=aws_environ_factory, prompt=prompt):
+        with _resolve_admin_environ(
+            aws_environ_factory=aws_environ_factory, prompt=prompt
+        ):
             new_profile = aws_access_key.create_user(username=username)
         print("Created IAM user '{}'.".format(username))
         print("Created access key {}.".format(new_profile.aws_access_key_id))
@@ -141,7 +143,9 @@ def get_task_delete(
           --username  IAM username.
         """
         _ = context
-        with _resolve_admin_environ(aws_environ_factory=aws_environ_factory, prompt=prompt):
+        with _resolve_admin_environ(
+            aws_environ_factory=aws_environ_factory, prompt=prompt
+        ):
             protected_username = _caller_username()
             confirm = (
                 input("Delete IAM user '{}'? [y/N] ".format(username)).strip().lower()
@@ -214,7 +218,9 @@ def get_task_list(
           --prompt  Prompt for admin credentials.
         """
         _ = context
-        with _resolve_admin_environ(aws_environ_factory=aws_environ_factory, prompt=prompt):
+        with _resolve_admin_environ(
+            aws_environ_factory=aws_environ_factory, prompt=prompt
+        ):
             users = aws_access_key.list_users()
         if not users:
             print("No IAM users found.")
@@ -255,7 +261,9 @@ def get_task_rotate_key(
     return cast(Task[Callable[..., None]], task_rotate_key)
 
 
-def get_collection(*, aws_environ_factory: AwsEnvironFactory | None = None) -> Collection:
+def get_collection(
+    *, aws_environ_factory: AwsEnvironFactory | None = None
+) -> Collection:
     """Get a collection of tasks for managing IAM users and access keys."""
     collection = Collection("access-key")
     collection.add_task(get_task_create(aws_environ_factory=aws_environ_factory))
