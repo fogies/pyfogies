@@ -251,6 +251,18 @@ def get_task_rotate_key(
         with _resolve_admin_environ(
             aws_environ_factory=aws_environ_factory, prompt=prompt
         ) as admin_key_id:
+            keys = aws_access_key.get_keys(username=username)
+            if keys.previous is not None:
+                _print_user_key_overview(username=username, keys=keys)
+                print()
+                confirm = (
+                    input("Delete key {}? [y/N] ".format(keys.previous.key_id))
+                    .strip()
+                    .lower()
+                )
+                if confirm != "y":
+                    print("Aborted.")
+                    return
             new_profile = aws_access_key.rotate_key(
                 username=username,
                 protected_key_ids={admin_key_id},
