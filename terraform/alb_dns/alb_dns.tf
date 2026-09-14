@@ -31,19 +31,21 @@ resource "aws_acm_certificate" "cert" {
   }
 }
 
-resource "aws_route53_record" "cert_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
+locals {
+  dvo_by_hostname = {
+    for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => dvo
   }
+}
+
+resource "aws_route53_record" "cert_validation" {
+  # Intentionally keyed by hostnames known at plan time.
+  # Terraform can apparently be unstable with for_each on a computed value.
+  for_each = toset(var.hostnames)
 
   zone_id = data.aws_route53_zone.zone.zone_id
-  name    = each.value.name
-  type    = each.value.type
-  records = [each.value.record]
+  name    = local.dvo_by_hostname[each.value].resource_record_name
+  type    = local.dvo_by_hostname[each.value].resource_record_type
+  records = [local.dvo_by_hostname[each.value].resource_record_value]
   ttl     = 60
 }
 
