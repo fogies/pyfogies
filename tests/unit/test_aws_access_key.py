@@ -6,7 +6,6 @@ import pytest
 
 import fogies.aws_access_key as aws_access_key
 from fogies.tools.aws_environ import AwsEnviron, AwsProfile
-from fogies.typing import boto_client_sts
 
 _TEST_USERNAME = "pyfogies-test-aws-access-key"
 _NONEXISTENT_USERNAME = "pyfogies-test-aws-access-key-nonexistent"
@@ -26,14 +25,6 @@ def _delete_test_user_if_exists(pyfogies_test_aws_environ: AwsEnviron) -> None:
                 protected_key_ids={pyfogies_test_aws_environ.aws_access_key_id},
             )
     aws_access_key.delete_user(username=_TEST_USERNAME, protected_usernames=set())
-
-
-@pytest.fixture(scope="module")
-def test_aws_environ_username(pyfogies_test_aws_environ: AwsEnviron) -> str:
-    """Return the IAM username currently authenticated by the test session."""
-    _ = pyfogies_test_aws_environ
-    arn = boto_client_sts().get_caller_identity()["Arn"]
-    return arn.split("/")[-1]
 
 
 @pytest.fixture(scope="module")
@@ -215,20 +206,20 @@ def test_delete_key_refuses_protected_key(
 
 
 def test_delete_user_raises_if_has_keys(
-    test_aws_environ_username: str,
+    pyfogies_test_aws_environ: AwsEnviron,
     test_profile_known_state: AwsProfile,
 ) -> None:
     """delete_user raises ValueError when the user still has keys."""
     _ = test_profile_known_state
     with pytest.raises(ValueError, match="still has"):
         aws_access_key.delete_user(
-            username=_TEST_USERNAME, protected_usernames={test_aws_environ_username}
+            username=_TEST_USERNAME,
+            protected_usernames={pyfogies_test_aws_environ.username},
         )
 
 
 def test_delete_user_raises_if_protected(
     pyfogies_test_aws_environ: AwsEnviron,
-    test_aws_environ_username: str,
     test_profile_known_state: AwsProfile,
 ) -> None:
     """delete_user raises ValueError when the username is protected."""
@@ -240,13 +231,12 @@ def test_delete_user_raises_if_protected(
     with pytest.raises(ValueError, match="protected IAM user"):
         aws_access_key.delete_user(
             username=_TEST_USERNAME,
-            protected_usernames={_TEST_USERNAME, test_aws_environ_username},
+            protected_usernames={_TEST_USERNAME, pyfogies_test_aws_environ.username},
         )
 
 
 def test_delete_user_succeeds_after_keys_removed(
     pyfogies_test_aws_environ: AwsEnviron,
-    test_aws_environ_username: str,
     test_profile_known_state: AwsProfile,
 ) -> None:
     """delete_user succeeds once all keys are gone."""
@@ -256,7 +246,8 @@ def test_delete_user_succeeds_after_keys_removed(
         protected_key_ids={pyfogies_test_aws_environ.aws_access_key_id},
     )
     aws_access_key.delete_user(
-        username=_TEST_USERNAME, protected_usernames={test_aws_environ_username}
+        username=_TEST_USERNAME,
+        protected_usernames={pyfogies_test_aws_environ.username},
     )
 
     users = aws_access_key.list_users()

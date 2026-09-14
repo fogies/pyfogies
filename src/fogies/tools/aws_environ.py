@@ -26,6 +26,7 @@ class AwsProfile(BaseModel):
 
 class AwsEnviron(BaseModel):
     profile: str
+    username: str
     aws_access_key_id: str
 
 
@@ -85,9 +86,12 @@ def aws_environ_from_profile(
     Confirms the credentials actually work (via STS GetCallerIdentity) before
     yielding, raising ValueError immediately rather than letting some later,
     unrelated AWS call fail confusingly. The extra round trip is minor next
-    to the time lost misdiagnosing an unclear downstream error.
+    to the time lost misdiagnosing an unclear downstream error. That same
+    call's identity ARN also supplies the yielded username, so callers never
+    need a second STS call just to learn it.
 
-    Yields an :class:`AwsEnviron` describing which profile and key ID are active.
+    Yields an :class:`AwsEnviron` describing which profile, IAM username,
+    and key ID are active.
     """
     variables: dict[str, str] = {
         "AWS_ACCESS_KEY_ID": profile.aws_access_key_id,
@@ -99,13 +103,16 @@ def aws_environ_from_profile(
         raise_if_changed=raise_if_changed,
     ):
         try:
-            _ = boto_client_sts().get_caller_identity()
+            identity = boto_client_sts().get_caller_identity()
         except botocore.exceptions.ClientError as exc:
             raise ValueError(
                 "Invalid AWS credentials for profile '{}': {}".format(profile.name, exc)
             ) from exc
+        # ARN format for IAM users: arn:aws:iam::123456789012:user/username
+        username = identity["Arn"].split("/")[-1]
         yield AwsEnviron(
             profile=profile.name,
+            username=username,
             aws_access_key_id=profile.aws_access_key_id,
         )
 
