@@ -45,7 +45,9 @@ def load_aws_profile_from_config(config_path: Path, profile_name: str) -> AwsPro
     aws_access_key_id = "value-id"
     aws_secret_access_key = "value-secret"
 
-    Created from a template if it doesn't exist yet.
+    Created from a template if it doesn't exist yet -- callers should expect
+    a FileNotFoundError-style failure the first time, prompting them to fill
+    in the newly-created file with real credentials and re-run.
     """
     if config_path.suffix != ".toml":
         raise ValueError(

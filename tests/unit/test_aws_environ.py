@@ -130,3 +130,16 @@ def test_load_aws_profile_from_config_raises_for_missing_profile(
 
     with pytest.raises(KeyError, match="not found"):
         _ = load_aws_profile_from_config(config_path=config_path, profile_name="test")
+
+
+def test_load_aws_profile_from_config_raises_for_missing_file(
+    tmp_path: Path,
+) -> None:
+    """load_aws_profile_from_config creates a template and raises, rather than reading it."""
+    config_path = tmp_path / "config.toml"
+    assert not config_path.exists()
+
+    with pytest.raises(FileNotFoundError, match="was not found"):
+        _ = load_aws_profile_from_config(config_path=config_path, profile_name="test")
+
+    assert config_path.exists()

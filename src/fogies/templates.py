@@ -12,18 +12,32 @@ from collections.abc import Callable
 
 
 def ensure_from_template(
-    *, path: pathlib.Path, template_factory: Callable[[], str]
+    *,
+    path: pathlib.Path,
+    template_factory: Callable[[], str],
+    raise_if_file_not_found: bool = True,
 ) -> None:
     """Create path from template_factory() if it doesn't exist yet.
 
     template_factory is called only when path is missing, so callers can
     pass a factory wrapping a packaged-resource lookup (importlib.resources)
     without paying that cost when the file already exists.
+
+    raise_if_file_not_found defaults to True: a template usually needs the
+    reader to fill in real values (credentials, an API key), so first-time
+    setup fails loudly with a message pointing at the file just created,
+    instead of silently proceeding against a placeholder. Pass False for a
+    template whose defaults are already usable as-is (e.g. an initially
+    empty state-tracking file).
     """
     if path.exists():
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     _ = path.write_text(template_factory(), encoding="utf-8")
+    if raise_if_file_not_found:
+        raise FileNotFoundError(
+            "Expected file '{}' was not found, was created from template.".format(path)
+        )
 
 
 def _read_template_from_resources(name: str) -> str:

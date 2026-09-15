@@ -31,7 +31,9 @@ class PyfogiesTestsConfig(BaseModel):
     def load(*, path: Path) -> "PyfogiesTestsConfig":
         """Load and validate configuration from a TOML file.
 
-        Created from a template if it doesn't exist yet.
+        Created from a template if it doesn't exist yet -- callers should
+        expect a FileNotFoundError-style failure the first time, prompting
+        them to fill in the newly-created file and re-run.
         """
         ensure_from_template(
             path=path, template_factory=_pyfogies_tests_toml_template_factory

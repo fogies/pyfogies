@@ -196,7 +196,9 @@ class BackendStatus(BaseModel):
         Otherwise seeds a new file from backend_status_toml_template_factory().
         """
         ensure_from_template(
-            path=path, template_factory=backend_status_toml_template_factory
+            path=path,
+            template_factory=backend_status_toml_template_factory,
+            raise_if_file_not_found=False,
         )
         with path.open("r", encoding="utf-8") as f:
             doc = tomlkit.parse(f.read())
