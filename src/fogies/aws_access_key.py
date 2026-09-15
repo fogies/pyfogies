@@ -67,11 +67,16 @@ def get_keys(*, username: str) -> IamAccessKeys:
 def list_users() -> list[_IamUserInfo]:
     """List all IAM users (sorted by name) and their access keys."""
     iam = boto_client_iam()
+    raw_users = [
+        user
+        for page in iam.get_paginator("list_users").paginate()
+        for user in page["Users"]
+    ]
     users = [
         _IamUserInfo(
             username=user["UserName"], keys=get_keys(username=user["UserName"])
         )
-        for user in iam.list_users()["Users"]
+        for user in raw_users
     ]
     return sorted(users, key=lambda u: u.username)
 
