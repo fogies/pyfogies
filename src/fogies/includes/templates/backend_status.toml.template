@@ -1,0 +1,5 @@
+# Tracks this Terraform backend and the states using it.
+# Managed by tasks for Terraform apply and destroy.
+
+[backend]
+applied = false

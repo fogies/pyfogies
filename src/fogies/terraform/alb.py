@@ -1,16 +1,6 @@
-"""Pydantic models for Terraform ALB module variables and output."""
+"""Pydantic models for Terraform ALB module output."""
 
 from pydantic import BaseModel
-
-
-class AlbVars(BaseModel):
-    region: str
-    name: str
-    subnet_ids: list[str]
-    security_group_ids: list[str]
-    self_signed_certificate: bool = False
-    certificate_arn: str | None = None
-    tags: dict[str, str] = {}
 
 
 class AlbOutput(BaseModel):

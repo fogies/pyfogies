@@ -27,3 +27,4 @@ output "certificate_pem" {
   description = "PEM of the certificate. Non-null only when a self-signed certificate was created."
   value       = local.certificate_pem
 }
+

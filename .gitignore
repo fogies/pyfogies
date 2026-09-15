@@ -13,7 +13,8 @@ __pycache__/
 /.staging
 
 # Local credentials and secrets.
-/secrets
+/secrets/*
+!/secrets/.gitkeep
 
 # Terraform state, cache, and crash logs.
 **/.terraform/

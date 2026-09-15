@@ -1,0 +1,6 @@
+# AWS credentials. Keyed by profile name.
+# https://docs.aws.amazon.com/sdkref/latest/guide/feature-static-credentials.html
+
+# [profile-name]
+# aws_access_key_id = "..."
+# aws_secret_access_key = "..."

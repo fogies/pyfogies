@@ -413,24 +413,24 @@ def terraform(
             init_params=init_params,
         )
 
-    if apply_on_entry:
-        assert command_params is not None
-        assert module_path is not None
-        _ = tf.apply(
-            command_params=command_params,
-            module_path=module_path,
-            tfvars_path=tfvars_path,
-            apply_params=apply_params,
-        )
-        if backend_status_path is not None:
-            assert backend is not None
-            backend_status = BackendStatus.load(path=backend_status_path)
-            backend_status.states[backend.state] = BackendStatusEntry(
-                applied=bool(backend_state_resources(config=backend))
-            )
-            backend_status.save(path=backend_status_path)
-
     try:
+        if apply_on_entry:
+            assert command_params is not None
+            assert module_path is not None
+            _ = tf.apply(
+                command_params=command_params,
+                module_path=module_path,
+                tfvars_path=tfvars_path,
+                apply_params=apply_params,
+            )
+            if backend_status_path is not None:
+                assert backend is not None
+                backend_status = BackendStatus.load(path=backend_status_path)
+                backend_status.states[backend.state] = BackendStatusEntry(
+                    applied=bool(backend_state_resources(config=backend))
+                )
+                backend_status.save(path=backend_status_path)
+
         yield tf
     finally:
         if destroy_on_exit:

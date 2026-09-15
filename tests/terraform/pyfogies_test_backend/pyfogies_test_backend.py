@@ -6,21 +6,17 @@ from collections.abc import Iterator
 import pytest
 from pydantic import BaseModel
 
-from fogies.terraform.backend import (
-    BackendOutput,
-    BackendVars,
-    backend_delete_state_objects,
-)
+from fogies.terraform.backend import BackendOutput, BackendVars
 from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
-    terraform_output,
     terraform_tfvars,
 )
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from fogies.tools.terraform_backend import terraform_backend
+from tasks.paths import PATH_STAGING_BINARY_CACHE, PATH_TEST_BACKEND_STATUS
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import (
     PYFOGIES_TEST_TERRAFORM_BACKEND_NAME,
@@ -54,26 +50,20 @@ def pyfogies_test_backend(
                 states=[s.value for s in PyfogiesTestTerraformBackendStates],
             ),
         ) as tfvars_path,
-        terraform_output(
+        terraform_backend(
             binary_cache_path=PATH_STAGING_BINARY_CACHE,
             command_params=command_params,
             module_path=backend_module_path,
+            backend_status_path=PATH_TEST_BACKEND_STATUS,
             tfvars_path=tfvars_path,
             init_on_entry=True,
-            init_params=InitParams(
-                upgrade=True,
-                reconfigure=True,
-            ),
+            init_params=InitParams(upgrade=True, reconfigure=True),
             apply_on_entry=True,
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
             output_model=_PyFogiesTestBackendOutput,
+            output_model_get_backend=lambda o: o.backend,
         ) as output,
     ):
-        try:
-            yield output.backend
-        finally:
-            # Verifies no resources remain, then clears bucket contents so
-            # Terraform can destroy it.
-            backend_delete_state_objects(output=output.backend)
+        yield output.backend

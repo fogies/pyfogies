@@ -1,15 +1,6 @@
-"""Pydantic models for Terraform ECR module variables and output."""
+"""Pydantic models for Terraform ECR module output."""
 
 from pydantic import BaseModel
-
-
-class EcrVars(BaseModel):
-    region: str
-    repositories: list[str]
-    force_delete: bool
-    lifecycle_keep_count_limit: int
-    lifecycle_keep_days_limit: int
-    tags: dict[str, str] = {}
 
 
 class EcrRepositoryOutput(BaseModel):

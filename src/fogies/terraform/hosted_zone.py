@@ -1,11 +1,6 @@
-"""Pydantic models for Terraform hosted_zone module variables and output."""
+"""Pydantic models for Terraform hosted_zone module output."""
 
 from pydantic import BaseModel
-
-
-class HostedZoneVars(BaseModel):
-    zone_name: str
-    create_zone: bool
 
 
 class HostedZoneOutput(BaseModel):

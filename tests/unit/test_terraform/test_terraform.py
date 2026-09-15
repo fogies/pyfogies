@@ -211,6 +211,73 @@ def test_terraform_output(tmp_path: pathlib.Path) -> None:
         assert tool_output == expected_output
 
 
+def test_terraform_apply_partial_failure_still_destroys(tmp_path: pathlib.Path) -> None:
+    """destroy_on_exit still runs and cleans up when apply_on_entry partially fails."""
+    command_params = CommandParams(in_stream=False)
+    module_path = pathlib.Path(__file__).parent / "partial_failure"
+
+    tfvars_path = tmp_path / "tool.tfvars.json"
+    expected_file_path = tmp_path / "test_resource_partial_failure.txt"
+
+    with terraform_tfvars(
+        path=tfvars_path,
+        variables=_ToolVars(
+            test_path=str(expected_file_path),
+            test_content="test_terraform_apply_partial_failure_still_destroys",
+        ),
+    ) as tfvars_path:
+        # First, confirm the module itself really does leave the independent
+        # local_file resource behind when the unrelated null_resource fails --
+        # otherwise the assertions below would pass vacuously even without the
+        # fix, since there would be nothing to clean up in the first place.
+        with terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf:
+            _ = tf.init(
+                command_params=command_params,
+                module_path=module_path,
+                init_params=InitParams(upgrade=True),
+            )
+            with pytest.raises(UnexpectedExit):
+                _ = tf.apply(
+                    command_params=command_params,
+                    module_path=module_path,
+                    tfvars_path=tfvars_path,
+                    apply_params=ApplyParams(auto_approve=True),
+                )
+            assert expected_file_path.exists(), (
+                "expected the independent resource to be created despite "
+                "the unrelated resource's apply failure"
+            )
+
+            _ = tf.destroy(
+                command_params=command_params,
+                module_path=module_path,
+                tfvars_path=tfvars_path,
+                destroy_params=DestroyParams(auto_approve=True),
+            )
+            assert not expected_file_path.exists()
+
+        # Now confirm terraform()'s own apply_on_entry/destroy_on_exit wiring
+        # reaches the same end state automatically -- destroy_on_exit must
+        # still run despite apply_on_entry raising. This is the behavior
+        # terraform()'s apply/finally ordering was fixed for.
+        with pytest.raises(UnexpectedExit):
+            with terraform(
+                binary_cache_path=PATH_STAGING_BINARY_CACHE,
+                command_params=command_params,
+                module_path=module_path,
+                tfvars_path=tfvars_path,
+                init_on_entry=True,
+                init_params=InitParams(upgrade=True),
+                apply_on_entry=True,
+                apply_params=ApplyParams(auto_approve=True),
+                destroy_on_exit=True,
+                destroy_params=DestroyParams(auto_approve=True),
+            ):
+                pass
+
+        assert not expected_file_path.exists()
+
+
 def test_terraform_output_invalid_module_raises(tmp_path: pathlib.Path) -> None:
     """terraform_output with invalid module raises when apply fails."""
     command_params = CommandParams(in_stream=False)

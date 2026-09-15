@@ -35,6 +35,21 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0.dev6] (2026-09-15)
+
+### Added
+- Added Terraform modules for `access_key_permissions`, `alb_dns`, `cloudwatch`, `ecs`, `security_group/alb_public_http_https`, and `security_group/ecs_from_alb_http`. (#6)
+- Added tool and tasks for `aws_access_key`. (#6)
+- Added `ensure_from_template`. (#6)
+
+### Changed
+- Added `ready_poll`, replacing `readiness_poll` functions. (#6)
+- Refactored `aws_environ_from_config` and `aws_environ_from_profile`. (#6)
+
+### Tests
+- Refactored self-signed ALB into a shared fixture. (#6)
+- Added testing for Terraform modules. (#6)
+
 ## [0.0.0.dev5] (2026-08-11)
 
 ### Added

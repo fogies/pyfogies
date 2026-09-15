@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from tasks.paths import PATH_SECRETS_PYFOGIES_TESTS
+from fogies.templates import ensure_from_template
+from tasks.paths import PATH_SECRETS_PYFOGIES_TESTS, PATH_TEMPLATE_PYFOGIES_TESTS
+
+
+def _pyfogies_tests_toml_template_factory() -> str:
+    return PATH_TEMPLATE_PYFOGIES_TESTS.read_text(encoding="utf-8")
 
 
 class _AwsConfig(BaseModel):
@@ -26,14 +31,13 @@ class PyfogiesTestsConfig(BaseModel):
     def load(*, path: Path) -> "PyfogiesTestsConfig":
         """Load and validate configuration from a TOML file.
 
-        Raises FileNotFoundError if the file does not exist.
+        Created from a template if it doesn't exist yet -- callers should
+        expect a FileNotFoundError-style failure the first time, prompting
+        them to fill in the newly-created file and re-run.
         """
-        if not path.exists():
-            raise FileNotFoundError(
-                "pyfogies test configuration file not found: '{}'.\nSee provided template.".format(
-                    path
-                )
-            )
+        ensure_from_template(
+            path=path, template_factory=_pyfogies_tests_toml_template_factory
+        )
         with path.open("rb") as f:
             data = tomllib.load(f)
         return PyfogiesTestsConfig.model_validate(data)

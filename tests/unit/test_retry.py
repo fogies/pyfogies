@@ -4,7 +4,7 @@ import pathlib
 
 import pytest
 
-from fogies.retry import readiness_poll, retry_transient
+from fogies.retry import retry_transient
 
 
 class _TestError(Exception):
@@ -13,28 +13,6 @@ class _TestError(Exception):
 
 class _OtherError(Exception):
     pass
-
-
-def test_readiness_poll_succeeds() -> None:
-    calls = 0
-    for attempt in readiness_poll(
-        exceptions=_TestError, timeout=10.0, poll_interval=0.1
-    ):
-        with attempt:
-            calls += 1
-            if calls < 5:
-                raise _TestError("Not Yet")
-
-    assert calls == 5
-
-
-def test_readiness_poll_ignores_other_exceptions() -> None:
-    with pytest.raises(_OtherError):
-        for attempt in readiness_poll(
-            exceptions=_TestError, timeout=10.0, poll_interval=0.1
-        ):
-            with attempt:
-                raise _OtherError("Unrelated")
 
 
 def test_retry_transient_succeeds() -> None:
