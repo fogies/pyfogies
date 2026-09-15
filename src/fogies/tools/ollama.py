@@ -17,7 +17,7 @@ import tenacity
 from filelock import BaseFileLock, FileLock
 from pydantic import BaseModel
 
-from fogies.retry import readiness_poll_short
+from fogies.ready_poll import READY_POLL_TIMING_SHORT, ready_poll
 
 # Most recent first; _KNOWN_VERSIONS[0] is the default.
 _KNOWN_VERSIONS = [
@@ -35,6 +35,8 @@ _OLLAMA_URL_TEMPLATE = (
 _OLLAMA_LISTEN_ADDRESS: tuple[str, int] = ("127.0.0.1", 11434)
 _OLLAMA_LISTEN_PROBE_TIMEOUT = 0.25
 _OLLAMA_TERMINATE_WAIT_TIMEOUT = 10.0
+
+_READY_POLL_EXCEPTIONS_OLLAMA = OSError
 
 
 class _PidWithCreateTime(BaseModel):
@@ -213,7 +215,11 @@ def _assert_process_alive(pid: _PidWithCreateTime) -> None:
 
 def _wait_until_listening(*, pid: _PidWithCreateTime) -> None:
     try:
-        for attempt in readiness_poll_short(exceptions=OSError, reraise=False):
+        for attempt in ready_poll(
+            exceptions=_READY_POLL_EXCEPTIONS_OLLAMA,
+            timing=READY_POLL_TIMING_SHORT,
+            reraise=False,
+        ):
             with attempt:
                 # If the server process has already died, fail fast.
                 _assert_process_alive(pid)
