@@ -72,6 +72,24 @@ def load_aws_profile_from_config(config_path: Path, profile_name: str) -> AwsPro
     return AwsProfile.model_validate({"name": profile_name, **profile_data})
 
 
+def _username_from_iam_arn(arn: str) -> str:
+    """Return the IAM username from an IAM user's ARN.
+
+    IAM users have ARNs of the form
+    arn:aws:iam::<account-id>:user/<path/>username. Raises ValueError for any
+    other ARN shape (e.g. an assumed-role or federated-session identity),
+    since those don't identify a static-credential IAM user.
+    """
+    arn_parts = arn.split(":")
+    if (
+        len(arn_parts) != 6
+        or arn_parts[2] != "iam"
+        or not arn_parts[5].startswith("user/")
+    ):
+        raise ValueError("Expected an IAM user ARN, got '{}'".format(arn))
+    return arn_parts[5].rsplit("/", 1)[-1]
+
+
 @contextlib.contextmanager
 def aws_environ_from_profile(
     *,
@@ -110,8 +128,7 @@ def aws_environ_from_profile(
             raise ValueError(
                 "Invalid AWS credentials for profile '{}': {}".format(profile.name, exc)
             ) from exc
-        # ARN format for IAM users: arn:aws:iam::123456789012:user/username
-        username = identity["Arn"].split("/")[-1]
+        username = _username_from_iam_arn(identity["Arn"])
         yield AwsEnviron(
             profile=profile.name,
             username=username,

@@ -12,6 +12,9 @@ from pathlib import Path
 import pytest
 
 from fogies.tools.aws_environ import (
+    _username_from_iam_arn,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.aws_environ import (
     AwsProfile,
     aws_environ_from_config,
     aws_environ_from_profile,
@@ -143,3 +146,21 @@ def test_load_aws_profile_from_config_raises_for_missing_file(
         _ = load_aws_profile_from_config(config_path=config_path, profile_name="test")
 
     assert config_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("arn", "expected_username"),
+    [
+        ("arn:aws:iam::123456789012:user/alice", "alice"),
+        ("arn:aws:iam::123456789012:user/team/alice", "alice"),
+        ("arn:aws:sts::123456789012:assumed-role/SomeRole/session-name", None),
+        ("not-an-arn", None),
+    ],
+)
+def test_username_from_iam_arn(arn: str, expected_username: str | None) -> None:
+    """Returns the username for an IAM user ARN; raises for any other shape."""
+    if expected_username is None:
+        with pytest.raises(ValueError, match="Expected an IAM user ARN"):
+            _ = _username_from_iam_arn(arn)
+    else:
+        assert _username_from_iam_arn(arn) == expected_username
