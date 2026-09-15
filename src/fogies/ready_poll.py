@@ -10,10 +10,10 @@ import dataclasses
 import requests
 import tenacity
 
-
 # Exceptions that mean an HTTP endpoint is not yet ready.
 READY_POLL_EXCEPTIONS_HTTP: tuple[type[BaseException], ...] = (
     requests.exceptions.ConnectionError,
+    requests.exceptions.HTTPError,
     requests.exceptions.SSLError,
     requests.exceptions.Timeout,
     TimeoutError,

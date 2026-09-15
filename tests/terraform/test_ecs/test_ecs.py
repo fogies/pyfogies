@@ -7,7 +7,11 @@ import pytest
 import requests
 from pydantic import BaseModel
 
-from fogies.retry import readiness_poll_long
+from fogies.ready_poll import (
+    READY_POLL_EXCEPTIONS_HTTP,
+    READY_POLL_TIMING_LONG,
+    ready_poll,
+)
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.cloudwatch import CloudwatchOutput
 from fogies.terraform.ecs import EcsOutput
@@ -108,11 +112,9 @@ def _wait_for_ecs(alb: PyfogiesTestAlbOutput, pem_tmp: pathlib.Path) -> None:
     else:
         verify = True
 
-    for attempt in readiness_poll_long(
-        exceptions=(
-            requests.exceptions.ConnectionError,
-            _Unhealthy,
-        ),
+    for attempt in ready_poll(
+        exceptions=READY_POLL_EXCEPTIONS_HTTP,
+        timing=READY_POLL_TIMING_LONG,
     ):
         with attempt:
             response = requests.get(
@@ -121,16 +123,7 @@ def _wait_for_ecs(alb: PyfogiesTestAlbOutput, pem_tmp: pathlib.Path) -> None:
                 timeout=5,
                 allow_redirects=False,
             )
-            if response.status_code != 200:
-                raise _Unhealthy(
-                    "ECS tasks not yet healthy (ALB returned {})".format(
-                        response.status_code
-                    )
-                )
-
-
-class _Unhealthy(Exception):
-    pass
+            response.raise_for_status()
 
 
 def _get_task_public_ip(*, cluster_arn: str, service_name: str, region: str) -> str:
