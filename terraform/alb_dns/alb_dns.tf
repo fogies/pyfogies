@@ -4,7 +4,10 @@ locals {
 }
 
 data "aws_route53_zone" "zone" {
-  name = var.hosted_zone_name
+  # Disambiguates from a private zone of the same name, since the ALB alias
+  # and ACM validation records here must land in the public zone.
+  name         = var.hosted_zone_name
+  private_zone = false
 }
 
 resource "aws_route53_record" "hostname" {
