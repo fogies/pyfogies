@@ -8,7 +8,12 @@ import pytest
 import requests
 from pydantic import BaseModel
 
-from fogies.retry import readiness_poll_long
+from fogies.ready_poll import (
+    READY_POLL_EXCEPTIONS_DNS,
+    READY_POLL_EXCEPTIONS_HTTP,
+    READY_POLL_TIMING_LONG,
+    ready_poll,
+)
 from fogies.terraform.backend import BackendOutput
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
@@ -100,17 +105,16 @@ def alb_dns_output(
 
 
 def _wait_for_dns(hostname: str) -> None:
-    for attempt in readiness_poll_long(exceptions=socket.gaierror):
+    for attempt in ready_poll(
+        exceptions=READY_POLL_EXCEPTIONS_DNS, timing=READY_POLL_TIMING_LONG
+    ):
         with attempt:
             _ = socket.getaddrinfo(hostname, None)
 
 
 def _wait_for_https(hostname: str) -> None:
-    for attempt in readiness_poll_long(
-        exceptions=(
-            requests.exceptions.ConnectionError,
-            requests.exceptions.SSLError,
-        )
+    for attempt in ready_poll(
+        exceptions=READY_POLL_EXCEPTIONS_HTTP, timing=READY_POLL_TIMING_LONG
     ):
         with attempt:
             _ = requests.get(

@@ -6,9 +6,13 @@ needs different numbers.
 """
 
 import dataclasses
+import socket
 
 import requests
 import tenacity
+
+# Exceptions that mean DNS resolution hasn't propagated yet.
+READY_POLL_EXCEPTIONS_DNS: tuple[type[BaseException], ...] = (socket.gaierror,)
 
 # Exceptions that mean an HTTP endpoint is not yet ready.
 READY_POLL_EXCEPTIONS_HTTP: tuple[type[BaseException], ...] = (
