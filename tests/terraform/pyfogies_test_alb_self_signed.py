@@ -7,7 +7,11 @@ import pytest
 import requests
 from pydantic import BaseModel
 
-from fogies.retry import readiness_poll_long
+from fogies.ready_poll import (
+    READY_POLL_EXCEPTIONS_HTTP,
+    READY_POLL_TIMING_LONG,
+    ready_poll,
+)
 from fogies.terraform.alb import AlbOutput
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.network import NetworkOutput
@@ -46,7 +50,9 @@ class _TfAlbSelfSignedOutput(BaseModel):
 
 
 def _wait_for_alb(dns_name: str) -> None:
-    for attempt in readiness_poll_long(exceptions=requests.exceptions.ConnectionError):
+    for attempt in ready_poll(
+        exceptions=READY_POLL_EXCEPTIONS_HTTP, timing=READY_POLL_TIMING_LONG
+    ):
         with attempt:
             _ = requests.get(
                 "http://{}".format(dns_name), timeout=5, allow_redirects=False
