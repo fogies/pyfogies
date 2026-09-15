@@ -35,7 +35,7 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
-## [0.0.0.dev6] (2026-09-15)
+## [0.0.0-dev.6] (2026-09-15)
 
 ### Added
 - Added Terraform modules for `access_key_permissions`, `alb_dns`, `cloudwatch`, `ecs`, `security_group/alb_public_http_https`, and `security_group/ecs_from_alb_http`. (#6)
@@ -50,7 +50,7 @@ Will not document changes to agent configuration used in development.
 - Refactored self-signed ALB into a shared fixture. (#6)
 - Added testing for Terraform modules. (#6)
 
-## [0.0.0.dev5] (2026-08-11)
+## [0.0.0-dev.5] (2026-08-11)
 
 ### Added
 - Added Terraform modules for `alb`, `backend`, `ecr`, `hosted_zone`, `network`. (#5)
@@ -66,17 +66,17 @@ Will not document changes to agent configuration used in development.
 - Re-organized tests (#5).
 - Added testing for Terraform modules. (#5)
 
-## [0.0.0.dev4] (2026-04-14)
+## [0.0.0-dev.4] (2026-04-14)
 
 ### Added
 - Added `py.typed` marker for typed distribution. (#4)
 
-## [0.0.0.dev3] (2026-03-24)
+## [0.0.0-dev.3] (2026-03-24)
 
 ### Fixed
 - Issues of shadowing caused by `paths.py`. (#3)
 
-## [0.0.0.dev2] (2026-03-20)
+## [0.0.0-dev.2] (2026-03-20)
 
 ### Added
 - Added tools for `aws_environ`, `command`, `environ`, `ollama`, `terraform`. (#2)
@@ -86,7 +86,7 @@ Will not document changes to agent configuration used in development.
 - Added testing for Terraform modules. (#2)
 - Extended testing of tools. (#2).
 
-## [0.0.0.dev1] (2025-12-23)
+## [0.0.0-dev.1] (2025-12-23)
 
 ### Added
 - Added tasks for `format`, `lint`, `poetry`, `test`. (#1)
