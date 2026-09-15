@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 import pytest
 from pydantic import BaseModel
 
-from fogies.retry import readiness_poll_short
+from fogies.ready_poll import READY_POLL_TIMING_SHORT, ready_poll
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.cloudwatch import CloudwatchOutput
 from fogies.tools.command import CommandParams
@@ -118,7 +118,7 @@ def test_cloudwatch_write_and_read(
     )
 
     events: list[OutputLogEventTypeDef] = []
-    for attempt in readiness_poll_short(exceptions=_NoEventsYet):
+    for attempt in ready_poll(exceptions=_NoEventsYet, timing=READY_POLL_TIMING_SHORT):
         with attempt:
             response = client.get_log_events(
                 logGroupName=cloudwatch_output.cloudwatch.log_group_name,
