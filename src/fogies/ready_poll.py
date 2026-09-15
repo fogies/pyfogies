@@ -39,7 +39,7 @@ READY_POLL_TIMING_LONG = ReadyPollTiming(
 
 # Profile for something expected ready within seconds.
 READY_POLL_TIMING_SHORT = ReadyPollTiming(
-    timeout_seconds=10.0, poll_interval_seconds=1.0
+    timeout_seconds=10.0, poll_interval_seconds=0.5
 )
 
 
