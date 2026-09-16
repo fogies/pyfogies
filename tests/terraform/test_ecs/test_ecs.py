@@ -28,7 +28,7 @@ from fogies.tools.terraform import (
 from fogies.typing import boto_client_ec2, boto_client_ecs
 from tasks.paths import PATH_STAGING_BINARY_CACHE, PATH_TEST_BACKEND_STATUS
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
-from tests.terraform.backend import PyfogiesTestTerraformBackendStates
+from tests.terraform.backend import PyfogiesTestBackendStates
 from tests.terraform.pyfogies_test_alb_self_signed import PyfogiesTestAlbOutput
 
 _TEST_ECS_NAME = "pyfogies-test-ecs"
@@ -66,7 +66,7 @@ def ecs_output(
     tfvars_path = tmp_path / "test-ecs.tfvars.json"
     pem_tmp = tmp_path / "certificate.pem"
 
-    backend = pyfogies_test_backend[PyfogiesTestTerraformBackendStates.TEST_ECS.value]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ECS.value]
 
     with (
         terraform_tfbackend(
