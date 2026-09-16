@@ -6,12 +6,14 @@ data "aws_route53_zone" "existing" {
 resource "aws_route53_zone" "zone" {
   count = var.create_zone ? 1 : 0
   name  = var.zone_name
+  tags  = var.tags
 }
 
 resource "aws_route53domains_registered_domain" "domain" {
   count       = var.create_zone ? 1 : 0
   provider    = aws.us_east_1
   domain_name = var.zone_name
+  tags        = var.tags
 
   dynamic "name_server" {
     for_each = toset(aws_route53_zone.zone[0].name_servers)

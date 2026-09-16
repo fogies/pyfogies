@@ -32,6 +32,7 @@ from tests.terraform.backend import PyfogiesTestTerraformBackendStates
 from tests.terraform.pyfogies_test_alb_self_signed import PyfogiesTestAlbOutput
 
 _TEST_ECS_NAME = "pyfogies-test-ecs"
+_TEST_ECS_TAGS = {"Project": "pyfogies-test-ecs"}
 
 
 class _TestEcsVars(BaseModel):
@@ -41,6 +42,7 @@ class _TestEcsVars(BaseModel):
     subnet_ids: list[str]
     alb_security_group_id: str
     listener_https_arn: str
+    tags: dict[str, str] = {}
 
 
 class _TestEcsOutput(BaseModel):
@@ -80,6 +82,7 @@ def ecs_output(
                 subnet_ids=pyfogies_test_network.subnet_ids,
                 alb_security_group_id=pyfogies_test_alb_self_signed.alb_security_group_id,
                 listener_https_arn=pyfogies_test_alb_self_signed.alb.listener_https_arn,
+                tags=_TEST_ECS_TAGS,
             ),
         ) as tfvars_path,
         terraform_output(

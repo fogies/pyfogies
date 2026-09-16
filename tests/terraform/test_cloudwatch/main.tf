@@ -30,11 +30,18 @@ variable "retention_in_days" {
   type        = number
 }
 
+variable "tags" {
+  description = "Tags to apply to created resources."
+  type        = map(string)
+  default     = {}
+}
+
 module "cloudwatch" {
   source = "../../../terraform/cloudwatch"
 
   name              = var.log_group_name
   retention_in_days = var.retention_in_days
+  tags              = var.tags
 }
 
 output "cloudwatch" {

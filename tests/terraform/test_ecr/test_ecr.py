@@ -19,9 +19,12 @@ from tasks.paths import PATH_STAGING_BINARY_CACHE, PATH_TEST_BACKEND_STATUS
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestTerraformBackendStates
 
+_TEST_ECR_TAGS = {"Project": "pyfogies-test-ecr"}
+
 
 class _TestRegionVars(BaseModel):
     region: str
+    tags: dict[str, str] = {}
 
 
 class _TestEcrOutput(BaseModel):
@@ -48,7 +51,9 @@ def test_ecr_output(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_TestRegionVars(region=pyfogies_test_config.aws.region),
+            variables=_TestRegionVars(
+                region=pyfogies_test_config.aws.region, tags=_TEST_ECR_TAGS
+            ),
         ) as tfvars_path,
         terraform_output(
             binary_cache_path=PATH_STAGING_BINARY_CACHE,

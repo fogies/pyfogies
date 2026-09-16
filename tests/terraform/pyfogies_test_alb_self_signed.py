@@ -29,6 +29,7 @@ from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestTerraformBackendStates
 
 _TEST_ALB_NAME_SELF_SIGNED = "pyfogies-test-alb-self-signed"
+_TEST_ALB_TAGS_SELF_SIGNED = {"Project": "pyfogies-test-alb-self-signed"}
 _TEST_ALB_MODULE = pathlib.Path(__file__).parent / "test_alb_self_signed"
 
 
@@ -42,6 +43,7 @@ class _AlbSelfSignedVars(BaseModel):
     alb_name: str
     vpc_id: str
     subnet_ids: list[str]
+    tags: dict[str, str] = {}
 
 
 class _TfAlbSelfSignedOutput(BaseModel):
@@ -88,6 +90,7 @@ def pyfogies_test_alb_self_signed(
                 alb_name=_TEST_ALB_NAME_SELF_SIGNED,
                 vpc_id=pyfogies_test_network.vpc_id,
                 subnet_ids=list(pyfogies_test_network.subnet_ids),
+                tags=_TEST_ALB_TAGS_SELF_SIGNED,
             ),
         ) as tfvars_path,
         terraform_output(

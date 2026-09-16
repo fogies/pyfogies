@@ -39,11 +39,18 @@ variable "subnet_ids" {
   type        = set(string)
 }
 
+variable "tags" {
+  description = "Tags to apply to created resources."
+  type        = map(string)
+  default     = {}
+}
+
 module "alb_sg" {
   source = "../../../terraform/security_group/alb_public_http_https"
 
   name   = var.alb_name
   vpc_id = var.vpc_id
+  tags   = var.tags
 }
 
 module "alb" {
@@ -54,6 +61,7 @@ module "alb" {
   subnet_ids              = var.subnet_ids
   security_group_ids      = [module.alb_sg.security_group_id]
   self_signed_certificate = true
+  tags                    = var.tags
 }
 
 output "alb_security_group_id" {

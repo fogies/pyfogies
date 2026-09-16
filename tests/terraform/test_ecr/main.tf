@@ -20,6 +20,12 @@ variable "region" {
   type        = string
 }
 
+variable "tags" {
+  description = "Tags to apply to created resources."
+  type        = map(string)
+  default     = {}
+}
+
 module "ecr" {
   source = "../../../terraform/ecr"
 
@@ -28,6 +34,7 @@ module "ecr" {
   lifecycle_keep_count_limit = 10
   lifecycle_keep_days_limit  = 180
   force_delete               = true
+  tags                       = var.tags
 }
 
 output "ecr" {

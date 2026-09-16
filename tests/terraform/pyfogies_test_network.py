@@ -22,10 +22,12 @@ from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestTerraformBackendStates
 
 _TEST_NETWORK_MODULE = pathlib.Path(__file__).parent / "test_network"
+_TEST_NETWORK_TAGS = {"Project": "pyfogies-test-network"}
 
 
 class _TestNetworkVars(BaseModel):
     region: str
+    tags: dict[str, str] = {}
 
 
 class _TestNetworkOutput(BaseModel):
@@ -54,7 +56,9 @@ def pyfogies_test_network(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_TestNetworkVars(region=pyfogies_test_config.aws.region),
+            variables=_TestNetworkVars(
+                region=pyfogies_test_config.aws.region, tags=_TEST_NETWORK_TAGS
+            ),
         ) as tfvars_path,
         terraform_output(
             binary_cache_path=PATH_STAGING_BINARY_CACHE,

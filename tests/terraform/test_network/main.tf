@@ -20,11 +20,18 @@ variable "region" {
   type        = string
 }
 
+variable "tags" {
+  description = "Tags to apply to created resources."
+  type        = map(string)
+  default     = {}
+}
+
 module "network" {
   source = "../../../terraform/network"
 
   region                  = var.region
   availability_zone_count = 2
+  tags                    = var.tags
 }
 
 output "network" {

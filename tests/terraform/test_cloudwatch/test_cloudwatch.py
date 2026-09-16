@@ -31,12 +31,14 @@ from tests.terraform.backend import PyfogiesTestTerraformBackendStates
 _TEST_LOG_GROUP_NAME = "/pyfogies/test-cloudwatch"
 _TEST_LOG_STREAM_NAME = "test-stream"
 _TEST_RETENTION_IN_DAYS = 7
+_TEST_CLOUDWATCH_TAGS = {"Project": "pyfogies-test-cloudwatch"}
 
 
 class _TestCloudwatchVars(BaseModel):
     region: str
     log_group_name: str
     retention_in_days: int
+    tags: dict[str, str] = {}
 
 
 class _TestCloudwatchOutput(BaseModel):
@@ -71,6 +73,7 @@ def cloudwatch_output(
                 region=pyfogies_test_config.aws.region,
                 log_group_name=_TEST_LOG_GROUP_NAME,
                 retention_in_days=_TEST_RETENTION_IN_DAYS,
+                tags=_TEST_CLOUDWATCH_TAGS,
             ),
         ) as tfvars_path,
         terraform_output(
