@@ -198,7 +198,9 @@ class _Terraform:
         if apply_params.auto_approve:
             apply_args.append("-auto-approve")
         if tfvars_path is not None:
-            apply_args.extend(["-var-file", str(tfvars_path)])
+            # Resolved: terraform runs with cwd=module_path, which may differ
+            # from wherever tfvars_path was written relative to.
+            apply_args.extend(["-var-file", str(tfvars_path.resolve())])
 
         return command_run(
             command=self.binary_path,
@@ -228,7 +230,9 @@ class _Terraform:
         if destroy_params.auto_approve:
             destroy_args.append("-auto-approve")
         if tfvars_path is not None:
-            destroy_args.extend(["-var-file", str(tfvars_path)])
+            # Resolved: terraform runs with cwd=module_path, which may differ
+            # from wherever tfvars_path was written relative to.
+            destroy_args.extend(["-var-file", str(tfvars_path.resolve())])
 
         return command_run(
             command=self.binary_path,
@@ -274,7 +278,9 @@ class _Terraform:
             init_params = InitParams()
         init_args = ["init"]
         if tfbackend_path is not None:
-            init_args.extend(["-backend-config", str(tfbackend_path)])
+            # Resolved: terraform runs with cwd=module_path, which may differ
+            # from wherever tfbackend_path was written relative to.
+            init_args.extend(["-backend-config", str(tfbackend_path.resolve())])
         if init_params.migrate_state:
             init_args.append("-migrate-state")
         if init_params.reconfigure:

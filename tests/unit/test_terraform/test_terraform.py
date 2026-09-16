@@ -123,6 +123,65 @@ def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
             assert destroy_result.exited == 0
 
 
+def test_terraform_apply_resolves_relative_tfvars_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+) -> None:
+    """apply/init/destroy resolve a relative tfvars_path/tfbackend_path themselves.
+
+    terraform runs with cwd=module_path, which differs from wherever the cwd
+    was when tfvars_path was written; a relative path must still resolve
+    against that original cwd, not against module_path.
+    """
+    binary_cache_path = PATH_STAGING_BINARY_CACHE.resolve()
+    module_path = pathlib.Path(__file__).parent / "valid"
+
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    monkeypatch.chdir(work_dir)
+
+    command_params = CommandParams(in_stream=False)
+    expected_file_path = tmp_path / "test_resource.txt"
+    expected_file_content = "test_terraform_apply_resolves_relative_tfvars_path"
+    relative_tfvars_path = pathlib.Path("tool.tfvars.json")
+
+    with (
+        terraform_tfvars(
+            path=relative_tfvars_path,
+            variables=_ToolVars(
+                test_path=str(expected_file_path),
+                test_content=expected_file_content,
+            ),
+        ) as tfvars_path,
+        terraform(binary_cache_path=binary_cache_path) as tf,
+    ):
+        assert not tfvars_path.is_absolute()
+
+        _ = tf.init(
+            command_params=command_params,
+            module_path=module_path,
+            init_params=InitParams(upgrade=True),
+        )
+        apply_result = tf.apply(
+            command_params=command_params,
+            module_path=module_path,
+            tfvars_path=tfvars_path,
+            apply_params=ApplyParams(auto_approve=True),
+        )
+        try:
+            assert apply_result.exited == 0
+            assert expected_file_path.exists()
+            assert expected_file_path.read_text().strip() == expected_file_content
+        finally:
+            destroy_result = tf.destroy(
+                command_params=command_params,
+                module_path=module_path,
+                tfvars_path=tfvars_path,
+                destroy_params=DestroyParams(auto_approve=True),
+            )
+            assert destroy_result.exited == 0
+
+
 def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
     """Context manager runs init/apply on entry and destroy on exit; test only calls output."""
     command_params = CommandParams(in_stream=False)
