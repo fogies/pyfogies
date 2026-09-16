@@ -5,7 +5,7 @@ import pathlib
 import sys
 import urllib.request
 import zipfile
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from http.client import HTTPResponse
 from typing import NewType, TypeVar, cast
@@ -83,11 +83,18 @@ class _TerraformCommandOutputModel(
 TfbackendPath = NewType("TfbackendPath", pathlib.Path)
 TfvarsPath = NewType("TfvarsPath", pathlib.Path)
 
-# Types for passing a pre-built terraform_tfbackend()/terraform_tfvars()
-# context manager into a task factory, to be entered when (and only when)
-# the task actually runs.
+# Types for passing a terraform_tfbackend()/terraform_tfvars() context
+# manager into a task factory, to be entered when the task actually runs.
 TfbackendContextManager = AbstractContextManager[TfbackendPath]
 TfvarsContextManager = AbstractContextManager[TfvarsPath]
+
+# Factories rather than pre-built context managers: a context manager built
+# by @contextlib.contextmanager can only be entered once, so anything that
+# might run more than once per process (e.g. an invoke task) must build its
+# own fresh instance each time instead of reusing one captured at definition
+# time.
+TfbackendFactory = Callable[[], TfbackendContextManager]
+TfvarsFactory = Callable[[], TfvarsContextManager]
 
 
 @contextmanager

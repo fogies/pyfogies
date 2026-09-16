@@ -8,14 +8,14 @@ from invoke.context import Context
 from invoke.tasks import Task, task
 
 from fogies.terraform.backend import BackendConfig
-from fogies.tools.aws_environ import AwsEnvironContextManager
+from fogies.tools.aws_environ import AwsEnvironFactory
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
-    TfbackendContextManager,
-    TfvarsContextManager,
+    TfbackendFactory,
+    TfvarsFactory,
     terraform,
 )
 
@@ -24,18 +24,18 @@ def get_task_apply(
     *,
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
-    aws_environ: AwsEnvironContextManager | None = None,
+    aws_environ_factory: AwsEnvironFactory | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
-    tfbackend: TfbackendContextManager | None = None,
-    tfvars: TfvarsContextManager | None = None,
+    tfbackend_factory: TfbackendFactory | None = None,
+    tfvars_factory: TfvarsFactory | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    if backend is not None and tfbackend is None:
-        raise ValueError("tfbackend is required when backend is set")
+    if backend is not None and tfbackend_factory is None:
+        raise ValueError("tfbackend_factory is required when backend is set")
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
@@ -71,11 +71,15 @@ def get_task_apply(
         )
 
         with ExitStack() as stack:
-            if aws_environ is not None:
-                _ = stack.enter_context(aws_environ)
+            if aws_environ_factory is not None:
+                _ = stack.enter_context(aws_environ_factory())
 
-            tfbackend_path = stack.enter_context(tfbackend) if tfbackend else None
-            tfvars_path = stack.enter_context(tfvars) if tfvars else None
+            tfbackend_path = (
+                stack.enter_context(tfbackend_factory()) if tfbackend_factory else None
+            )
+            tfvars_path = (
+                stack.enter_context(tfvars_factory()) if tfvars_factory else None
+            )
 
             _ = stack.enter_context(
                 terraform(
@@ -101,18 +105,18 @@ def get_task_destroy(
     *,
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
-    aws_environ: AwsEnvironContextManager | None = None,
+    aws_environ_factory: AwsEnvironFactory | None = None,
     backend: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
-    tfbackend: TfbackendContextManager | None = None,
-    tfvars: TfvarsContextManager | None = None,
+    tfbackend_factory: TfbackendFactory | None = None,
+    tfvars_factory: TfvarsFactory | None = None,
     default_init: bool = True,
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    if backend is not None and tfbackend is None:
-        raise ValueError("tfbackend is required when backend is set")
+    if backend is not None and tfbackend_factory is None:
+        raise ValueError("tfbackend_factory is required when backend is set")
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
@@ -148,11 +152,15 @@ def get_task_destroy(
         )
 
         with ExitStack() as stack:
-            if aws_environ is not None:
-                _ = stack.enter_context(aws_environ)
+            if aws_environ_factory is not None:
+                _ = stack.enter_context(aws_environ_factory())
 
-            tfbackend_path = stack.enter_context(tfbackend) if tfbackend else None
-            tfvars_path = stack.enter_context(tfvars) if tfvars else None
+            tfbackend_path = (
+                stack.enter_context(tfbackend_factory()) if tfbackend_factory else None
+            )
+            tfvars_path = (
+                stack.enter_context(tfvars_factory()) if tfvars_factory else None
+            )
 
             _ = stack.enter_context(
                 terraform(
