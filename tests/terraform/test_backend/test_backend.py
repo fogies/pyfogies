@@ -21,7 +21,7 @@ from tasks.paths import (
     PATH_STAGING_BINARY_CACHE,
 )
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
-from tests.terraform.backend import PyfogiesTestTerraformBackendStates
+from tests.terraform.backend import PyfogiesTestBackendStates
 
 
 class _TestBackendOutput(BaseModel):
@@ -36,8 +36,9 @@ class _TestStateOutput(BaseModel):
     test_value: str
 
 
-_TEST_BACKEND_NESTED_BACKEND_NAME = "test-backend-nested-backend"
-_TEST_BACKEND_NESTED_BACKEND_STATES = ["test-state-a", "test-state-b"]
+_TEST_BACKEND_NESTED_NAME = "test-backend-nested"
+_TEST_BACKEND_NESTED_STATES = ["test-state-a", "test-state-b"]
+_TEST_BACKEND_NESTED_TAGS = {"Project": "test-backend-nested"}
 
 
 @pytest.fixture(scope="module")
@@ -65,17 +66,15 @@ def nested_backend_output(
     with (
         terraform_tfbackend(
             path=tfbackend_path,
-            backend=pyfogies_test_backend[
-                PyfogiesTestTerraformBackendStates.TEST_BACKEND.value
-            ],
+            backend=pyfogies_test_backend[PyfogiesTestBackendStates.TEST_BACKEND.value],
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
             variables=BackendVars(
-                name=_TEST_BACKEND_NESTED_BACKEND_NAME,
+                name=_TEST_BACKEND_NESTED_NAME,
                 region=pyfogies_test_config.aws.region,
-                states=_TEST_BACKEND_NESTED_BACKEND_STATES,
-                tags={},
+                states=_TEST_BACKEND_NESTED_STATES,
+                tags=_TEST_BACKEND_NESTED_TAGS,
             ),
         ) as tfvars_path,
         terraform_backend(
@@ -110,11 +109,11 @@ def test_backend_status_applied(
 def test_backend_output(nested_backend_output: BackendOutput) -> None:
     """Backend module output matches expected bucket and state keys."""
     expected_bucket_name = "{}-bucket-{}".format(
-        _TEST_BACKEND_NESTED_BACKEND_NAME,
+        _TEST_BACKEND_NESTED_NAME,
         nested_backend_output.region,
     )
     expected_state_keys = {
-        s: "{}/terraform.tfstate".format(s) for s in _TEST_BACKEND_NESTED_BACKEND_STATES
+        s: "{}/terraform.tfstate".format(s) for s in _TEST_BACKEND_NESTED_STATES
     }
 
     assert isinstance(nested_backend_output, BackendOutput)

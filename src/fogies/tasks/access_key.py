@@ -13,18 +13,11 @@ from invoke.tasks import Task, task
 
 import fogies.aws_access_key as aws_access_key
 from fogies.tools.aws_environ import (
-    AwsEnvironContextManager,
+    AwsEnvironFactory,
     AwsProfile,
     aws_environ_from_profile,
 )
 from fogies.typing import boto_client_sts
-
-# A factory rather than a pre-built context manager: get_collection() shares
-# this across five tasks, and a context manager built by @contextlib.
-# contextmanager can only be entered once, so each task must build its own
-# fresh instance at run time. Mirrors the _aws_environ_factory() pattern used
-# by consumers of these tasks (see e.g. fogies-infrastructure's tasks/__init__.py).
-AwsEnvironFactory = Callable[[], AwsEnvironContextManager]
 
 
 def _prompt_admin_credentials() -> tuple[str, str]:

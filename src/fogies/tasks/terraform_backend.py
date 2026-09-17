@@ -9,14 +9,15 @@ from invoke.context import Context
 from invoke.tasks import Task, task
 
 from fogies.terraform.backend import BackendOutput
-from fogies.tools.aws_environ import AwsEnvironContextManager
+from fogies.tools.aws_environ import AwsEnvironFactory
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
     TerraformOutputModel,
-    TfvarsContextManager,
+    TfvarsFactory,
+    terraform_templated,
 )
 from fogies.tools.terraform_backend import terraform_backend
 
@@ -25,10 +26,10 @@ def get_task_backend_apply(
     *,
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
-    aws_environ: AwsEnvironContextManager | None = None,
+    aws_environ_factory: AwsEnvironFactory | None = None,
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
-    tfvars: TfvarsContextManager | None = None,
+    tfvars_factory: TfvarsFactory | None = None,
     output_model: type[TerraformOutputModel],
     output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
     default_init: bool = True,
@@ -71,10 +72,20 @@ def get_task_backend_apply(
         )
 
         with ExitStack() as stack:
-            if aws_environ is not None:
-                _ = stack.enter_context(aws_environ)
+            templated_paths = stack.enter_context(
+                terraform_templated(module_path=module_path)
+            )
+            if templated_paths:
+                print("Rendered __PYFOGIES_VERSION__ in:")
+                for templated_path in templated_paths:
+                    print("  {}".format(templated_path))
 
-            tfvars_path = stack.enter_context(tfvars) if tfvars else None
+            if aws_environ_factory is not None:
+                _ = stack.enter_context(aws_environ_factory())
+
+            tfvars_path = (
+                stack.enter_context(tfvars_factory()) if tfvars_factory else None
+            )
 
             output_result = stack.enter_context(
                 terraform_backend(
@@ -106,10 +117,10 @@ def get_task_backend_destroy(
     *,
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
-    aws_environ: AwsEnvironContextManager | None = None,
+    aws_environ_factory: AwsEnvironFactory | None = None,
     backend_status_path: pathlib.Path,
     tfbackend_path: pathlib.Path | None = None,
-    tfvars: TfvarsContextManager | None = None,
+    tfvars_factory: TfvarsFactory | None = None,
     output_model: type[TerraformOutputModel],
     output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
     default_init: bool = True,
@@ -154,10 +165,20 @@ def get_task_backend_destroy(
         )
 
         with ExitStack() as stack:
-            if aws_environ is not None:
-                _ = stack.enter_context(aws_environ)
+            templated_paths = stack.enter_context(
+                terraform_templated(module_path=module_path)
+            )
+            if templated_paths:
+                print("Rendered __PYFOGIES_VERSION__ in:")
+                for templated_path in templated_paths:
+                    print("  {}".format(templated_path))
 
-            tfvars_path = stack.enter_context(tfvars) if tfvars else None
+            if aws_environ_factory is not None:
+                _ = stack.enter_context(aws_environ_factory())
+
+            tfvars_path = (
+                stack.enter_context(tfvars_factory()) if tfvars_factory else None
+            )
 
             _ = stack.enter_context(
                 terraform_backend(

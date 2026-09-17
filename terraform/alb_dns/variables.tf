@@ -27,3 +27,9 @@ variable "listener_https_arn" {
   description = "ARN of the ALB HTTPS listener to attach the certificate to."
   type        = string
 }
+
+variable "tags" {
+  description = "Tags to apply to created resources."
+  type        = map(string)
+  default     = {}
+}

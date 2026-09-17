@@ -35,61 +35,74 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
-## [0.0.0.dev6] (2026-09-15)
+## [0.0.0-dev.7] (2026-09-17)
 
 ### Added
-- Added Terraform modules for `access_key_permissions`, `alb_dns`, `cloudwatch`, `ecs`, `security_group/alb_public_http_https`, and `security_group/ecs_from_alb_http`. (#6)
-- Added tool and tasks for `aws_access_key`. (#6)
-- Added `ensure_from_template`. (#6)
+- Added consistent support for `tags` variable in Terraform modules. ([#7](https://github.com/fogies/pyfogies/pull/7))
+- Added `terraform_templated` with support for `__PYFOGIES_VERSION__`. ([#7](https://github.com/fogies/pyfogies/pull/7))
 
 ### Changed
-- Added `ready_poll`, replacing `readiness_poll` functions. (#6)
-- Refactored `aws_environ_from_config` and `aws_environ_from_profile`. (#6)
+- Refactored tasks to accept context manager factories. ([#7](https://github.com/fogies/pyfogies/pull/7))
+- Refactored Terraform tool to resolve relative paths. ([#7](https://github.com/fogies/pyfogies/pull/7))
 
 ### Tests
-- Refactored self-signed ALB into a shared fixture. (#6)
-- Added testing for Terraform modules. (#6)
+- Refactored testing for Terraform backend. ([#7](https://github.com/fogies/pyfogies/pull/7))
 
-## [0.0.0.dev5] (2026-08-11)
+## [0.0.0-dev.6] (2026-09-15)
 
 ### Added
-- Added Terraform modules for `alb`, `backend`, `ecr`, `hosted_zone`, `network`. (#5)
-- Added tools and tasks for `terraform` and related `terraform_backend`. (#5)
-- Added tool for `aws_environ`. (#5)
-- Added templates for `secrets/aws.toml`, `secrets/poetry.toml`, `secrets/pyfogies-tests.toml`. (#5)
+- Added Terraform modules for `access_key_permissions`, `alb_dns`, `cloudwatch`, `ecs`, `security_group/alb_public_http_https`, and `security_group/ecs_from_alb_http`. ([#6](https://github.com/fogies/pyfogies/pull/6))
+- Added tool and tasks for `aws_access_key`. ([#6](https://github.com/fogies/pyfogies/pull/6))
+- Added `ensure_from_template`. ([#6](https://github.com/fogies/pyfogies/pull/6))
 
 ### Changed
-- Improved task for `format`. (#5)
-- Improved tool for `command`. (#5)
+- Refactored `ready_poll`. ([#6](https://github.com/fogies/pyfogies/pull/6))
+- Refactored `aws_environ_from_config` and `aws_environ_from_profile`. ([#6](https://github.com/fogies/pyfogies/pull/6))
 
 ### Tests
-- Re-organized tests (#5).
-- Added testing for Terraform modules. (#5)
+- Refactored self-signed ALB into a shared fixture. ([#6](https://github.com/fogies/pyfogies/pull/6))
+- Extended testing for Terraform modules. ([#6](https://github.com/fogies/pyfogies/pull/6))
 
-## [0.0.0.dev4] (2026-04-14)
+## [0.0.0-dev.5] (2026-08-11)
 
 ### Added
-- Added `py.typed` marker for typed distribution. (#4)
+- Added Terraform modules for `alb`, `backend`, `ecr`, `hosted_zone`, `network`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Added tools and tasks for `terraform` and related `terraform_backend`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Added tool for `aws_environ`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Added templates for `secrets/aws.toml`, `secrets/poetry.toml`, `secrets/pyfogies-tests.toml`. ([#5](https://github.com/fogies/pyfogies/pull/5))
 
-## [0.0.0.dev3] (2026-03-24)
+### Changed
+- Improved task for `format`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Improved tool for `command`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+
+### Tests
+- Refactored tests ([#5](https://github.com/fogies/pyfogies/pull/5)).
+- Extended testing for Terraform modules. ([#5](https://github.com/fogies/pyfogies/pull/5))
+
+## [0.0.0-dev.4] (2026-04-14)
+
+### Added
+- Added `py.typed` marker for typed distribution. ([#4](https://github.com/fogies/pyfogies/pull/4))
+
+## [0.0.0-dev.3] (2026-03-24)
 
 ### Fixed
-- Issues of shadowing caused by `paths.py`. (#3)
+- Fixed shadowing caused by `paths.py`. ([#3](https://github.com/fogies/pyfogies/pull/3))
 
-## [0.0.0.dev2] (2026-03-20)
-
-### Added
-- Added tools for `aws_environ`, `command`, `environ`, `ollama`, `terraform`. (#2)
-- Added Terraform module for `backend`. (#2).
-
-### Tests
-- Added testing for Terraform modules. (#2)
-- Extended testing of tools. (#2).
-
-## [0.0.0.dev1] (2025-12-23)
+## [0.0.0-dev.2] (2026-03-20)
 
 ### Added
-- Added tasks for `format`, `lint`, `poetry`, `test`. (#1)
+- Added tools for `aws_environ`, `command`, `environ`, `ollama`, `terraform`. ([#2](https://github.com/fogies/pyfogies/pull/2))
+- Added Terraform module for `backend`. ([#2](https://github.com/fogies/pyfogies/pull/2)).
 
 ### Tests
-- Added testing for tool availability. (#1)
+- Added testing for Terraform modules. ([#2](https://github.com/fogies/pyfogies/pull/2))
+- Extended testing of tools. ([#2](https://github.com/fogies/pyfogies/pull/2)).
+
+## [0.0.0-dev.1] (2025-12-23)
+
+### Added
+- Added tasks for `format`, `lint`, `poetry`, `test`. ([#1](https://github.com/fogies/pyfogies/pull/1))
+
+### Tests
+- Added testing for tool availability. ([#1](https://github.com/fogies/pyfogies/pull/1))

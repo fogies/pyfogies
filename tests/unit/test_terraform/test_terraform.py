@@ -14,6 +14,7 @@ from fogies.tools.terraform import (
     InitParams,
     terraform,
     terraform_output,
+    terraform_templated,
     terraform_tfbackend,
     terraform_tfvars,
 )
@@ -65,6 +66,80 @@ def test_terraform_tfbackend(tmp_path: pathlib.Path) -> None:
     assert not path.exists()
 
 
+def test_terraform_templated_renders_and_restores(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """A .tf file with the placeholder is rendered on entry, restored on exit.
+
+    Covers one file at the root of module_path and one nested in a
+    subdirectory, so both direct and recursive discovery are exercised. On
+    entry, each original is renamed to "<name>.tf.templated" and a rendered
+    copy is written back under the original name. On exit, each rendered
+    copy is removed and the original is restored under its original name and
+    content.
+    """
+    monkeypatch.setattr("fogies.tools.terraform.pyfogies_version", lambda: "1.2.3")
+
+    nested_dir_path = tmp_path / "nested"
+    nested_dir_path.mkdir()
+
+    root_path = tmp_path / "hosted_zone.tf"
+    nested_file_path = nested_dir_path / "hosted_zone.tf"
+    original_content = (
+        'source = "git::https://example.com/repo.git?ref=__PYFOGIES_VERSION__"\n'
+    )
+    _ = root_path.write_text(original_content, encoding="utf-8")
+    _ = nested_file_path.write_text(original_content, encoding="utf-8")
+
+    root_templated_path = tmp_path / "hosted_zone.tf.templated"
+    nested_templated_path = nested_dir_path / "hosted_zone.tf.templated"
+
+    with terraform_templated(module_path=tmp_path) as rendered_paths:
+        assert set(rendered_paths) == {root_path, nested_file_path}
+        rendered_content = (
+            'source = "git::https://example.com/repo.git?ref=v1.2.3"\n'
+        )
+        assert root_path.read_text(encoding="utf-8") == rendered_content
+        assert nested_file_path.read_text(encoding="utf-8") == rendered_content
+        assert root_templated_path.read_text(encoding="utf-8") == original_content
+        assert nested_templated_path.read_text(encoding="utf-8") == original_content
+
+    assert root_path.read_text(encoding="utf-8") == original_content
+    assert nested_file_path.read_text(encoding="utf-8") == original_content
+    assert not root_templated_path.exists()
+    assert not nested_templated_path.exists()
+
+
+def test_terraform_templated_skips_files_without_placeholder(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A .tf file with no placeholder is left completely untouched."""
+    path = tmp_path / "plain.tf"
+    original_content = 'locals {\n  name = "unrelated"\n}\n'
+    _ = path.write_text(original_content, encoding="utf-8")
+
+    with terraform_templated(module_path=tmp_path) as rendered_paths:
+        assert rendered_paths == []
+        assert path.read_text(encoding="utf-8") == original_content
+
+
+def test_terraform_templated_skips_terraform_cache_directory(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A .tf file under .terraform/ (Terraform's module-download cache) is skipped."""
+    cache_path = tmp_path / ".terraform" / "modules" / "hosted_zone"
+    cache_path.mkdir(parents=True)
+    path = cache_path / "hosted_zone.tf"
+    original_content = (
+        'source = "git::https://example.com/repo.git?ref=__PYFOGIES_VERSION__"\n'
+    )
+    _ = path.write_text(original_content, encoding="utf-8")
+
+    with terraform_templated(module_path=tmp_path) as rendered_paths:
+        assert rendered_paths == []
+        assert path.read_text(encoding="utf-8") == original_content
+
+
 def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
     """Apply and then destroy the tooling module using the Terraform tool."""
     command_params = CommandParams(in_stream=False)
@@ -113,6 +188,65 @@ def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
             )
             assert isinstance(tool_output, _ToolOutput)
             assert tool_output == expected_output
+        finally:
+            destroy_result = tf.destroy(
+                command_params=command_params,
+                module_path=module_path,
+                tfvars_path=tfvars_path,
+                destroy_params=DestroyParams(auto_approve=True),
+            )
+            assert destroy_result.exited == 0
+
+
+def test_terraform_apply_resolves_relative_tfvars_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+) -> None:
+    """apply/init/destroy resolve a relative tfvars_path/tfbackend_path themselves.
+
+    terraform runs with cwd=module_path, which differs from wherever the cwd
+    was when tfvars_path was written; a relative path must still resolve
+    against that original cwd, not against module_path.
+    """
+    binary_cache_path = PATH_STAGING_BINARY_CACHE.resolve()
+    module_path = pathlib.Path(__file__).parent / "valid"
+
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    monkeypatch.chdir(work_dir)
+
+    command_params = CommandParams(in_stream=False)
+    expected_file_path = tmp_path / "test_resource.txt"
+    expected_file_content = "test_terraform_apply_resolves_relative_tfvars_path"
+    relative_tfvars_path = pathlib.Path("tool.tfvars.json")
+
+    with (
+        terraform_tfvars(
+            path=relative_tfvars_path,
+            variables=_ToolVars(
+                test_path=str(expected_file_path),
+                test_content=expected_file_content,
+            ),
+        ) as tfvars_path,
+        terraform(binary_cache_path=binary_cache_path) as tf,
+    ):
+        assert not tfvars_path.is_absolute()
+
+        _ = tf.init(
+            command_params=command_params,
+            module_path=module_path,
+            init_params=InitParams(upgrade=True),
+        )
+        apply_result = tf.apply(
+            command_params=command_params,
+            module_path=module_path,
+            tfvars_path=tfvars_path,
+            apply_params=ApplyParams(auto_approve=True),
+        )
+        try:
+            assert apply_result.exited == 0
+            assert expected_file_path.exists()
+            assert expected_file_path.read_text().strip() == expected_file_content
         finally:
             destroy_result = tf.destroy(
                 command_params=command_params,

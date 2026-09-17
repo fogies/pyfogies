@@ -26,17 +26,19 @@ from fogies.tools.terraform import (
 from fogies.typing import boto_client_logs
 from tasks.paths import PATH_STAGING_BINARY_CACHE, PATH_TEST_BACKEND_STATUS
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
-from tests.terraform.backend import PyfogiesTestTerraformBackendStates
+from tests.terraform.backend import PyfogiesTestBackendStates
 
 _TEST_LOG_GROUP_NAME = "/pyfogies/test-cloudwatch"
 _TEST_LOG_STREAM_NAME = "test-stream"
 _TEST_RETENTION_IN_DAYS = 7
+_TEST_CLOUDWATCH_TAGS = {"Project": "pyfogies-test-cloudwatch"}
 
 
 class _TestCloudwatchVars(BaseModel):
     region: str
     log_group_name: str
     retention_in_days: int
+    tags: dict[str, str] = {}
 
 
 class _TestCloudwatchOutput(BaseModel):
@@ -56,9 +58,7 @@ def cloudwatch_output(
     tfbackend_path = tmp_path / "test-cloudwatch.tfbackend"
     tfvars_path = tmp_path / "test-cloudwatch.tfvars.json"
 
-    backend = pyfogies_test_backend[
-        PyfogiesTestTerraformBackendStates.TEST_CLOUDWATCH.value
-    ]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_CLOUDWATCH.value]
 
     with (
         terraform_tfbackend(
@@ -71,6 +71,7 @@ def cloudwatch_output(
                 region=pyfogies_test_config.aws.region,
                 log_group_name=_TEST_LOG_GROUP_NAME,
                 retention_in_days=_TEST_RETENTION_IN_DAYS,
+                tags=_TEST_CLOUDWATCH_TAGS,
             ),
         ) as tfvars_path,
         terraform_output(

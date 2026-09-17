@@ -31,7 +31,7 @@ def test_task_apply_and_destroy(
     task_apply = get_task_apply(
         module_path=_MODULE_PATH,
         binary_cache_path=PATH_STAGING_BINARY_CACHE,
-        tfvars=terraform_tfvars(
+        tfvars_factory=lambda: terraform_tfvars(
             path=tmp_path / "test.tfvars.json",
             variables=_TestVars(content=expected_content),
         ),
@@ -40,7 +40,7 @@ def test_task_apply_and_destroy(
     task_destroy = get_task_destroy(
         module_path=_MODULE_PATH,
         binary_cache_path=PATH_STAGING_BINARY_CACHE,
-        tfvars=terraform_tfvars(
+        tfvars_factory=lambda: terraform_tfvars(
             path=tmp_path / "test.tfvars.json",
             variables=_TestVars(content=expected_content),
         ),
@@ -54,3 +54,48 @@ def test_task_apply_and_destroy(
     finally:
         _ = task_destroy(Context())
         assert not expected_file_path.exists()
+
+
+def test_task_apply_and_destroy_run_twice(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+) -> None:
+    """The same task objects can run more than once in one process.
+
+    tfvars_factory builds a fresh terraform_tfvars() context manager on each
+    call; passing a single pre-built context manager instead would fail on
+    this second run, since a @contextlib.contextmanager instance can only be
+    entered once.
+    """
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    expected_file_path = _MODULE_PATH / "test_resource.txt"
+    expected_content = "test_task_apply_and_destroy_run_twice"
+
+    task_apply = get_task_apply(
+        module_path=_MODULE_PATH,
+        binary_cache_path=PATH_STAGING_BINARY_CACHE,
+        tfvars_factory=lambda: terraform_tfvars(
+            path=tmp_path / "test.tfvars.json",
+            variables=_TestVars(content=expected_content),
+        ),
+        default_apply_auto_approve=True,
+    )
+    task_destroy = get_task_destroy(
+        module_path=_MODULE_PATH,
+        binary_cache_path=PATH_STAGING_BINARY_CACHE,
+        tfvars_factory=lambda: terraform_tfvars(
+            path=tmp_path / "test.tfvars.json",
+            variables=_TestVars(content=expected_content),
+        ),
+        default_destroy_auto_approve=True,
+    )
+
+    try:
+        for _ in range(2):
+            _ = task_apply(Context())
+            assert expected_file_path.exists()
+            assert expected_file_path.read_text().strip() == expected_content
+            _ = task_destroy(Context())
+            assert not expected_file_path.exists()
+    finally:
+        _ = task_destroy(Context())

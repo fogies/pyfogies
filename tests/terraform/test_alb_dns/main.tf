@@ -40,6 +40,12 @@ variable "listener_https_arn" {
   type        = string
 }
 
+variable "tags" {
+  description = "Tags to apply to created resources."
+  type        = map(string)
+  default     = {}
+}
+
 module "alb_dns" {
   source = "../../../terraform/alb_dns"
 
@@ -53,6 +59,7 @@ module "alb_dns" {
   alb_dns_name       = var.alb_dns_name
   alb_zone_id        = var.alb_zone_id
   listener_https_arn = var.listener_https_arn
+  tags               = var.tags
 }
 
 output "hostname" {

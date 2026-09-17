@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import tomllib
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import cast
 
@@ -30,10 +30,17 @@ class AwsEnviron(BaseModel):
     aws_access_key_id: str
 
 
-# Type for passing a pre-built AWS environment context manager (e.g. from
-# aws_environ_from_config() or aws_environ_from_profile()) into a task factory,
-# to be entered when (and only when) the task actually runs.
+# Type for passing an AWS environment context manager (e.g. from
+# aws_environ_from_config() or aws_environ_from_profile()) into a task
+# factory, to be entered when the task actually runs.
 AwsEnvironContextManager = contextlib.AbstractContextManager[AwsEnviron]
+
+# A factory rather than a pre-built context manager: a context manager built
+# by @contextlib.contextmanager can only be entered once, so anything that
+# might run more than once per process (e.g. an invoke task, or several
+# tasks sharing one environment) must build its own fresh instance each time
+# instead of reusing one captured at definition time.
+AwsEnvironFactory = Callable[[], AwsEnvironContextManager]
 
 
 def load_aws_profile_from_config(config_path: Path, profile_name: str) -> AwsProfile:

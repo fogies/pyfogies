@@ -7,3 +7,9 @@ variable "create_zone" {
   description = "If true, create the hosted zone and update the domain registration's name servers. If false, use the existing hosted zone."
   type        = bool
 }
+
+variable "tags" {
+  description = "Tags to apply to created resources."
+  type        = map(string)
+  default     = {}
+}

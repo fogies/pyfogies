@@ -39,7 +39,7 @@ from fogies.tools.terraform import (
 from fogies.typing import boto_client_iam
 from tasks.paths import PATH_STAGING_BINARY_CACHE, PATH_TEST_BACKEND_STATUS
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
-from tests.terraform.backend import PyfogiesTestTerraformBackendStates
+from tests.terraform.backend import PyfogiesTestBackendStates
 
 # Shared by the access_key_username fixture below and by
 # _delete_stale_access_key_users, which sweeps by this prefix since it
@@ -162,7 +162,7 @@ def access_key_permissions_output(
     tfvars_path = tmp_path / "test-access-key-permissions.tfvars.json"
 
     backend = pyfogies_test_backend[
-        PyfogiesTestTerraformBackendStates.TEST_ACCESS_KEY_PERMISSIONS.value
+        PyfogiesTestBackendStates.TEST_ACCESS_KEY_PERMISSIONS.value
     ]
 
     with (

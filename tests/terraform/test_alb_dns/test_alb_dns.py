@@ -26,8 +26,10 @@ from fogies.tools.terraform import (
 )
 from tasks.paths import PATH_STAGING_BINARY_CACHE, PATH_TEST_BACKEND_STATUS
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
-from tests.terraform.backend import PyfogiesTestTerraformBackendStates
+from tests.terraform.backend import PyfogiesTestBackendStates
 from tests.terraform.pyfogies_test_alb_self_signed import PyfogiesTestAlbOutput
+
+_TEST_ALB_DNS_TAGS = {"Project": "pyfogies-test-alb-dns"}
 
 
 class _AlbDnsVars(BaseModel):
@@ -36,6 +38,7 @@ class _AlbDnsVars(BaseModel):
     alb_dns_name: str
     alb_zone_id: str
     listener_https_arn: str
+    tags: dict[str, str] = {}
 
 
 class _AlbDnsOutput(BaseModel):
@@ -62,9 +65,7 @@ def alb_dns_output(
     tmp_path = tmp_path_factory.mktemp("test-alb-dns")
     tfbackend_path = tmp_path / "test-alb-dns.tfbackend"
     tfvars_path = tmp_path / "test-alb-dns.tfvars.json"
-    backend = pyfogies_test_backend[
-        PyfogiesTestTerraformBackendStates.TEST_ALB_DNS.value
-    ]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ALB_DNS.value]
 
     with (
         terraform_tfbackend(
@@ -79,6 +80,7 @@ def alb_dns_output(
                 alb_dns_name=pyfogies_test_alb_self_signed.alb.alb_dns_name,
                 alb_zone_id=pyfogies_test_alb_self_signed.alb.alb_zone_id,
                 listener_https_arn=pyfogies_test_alb_self_signed.alb.listener_https_arn,
+                tags=_TEST_ALB_DNS_TAGS,
             ),
         ) as tfvars_path,
         terraform_output(
