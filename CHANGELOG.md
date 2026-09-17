@@ -43,12 +43,12 @@ Will not document changes to agent configuration used in development.
 - Added `ensure_from_template`. (#6)
 
 ### Changed
-- Added `ready_poll`, replacing `readiness_poll` functions. (#6)
+- Refactored `ready_poll`. (#6)
 - Refactored `aws_environ_from_config` and `aws_environ_from_profile`. (#6)
 
 ### Tests
 - Refactored self-signed ALB into a shared fixture. (#6)
-- Added testing for Terraform modules. (#6)
+- Extended testing for Terraform modules. (#6)
 
 ## [0.0.0-dev.5] (2026-08-11)
 
@@ -63,8 +63,8 @@ Will not document changes to agent configuration used in development.
 - Improved tool for `command`. (#5)
 
 ### Tests
-- Re-organized tests (#5).
-- Added testing for Terraform modules. (#5)
+- Refactored tests (#5).
+- Extended testing for Terraform modules. (#5)
 
 ## [0.0.0-dev.4] (2026-04-14)
 
@@ -74,7 +74,7 @@ Will not document changes to agent configuration used in development.
 ## [0.0.0-dev.3] (2026-03-24)
 
 ### Fixed
-- Issues of shadowing caused by `paths.py`. (#3)
+- Fixed shadowing caused by `paths.py`. (#3)
 
 ## [0.0.0-dev.2] (2026-03-20)
 
