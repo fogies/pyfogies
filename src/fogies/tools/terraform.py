@@ -13,6 +13,7 @@ from typing import NewType, TypeVar, cast
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel
 
+from fogies.pyfogies import pyfogies_version
 from fogies.terraform.backend import (
     BackendConfig,
     BackendStatus,
@@ -96,6 +97,12 @@ TfvarsContextManager = AbstractContextManager[TfvarsPath]
 TfbackendFactory = Callable[[], TfbackendContextManager]
 TfvarsFactory = Callable[[], TfvarsContextManager]
 
+# Type for passing a terraform_templated() context manager into a task
+# factory, to be entered when the task actually runs. Same factory rationale
+# as TfbackendFactory/TfvarsFactory above.
+TerraformTemplatedContextManager = AbstractContextManager[list[pathlib.Path]]
+TerraformTemplatedFactory = Callable[[], TerraformTemplatedContextManager]
+
 
 @contextmanager
 def terraform_tfbackend(
@@ -154,6 +161,56 @@ def terraform_tfvars(
     finally:
         if delete_on_exit and path.exists():
             path.unlink()
+
+
+# Substituted, wherever it appears in a file rendered by terraform_templated,
+# with the installed pyfogies version as a git ref (e.g. "v0.0.0.dev6").
+_TEMPLATED_PLACEHOLDER_PYFOGIES_VERSION = "__PYFOGIES_VERSION__"
+
+
+@contextmanager
+def terraform_templated(*, module_path: pathlib.Path) -> Generator[list[pathlib.Path]]:
+    """Render __PYFOGIES_VERSION__ in every .tf file under module_path that has it.
+
+    A templated file (e.g. hosted_zone.tf) is checked in as an ordinary .tf
+    file, with the __PYFOGIES_VERSION__ placeholder embedded in a module
+    source's ref=, so tools like `terraform fmt` keep formatting it normally.
+    Terraform can't load the placeholder directly, since it isn't a real ref,
+    so for each .tf file found anywhere under *module_path* that contains the
+    placeholder (skipping .terraform/, where Terraform caches downloaded
+    modules), entry renames it to "<name>.tf.templated" and writes a rendered
+    copy back under its original name for Terraform to load. On exit, each
+    rendered file is removed and the original is restored to its original
+    name. Yields the list of rendered paths.
+    """
+    resolved_version_ref = "v{}".format(pyfogies_version())
+
+    templated_paths: list[pathlib.Path] = []
+    rendered_paths: list[pathlib.Path] = []
+    for path_current in module_path.rglob("*.tf"):
+        if ".terraform" in path_current.relative_to(module_path).parts:
+            continue
+        content = path_current.read_text(encoding="utf-8")
+        if _TEMPLATED_PLACEHOLDER_PYFOGIES_VERSION not in content:
+            continue
+
+        templated_path = path_current.with_name(path_current.name + ".templated")
+        _ = path_current.rename(templated_path)
+        _ = path_current.write_text(
+            content.replace(
+                _TEMPLATED_PLACEHOLDER_PYFOGIES_VERSION, resolved_version_ref
+            ),
+            encoding="utf-8",
+        )
+        templated_paths.append(templated_path)
+        rendered_paths.append(path_current)
+
+    try:
+        yield rendered_paths
+    finally:
+        for templated_path, rendered_path in zip(templated_paths, rendered_paths):
+            rendered_path.unlink(missing_ok=True)
+            _ = templated_path.rename(rendered_path)
 
 
 class _Terraform:

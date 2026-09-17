@@ -14,6 +14,7 @@ from fogies.tools.terraform import (
     InitParams,
     terraform,
     terraform_output,
+    terraform_templated,
     terraform_tfbackend,
     terraform_tfvars,
 )
@@ -63,6 +64,80 @@ def test_terraform_tfbackend(tmp_path: pathlib.Path) -> None:
         assert 'key = "test-state/terraform.tfstate"' in text
         assert "use_lockfile = true" in text
     assert not path.exists()
+
+
+def test_terraform_templated_renders_and_restores(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """A .tf file with the placeholder is rendered on entry, restored on exit.
+
+    Covers one file at the root of module_path and one nested in a
+    subdirectory, so both direct and recursive discovery are exercised. On
+    entry, each original is renamed to "<name>.tf.templated" and a rendered
+    copy is written back under the original name. On exit, each rendered
+    copy is removed and the original is restored under its original name and
+    content.
+    """
+    monkeypatch.setattr("fogies.tools.terraform.pyfogies_version", lambda: "1.2.3")
+
+    nested_dir_path = tmp_path / "nested"
+    nested_dir_path.mkdir()
+
+    root_path = tmp_path / "hosted_zone.tf"
+    nested_file_path = nested_dir_path / "hosted_zone.tf"
+    original_content = (
+        'source = "git::https://example.com/repo.git?ref=__PYFOGIES_VERSION__"\n'
+    )
+    _ = root_path.write_text(original_content, encoding="utf-8")
+    _ = nested_file_path.write_text(original_content, encoding="utf-8")
+
+    root_templated_path = tmp_path / "hosted_zone.tf.templated"
+    nested_templated_path = nested_dir_path / "hosted_zone.tf.templated"
+
+    with terraform_templated(module_path=tmp_path) as rendered_paths:
+        assert set(rendered_paths) == {root_path, nested_file_path}
+        rendered_content = (
+            'source = "git::https://example.com/repo.git?ref=v1.2.3"\n'
+        )
+        assert root_path.read_text(encoding="utf-8") == rendered_content
+        assert nested_file_path.read_text(encoding="utf-8") == rendered_content
+        assert root_templated_path.read_text(encoding="utf-8") == original_content
+        assert nested_templated_path.read_text(encoding="utf-8") == original_content
+
+    assert root_path.read_text(encoding="utf-8") == original_content
+    assert nested_file_path.read_text(encoding="utf-8") == original_content
+    assert not root_templated_path.exists()
+    assert not nested_templated_path.exists()
+
+
+def test_terraform_templated_skips_files_without_placeholder(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A .tf file with no placeholder is left completely untouched."""
+    path = tmp_path / "plain.tf"
+    original_content = 'locals {\n  name = "unrelated"\n}\n'
+    _ = path.write_text(original_content, encoding="utf-8")
+
+    with terraform_templated(module_path=tmp_path) as rendered_paths:
+        assert rendered_paths == []
+        assert path.read_text(encoding="utf-8") == original_content
+
+
+def test_terraform_templated_skips_terraform_cache_directory(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A .tf file under .terraform/ (Terraform's module-download cache) is skipped."""
+    cache_path = tmp_path / ".terraform" / "modules" / "hosted_zone"
+    cache_path.mkdir(parents=True)
+    path = cache_path / "hosted_zone.tf"
+    original_content = (
+        'source = "git::https://example.com/repo.git?ref=__PYFOGIES_VERSION__"\n'
+    )
+    _ = path.write_text(original_content, encoding="utf-8")
+
+    with terraform_templated(module_path=tmp_path) as rendered_paths:
+        assert rendered_paths == []
+        assert path.read_text(encoding="utf-8") == original_content
 
 
 def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
