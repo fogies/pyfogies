@@ -35,6 +35,19 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0-dev.7] (2026-09-17)
+
+### Added
+- Added consistent support for `tags` variable in Terraform modules. (#7)
+- Added `terraform_templated` with support for `__PYFOGIES_VERSION__`. (#7)
+
+### Changed
+- Refactored tasks to accept context manager factories. (#7)
+- Refactored Terraform tool to resolve relative paths. (#7)
+
+### Tests
+- Refactored testing for Terraform backend. (#7)
+
 ## [0.0.0-dev.6] (2026-09-15)
 
 ### Added
