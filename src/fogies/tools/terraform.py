@@ -48,6 +48,7 @@ class DestroyParams:
 
 # Most recent first; _KNOWN_VERSIONS[0] is the default.
 _KNOWN_VERSIONS = [
+    "1.16.3",
     "1.14.4",
 ]
 
