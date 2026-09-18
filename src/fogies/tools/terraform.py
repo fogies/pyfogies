@@ -45,10 +45,10 @@ class DestroyParams:
     auto_approve: bool = False
 
 
-# Most recent first; _KNOWN_VERSIONS[0] is the default.
+# Most recent first; _KNOWN_VERSIONS[0] is the default. 
+# Versions must be ~> 1.15, because modules rely on `const = true` variables.
 _KNOWN_VERSIONS = [
     "1.16.3",
-    "1.14.4",
 ]
 
 _DEFAULT_VERSION = _KNOWN_VERSIONS[0]
