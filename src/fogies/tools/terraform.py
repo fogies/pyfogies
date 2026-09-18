@@ -13,7 +13,6 @@ from typing import NewType, TypeVar, cast
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel
 
-from fogies.pyfogies import pyfogies_version
 from fogies.terraform.backend import (
     BackendConfig,
     BackendStatus,
@@ -101,7 +100,7 @@ TfvarsFactory = Callable[[], TfvarsContextManager]
 # Type for passing a terraform_templated() context manager into a task
 # factory, to be entered when the task actually runs. Same factory rationale
 # as TfbackendFactory/TfvarsFactory above.
-TerraformTemplatedContextManager = AbstractContextManager[list[pathlib.Path]]
+TerraformTemplatedContextManager = AbstractContextManager[dict[pathlib.Path, list[str]]]
 TerraformTemplatedFactory = Callable[[], TerraformTemplatedContextManager]
 
 
@@ -164,52 +163,67 @@ def terraform_tfvars(
             path.unlink()
 
 
-# Substituted, wherever it appears in a file rendered by terraform_templated,
-# with the installed pyfogies version as a git ref (e.g. "v0.0.0.dev6").
-_TEMPLATED_PLACEHOLDER_PYFOGIES_VERSION = "__PYFOGIES_VERSION__"
+# Maps a placeholder string to the value that replaces it, wherever it
+# appears in a file rendered by terraform_templated. Empty for now: this
+# previously held __PYFOGIES_VERSION__, substituting the installed pyfogies
+# version into a module source's ref=, e.g. for hosted_zone.tf. That's no
+# longer needed as of Terraform 1.15+, which natively supports a `const =
+# true` variable in a module's source/version (see e.g.
+# fogies-infrastructure's `pyfogies_version` variable), resolved via
+# -var-file passed to `terraform init` (see _Terraform.init()'s tfvars_path).
+# Left in place, empty, since the same rename/render/restore mechanism could
+# still be useful for some future value Terraform itself can't parameterize.
+_TEMPLATED_PLACEHOLDERS: dict[str, str] = {}
 
 
 @contextmanager
-def terraform_templated(*, module_path: pathlib.Path) -> Generator[list[pathlib.Path]]:
-    """Render __PYFOGIES_VERSION__ in every .tf file under module_path that has it.
+def terraform_templated(
+    *, module_path: pathlib.Path
+) -> Generator[dict[pathlib.Path, list[str]]]:
+    """Render each placeholder in _TEMPLATED_PLACEHOLDERS into every matching .tf file.
 
-    A templated file (e.g. hosted_zone.tf) is checked in as an ordinary .tf
-    file, with the __PYFOGIES_VERSION__ placeholder embedded in a module
-    source's ref=, so tools like `terraform fmt` keep formatting it normally.
-    Terraform can't load the placeholder directly, since it isn't a real ref,
-    so for each .tf file found anywhere under *module_path* that contains the
-    placeholder (skipping .terraform/, where Terraform caches downloaded
+    A templated file is checked in as an ordinary .tf file, with a
+    placeholder embedded somewhere a real value can't go directly (e.g. a
+    module source's ref=, which must be a literal), so tools like `terraform
+    fmt` keep formatting it normally. Terraform can't load the placeholder
+    directly, so for each .tf file found anywhere under *module_path* that
+    contains one (skipping .terraform/, where Terraform caches downloaded
     modules), entry renames it to "<name>.tf.templated" and writes a rendered
     copy back under its original name for Terraform to load. On exit, each
     rendered file is removed and the original is restored to its original
-    name. Yields the list of rendered paths.
+    name. Yields a mapping from each rendered path to the placeholders that
+    were substituted in it. A no-op (empty mapping) while
+    _TEMPLATED_PLACEHOLDERS is empty.
     """
-    resolved_version_ref = "v{}".format(pyfogies_version())
-
-    templated_paths: list[pathlib.Path] = []
-    rendered_paths: list[pathlib.Path] = []
+    rendered: dict[pathlib.Path, list[str]] = {}
     for path_current in module_path.rglob("*.tf"):
         if ".terraform" in path_current.relative_to(module_path).parts:
             continue
         content = path_current.read_text(encoding="utf-8")
-        if _TEMPLATED_PLACEHOLDER_PYFOGIES_VERSION not in content:
+        placeholders_found = [
+            placeholder
+            for placeholder in _TEMPLATED_PLACEHOLDERS
+            if placeholder in content
+        ]
+        if not placeholders_found:
             continue
+
+        rendered_content = content
+        for placeholder in placeholders_found:
+            rendered_content = rendered_content.replace(
+                placeholder, _TEMPLATED_PLACEHOLDERS[placeholder]
+            )
 
         templated_path = path_current.with_name(path_current.name + ".templated")
         _ = path_current.rename(templated_path)
-        _ = path_current.write_text(
-            content.replace(
-                _TEMPLATED_PLACEHOLDER_PYFOGIES_VERSION, resolved_version_ref
-            ),
-            encoding="utf-8",
-        )
-        templated_paths.append(templated_path)
-        rendered_paths.append(path_current)
+        _ = path_current.write_text(rendered_content, encoding="utf-8")
+        rendered[path_current] = placeholders_found
 
     try:
-        yield rendered_paths
+        yield rendered
     finally:
-        for templated_path, rendered_path in zip(templated_paths, rendered_paths):
+        for rendered_path in rendered:
+            templated_path = rendered_path.with_name(rendered_path.name + ".templated")
             rendered_path.unlink(missing_ok=True)
             _ = templated_path.rename(rendered_path)
 
@@ -320,6 +334,7 @@ class _Terraform:
         command_params: CommandParams,
         module_path: pathlib.Path,
         tfbackend_path: pathlib.Path | None = None,
+        tfvars_path: pathlib.Path | None = None,
         init_params: InitParams | None = None,
     ) -> Result:
         """Run terraform init.
@@ -329,7 +344,11 @@ class _Terraform:
         *init_params.reconfigure* when true passes -reconfigure to terraform init.
         *init_params.upgrade* when true passes -upgrade to terraform init.
         *tfbackend_path* when set passes -backend-config=<path> to terraform
-        init, where <path> is a backend configuration file.
+        init, where <path> is a backend configuration file. *tfvars_path*
+        when set passes -var-file=<path>; init needs this only when a module
+        source or version references a `const = true` variable (Terraform
+        1.15+), since those are resolved at init time, before any other
+        variable usage.
         """
         command_params = command_params.require_cwd(module_path)
         if init_params is None:
@@ -339,6 +358,10 @@ class _Terraform:
             # Resolved: terraform runs with cwd=module_path, which may differ
             # from wherever tfbackend_path was written relative to.
             init_args.extend(["-backend-config", str(tfbackend_path.resolve())])
+        if tfvars_path is not None:
+            # Resolved: terraform runs with cwd=module_path, which may differ
+            # from wherever tfvars_path was written relative to.
+            init_args.extend(["-var-file", str(tfvars_path.resolve())])
         if init_params.migrate_state:
             init_args.append("-migrate-state")
         if init_params.reconfigure:
@@ -481,6 +504,7 @@ def terraform(
             command_params=command_params,
             module_path=module_path,
             tfbackend_path=tfbackend_path,
+            tfvars_path=tfvars_path,
             init_params=init_params,
         )
 
