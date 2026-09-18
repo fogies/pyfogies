@@ -17,5 +17,6 @@ def pyfogies_test_aws_environ(
     with aws_environ_from_config(
         config_path=PATH_SECRETS_AWS,
         profile_name=pyfogies_test_config.aws.profile,
+        raise_if_env_exists=False,
     ) as aws_env:
         yield aws_env

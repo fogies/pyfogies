@@ -101,14 +101,26 @@ def _username_from_iam_arn(arn: str) -> str:
 def aws_environ_from_profile(
     *,
     profile: AwsProfile,
-    raise_if_exists: bool = True,
-    raise_if_changed: bool = True,
+    raise_if_env_exists: bool,
+    raise_if_env_changed: bool = True,
 ) -> Generator[AwsEnviron]:
     """Context manager that applies AWS variables from an already-known profile.
 
     For credentials obtained some other way (e.g. prompted interactively, or
     freshly created/rotated) rather than read from an AWS config file; see
     aws_environ_from_config() for that case, which delegates here.
+
+    raise_if_env_exists has no default; see fogies.tools.environ.environ()
+    for why. Callers should almost always pass False:
+    AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY may already be set in the
+    environment for any number of unrelated reasons (another tool, a
+    personal script), which isn't itself a problem -- this context manager
+    overrides them for its own duration and restores the originals on exit
+    regardless. Pass True only to isolate a specific environment-related
+    failure. raise_if_env_changed stays True: that catches something
+    actually mutating the variables while this context manager believed it
+    had exclusive control, which is a real anomaly rather than ordinary
+    ambient state.
 
     Confirms the credentials actually work (via STS GetCallerIdentity) before
     yielding, raising ValueError immediately rather than letting some later,
@@ -126,8 +138,8 @@ def aws_environ_from_profile(
     }
     with environ(
         variables=variables,
-        raise_if_exists=raise_if_exists,
-        raise_if_changed=raise_if_changed,
+        raise_if_env_exists=raise_if_env_exists,
+        raise_if_env_changed=raise_if_env_changed,
     ):
         try:
             identity = boto_client_sts().get_caller_identity()
@@ -148,15 +160,16 @@ def aws_environ_from_config(
     *,
     config_path: Path,
     profile_name: str,
-    raise_if_exists: bool = True,
-    raise_if_changed: bool = True,
+    raise_if_env_exists: bool,
+    raise_if_env_changed: bool = True,
 ) -> Generator[AwsEnviron]:
     """Context manager that applies AWS variables read from an AWS config file.
 
     The *config_path* parameter specifies the AWS config file to read; it
     must have a ``.toml`` extension. The *profile_name* parameter specifies
     the AWS profile name, which is mapped to a ``[<name>]`` table in the
-    config file. See aws_environ_from_profile() for credential validation.
+    config file. See aws_environ_from_profile() for credential validation
+    and for raise_if_env_exists/raise_if_env_changed defaults.
 
     Yields an :class:`AwsEnviron` describing which profile and key ID are active.
     """
@@ -165,7 +178,7 @@ def aws_environ_from_config(
     )
     with aws_environ_from_profile(
         profile=aws_profile,
-        raise_if_exists=raise_if_exists,
-        raise_if_changed=raise_if_changed,
+        raise_if_env_exists=raise_if_env_exists,
+        raise_if_env_changed=raise_if_env_changed,
     ) as env:
         yield env

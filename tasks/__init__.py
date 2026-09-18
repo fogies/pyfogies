@@ -27,7 +27,9 @@ def _aws_environ_factory() -> AwsEnvironContextManager:
     only be entered once.
     """
     return aws_environ_from_config(
-        config_path=PATH_SECRETS_AWS, profile_name=_ACCESS_KEY_PROFILE
+        config_path=PATH_SECRETS_AWS,
+        profile_name=_ACCESS_KEY_PROFILE,
+        raise_if_env_exists=False,
     )
 
 
