@@ -35,6 +35,18 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0-dev.8] (2026-09-18)
+
+### Added
+- Added tools for `go` and `claude_sync`. ([#8](https://github.com/fogies/pyfogies/pull/8))
+
+### Changed
+- Updated Terraform to require 1.15, gaining support for `const` variables. ([#8](https://github.com/fogies/pyfogies/pull/8))
+- Refactored `environ` to consistently expose `raise_if_env_exists`. ([#8](https://github.com/fogies/pyfogies/pull/8))
+
+### Removed
+- Removed `__PYFOGIES_VERSION__` from `terraform_templated`. ([#8](https://github.com/fogies/pyfogies/pull/8))
+
 ## [0.0.0-dev.7] (2026-09-17)
 
 ### Added
