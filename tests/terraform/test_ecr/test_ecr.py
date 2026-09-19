@@ -42,7 +42,7 @@ def test_ecr_output(
     tfbackend_path = tmp_path / "test-ecr.tfbackend"
     tfvars_path = tmp_path / "test-ecr.tfvars.json"
 
-    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ECR.value]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ECR]
 
     with (
         terraform_tfbackend(

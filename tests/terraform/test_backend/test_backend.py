@@ -66,7 +66,7 @@ def nested_backend_output(
     with (
         terraform_tfbackend(
             path=tfbackend_path,
-            backend=pyfogies_test_backend[PyfogiesTestBackendStates.TEST_BACKEND.value],
+            backend=pyfogies_test_backend[PyfogiesTestBackendStates.TEST_BACKEND],
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,

@@ -58,7 +58,7 @@ def cloudwatch_output(
     tfbackend_path = tmp_path / "test-cloudwatch.tfbackend"
     tfvars_path = tmp_path / "test-cloudwatch.tfvars.json"
 
-    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_CLOUDWATCH.value]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_CLOUDWATCH]
 
     with (
         terraform_tfbackend(

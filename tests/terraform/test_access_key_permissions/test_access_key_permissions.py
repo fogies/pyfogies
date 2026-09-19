@@ -162,7 +162,7 @@ def access_key_permissions_output(
     tfvars_path = tmp_path / "test-access-key-permissions.tfvars.json"
 
     backend = pyfogies_test_backend[
-        PyfogiesTestBackendStates.TEST_ACCESS_KEY_PERMISSIONS.value
+        PyfogiesTestBackendStates.TEST_ACCESS_KEY_PERMISSIONS
     ]
 
     with (

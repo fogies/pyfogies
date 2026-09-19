@@ -66,7 +66,7 @@ def ecs_output(
     tfvars_path = tmp_path / "test-ecs.tfvars.json"
     pem_tmp = tmp_path / "certificate.pem"
 
-    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ECS.value]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ECS]
 
     with (
         terraform_tfbackend(

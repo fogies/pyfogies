@@ -65,7 +65,7 @@ def alb_dns_output(
     tmp_path = tmp_path_factory.mktemp("test-alb-dns")
     tfbackend_path = tmp_path / "test-alb-dns.tfbackend"
     tfvars_path = tmp_path / "test-alb-dns.tfvars.json"
-    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ALB_DNS.value]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ALB_DNS]
 
     with (
         terraform_tfbackend(

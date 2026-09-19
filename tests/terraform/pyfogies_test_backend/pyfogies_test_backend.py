@@ -47,7 +47,7 @@ def pyfogies_test_backend(
             variables=BackendVars(
                 name=PYFOGIES_TEST_BACKEND_NAME,
                 region=pyfogies_test_config.aws.region,
-                states=[s.value for s in PyfogiesTestBackendStates],
+                states=list(PyfogiesTestBackendStates),
                 tags=PYFOGIES_TEST_BACKEND_TAGS,
             ),
         ) as tfvars_path,

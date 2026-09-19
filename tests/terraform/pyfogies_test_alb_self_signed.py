@@ -74,9 +74,7 @@ def pyfogies_test_alb_self_signed(
     tmp_path = tmp_path_factory.mktemp("pyfogies-test-alb-self-signed")
     tfbackend_path = tmp_path / "pyfogies-test-alb-self-signed.tfbackend"
     tfvars_path = tmp_path / "pyfogies-test-alb-self-signed.tfvars.json"
-    backend = pyfogies_test_backend[
-        PyfogiesTestBackendStates.TEST_ALB_SELF_SIGNED.value
-    ]
+    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ALB_SELF_SIGNED]
 
     with (
         terraform_tfbackend(
