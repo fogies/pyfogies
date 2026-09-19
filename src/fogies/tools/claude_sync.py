@@ -123,6 +123,8 @@ def claude_sync(
             )
 
     if not exe_path.exists():
-        raise RuntimeError("claude-sync executable not found in '{}'".format(gobin_path))
+        raise RuntimeError(
+            "claude-sync executable not found in '{}'".format(gobin_path)
+        )
 
     yield _ClaudeSync(path=exe_path)
