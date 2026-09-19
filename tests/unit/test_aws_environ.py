@@ -35,7 +35,7 @@ def test_aws_environ_from_profile_sets_variables(
         config_path=PATH_SECRETS_AWS, profile_name=pyfogies_test_config.aws.profile
     )
 
-    with aws_environ_from_profile(profile=profile) as env:
+    with aws_environ_from_profile(profile=profile, raise_if_env_exists=False) as env:
         assert env.profile == profile.name
         assert env.aws_access_key_id == profile.aws_access_key_id
         assert os.environ.get("AWS_ACCESS_KEY_ID") == profile.aws_access_key_id
@@ -63,7 +63,9 @@ def test_aws_environ_from_profile_raises_for_invalid_credentials(
     )
 
     with pytest.raises(ValueError, match="Invalid AWS credentials"):
-        with aws_environ_from_profile(profile=invalid_profile):
+        with aws_environ_from_profile(
+            profile=invalid_profile, raise_if_env_exists=False
+        ):
             pass
 
     assert "AWS_ACCESS_KEY_ID" not in os.environ
@@ -107,7 +109,7 @@ def test_aws_environ_from_config_reads_selected_profile(
     _ = config_path.write_text(config_text, encoding="utf-8")
 
     with aws_environ_from_config(
-        config_path=config_path, profile_name="selected"
+        config_path=config_path, profile_name="selected", raise_if_env_exists=False
     ) as env:
         assert env.profile == "selected"
         assert env.aws_access_key_id == profile.aws_access_key_id

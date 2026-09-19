@@ -14,14 +14,14 @@ class _EnvironContext:
         self,
         variables: Mapping[str, str],
         *,
-        raise_if_exists: bool,
-        raise_if_changed: bool,
+        raise_if_env_exists: bool,
+        raise_if_env_changed: bool,
     ) -> None:
         self._variables: dict[str, str] = {
             name: str(value) for name, value in variables.items()
         }
-        self._raise_if_exists: bool = raise_if_exists
-        self._raise_if_changed: bool = raise_if_changed
+        self._raise_if_env_exists: bool = raise_if_env_exists
+        self._raise_if_env_changed: bool = raise_if_env_changed
         self._original_variables: dict[str, str | None] = {}
         self._applied_variables: list[str] = []
 
@@ -39,7 +39,7 @@ class _EnvironContext:
         try:
             for name, value in self._variables.items():
                 existing = os.environ.get(name)
-                if existing is not None and self._raise_if_exists:
+                if existing is not None and self._raise_if_env_exists:
                     raise ValueError(
                         "Environment variable '{}' already exists".format(name)
                     )
@@ -61,8 +61,8 @@ class _EnvironContext:
     ) -> bool:
         error: RuntimeError | None = None
 
-        # Enforce raise_if_changed only when the body exited normally.
-        if exc_type is None and self._raise_if_changed:
+        # Enforce raise_if_env_changed only when the body exited normally.
+        if exc_type is None and self._raise_if_env_changed:
             for name in self._applied_variables:
                 expected = self._variables[name]
                 current = os.environ.get(name)
@@ -86,8 +86,8 @@ class _EnvironContext:
 def environ(
     variables: Mapping[str, str],
     *,
-    raise_if_exists: bool = True,
-    raise_if_changed: bool = True,
+    raise_if_env_exists: bool,
+    raise_if_env_changed: bool = True,
 ) -> contextlib.AbstractContextManager[None]:
     """Return a context manager that applies the given environment overrides.
 
@@ -95,14 +95,23 @@ def environ(
     to assign for the duration of the context.
 
     For each variable:
-    - If raise_if_exists is True (default) and the variable already exists,
-      raises ValueError and leaves the environment unchanged.
-    - On normal exit, if raise_if_changed is True (default) and the value in
-      the environment differs from the value set by this context manager,
-      raises RuntimeError.
+    - If raise_if_env_exists is True and the variable already exists, raises
+      ValueError and leaves the environment unchanged. raise_if_env_exists has
+      no default: whether a pre-existing variable is worth caring about
+      depends entirely on the situation, and callers should say so explicitly
+      rather than the choice being inherited from here. In practice this is
+      almost always False -- a pre-existing variable this context manager is
+      about to override and later restore usually isn't a problem -- with
+      True reserved for deliberately isolating an environment-related
+      failure.
+    - On normal exit, if raise_if_env_changed is True (default) and the value
+      in the environment differs from the value set by this context manager,
+      raises RuntimeError. This one keeps a default: it's catching a genuine
+      anomaly (something else mutated the variable while this context
+      manager believed it had exclusive control), not a situational choice.
     """
     return _EnvironContext(
         variables=variables,
-        raise_if_exists=raise_if_exists,
-        raise_if_changed=raise_if_changed,
+        raise_if_env_exists=raise_if_env_exists,
+        raise_if_env_changed=raise_if_env_changed,
     )

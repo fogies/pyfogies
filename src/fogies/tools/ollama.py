@@ -21,6 +21,7 @@ from fogies.ready_poll import READY_POLL_TIMING_SHORT, ready_poll
 
 # Most recent first; _KNOWN_VERSIONS[0] is the default.
 _KNOWN_VERSIONS = [
+    "0.34.2",
     "0.32.5",
     "0.17.7",
 ]

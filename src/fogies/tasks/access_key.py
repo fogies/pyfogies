@@ -54,7 +54,7 @@ def _resolve_admin_environ(
     with contextlib.ExitStack() as stack:
         try:
             env = stack.enter_context(
-                aws_environ_from_profile(profile=profile, raise_if_exists=False)
+                aws_environ_from_profile(profile=profile, raise_if_env_exists=False)
             )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc

@@ -78,7 +78,10 @@ def test_terraform_templated_renders_and_restores(
     copy is removed and the original is restored under its original name and
     content.
     """
-    monkeypatch.setattr("fogies.tools.terraform.pyfogies_version", lambda: "1.2.3")
+    monkeypatch.setattr(
+        "fogies.tools.terraform._TEMPLATED_PLACEHOLDERS",
+        {"__TEST_PLACEHOLDER__": "test-value"},
+    )
 
     nested_dir_path = tmp_path / "nested"
     nested_dir_path.mkdir()
@@ -86,7 +89,7 @@ def test_terraform_templated_renders_and_restores(
     root_path = tmp_path / "hosted_zone.tf"
     nested_file_path = nested_dir_path / "hosted_zone.tf"
     original_content = (
-        'source = "git::https://example.com/repo.git?ref=__PYFOGIES_VERSION__"\n'
+        'source = "git::https://example.com/repo.git?ref=__TEST_PLACEHOLDER__"\n'
     )
     _ = root_path.write_text(original_content, encoding="utf-8")
     _ = nested_file_path.write_text(original_content, encoding="utf-8")
@@ -94,10 +97,13 @@ def test_terraform_templated_renders_and_restores(
     root_templated_path = tmp_path / "hosted_zone.tf.templated"
     nested_templated_path = nested_dir_path / "hosted_zone.tf.templated"
 
-    with terraform_templated(module_path=tmp_path) as rendered_paths:
-        assert set(rendered_paths) == {root_path, nested_file_path}
+    with terraform_templated(module_path=tmp_path) as rendered:
+        assert rendered == {
+            root_path: ["__TEST_PLACEHOLDER__"],
+            nested_file_path: ["__TEST_PLACEHOLDER__"],
+        }
         rendered_content = (
-            'source = "git::https://example.com/repo.git?ref=v1.2.3"\n'
+            'source = "git::https://example.com/repo.git?ref=test-value"\n'
         )
         assert root_path.read_text(encoding="utf-8") == rendered_content
         assert nested_file_path.read_text(encoding="utf-8") == rendered_content
@@ -111,32 +117,55 @@ def test_terraform_templated_renders_and_restores(
 
 
 def test_terraform_templated_skips_files_without_placeholder(
-    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     """A .tf file with no placeholder is left completely untouched."""
+    monkeypatch.setattr(
+        "fogies.tools.terraform._TEMPLATED_PLACEHOLDERS",
+        {"__TEST_PLACEHOLDER__": "test-value"},
+    )
+
     path = tmp_path / "plain.tf"
     original_content = 'locals {\n  name = "unrelated"\n}\n'
     _ = path.write_text(original_content, encoding="utf-8")
 
-    with terraform_templated(module_path=tmp_path) as rendered_paths:
-        assert rendered_paths == []
+    with terraform_templated(module_path=tmp_path) as rendered:
+        assert rendered == {}
         assert path.read_text(encoding="utf-8") == original_content
 
 
 def test_terraform_templated_skips_terraform_cache_directory(
-    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     """A .tf file under .terraform/ (Terraform's module-download cache) is skipped."""
+    monkeypatch.setattr(
+        "fogies.tools.terraform._TEMPLATED_PLACEHOLDERS",
+        {"__TEST_PLACEHOLDER__": "test-value"},
+    )
+
     cache_path = tmp_path / ".terraform" / "modules" / "hosted_zone"
     cache_path.mkdir(parents=True)
     path = cache_path / "hosted_zone.tf"
     original_content = (
-        'source = "git::https://example.com/repo.git?ref=__PYFOGIES_VERSION__"\n'
+        'source = "git::https://example.com/repo.git?ref=__TEST_PLACEHOLDER__"\n'
     )
     _ = path.write_text(original_content, encoding="utf-8")
 
-    with terraform_templated(module_path=tmp_path) as rendered_paths:
-        assert rendered_paths == []
+    with terraform_templated(module_path=tmp_path) as rendered:
+        assert rendered == {}
+        assert path.read_text(encoding="utf-8") == original_content
+
+
+def test_terraform_templated_is_noop_with_no_placeholders_defined(
+    tmp_path: pathlib.Path,
+) -> None:
+    """With _TEMPLATED_PLACEHOLDERS empty (its real current state), nothing is touched."""
+    path = tmp_path / "hosted_zone.tf"
+    original_content = 'source = "git::https://example.com/repo.git?ref=__ANYTHING__"\n'
+    _ = path.write_text(original_content, encoding="utf-8")
+
+    with terraform_templated(module_path=tmp_path) as rendered:
+        assert rendered == {}
         assert path.read_text(encoding="utf-8") == original_content
 
 
