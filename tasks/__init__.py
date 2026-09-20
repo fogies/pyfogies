@@ -1,5 +1,7 @@
 """Invoke tasks for this project."""
 
+import pathlib
+
 import colorama
 from invoke.collection import Collection
 
@@ -10,9 +12,9 @@ import fogies.tasks.poetry
 import fogies.tasks.test
 from fogies.tools.aws_environ import AwsEnvironContextManager, aws_environ_from_config
 from tasks.paths import (
-    PATH_SECRETS_AWS,
-    PATH_SECRETS_POETRY,
-    PATH_STAGING_BINARY_CACHE,
+    SECRETS_AWS_PATH,
+    SECRETS_POETRY_PATH,
+    STAGING_BINARY_CACHE_PATH,
 )
 
 # Stand-in until a dedicated admin profile exists.
@@ -27,7 +29,7 @@ def _aws_environ_factory() -> AwsEnvironContextManager:
     only be entered once.
     """
     return aws_environ_from_config(
-        config_path=PATH_SECRETS_AWS,
+        config_path=SECRETS_AWS_PATH,
         profile_name=_ACCESS_KEY_PROFILE,
         raise_if_env_exists=False,
     )
@@ -45,12 +47,12 @@ namespace.add_task(
         fmt_black=True,
         fmt_isort=True,
         fmt_terraform=True,
-        terraform_binary_cache_path=PATH_STAGING_BINARY_CACHE,
+        terraform_binary_cache_path=STAGING_BINARY_CACHE_PATH,
     )
 )
 namespace.add_task(fogies.tasks.lint.get_task_lint())
 namespace.add_collection(
-    fogies.tasks.poetry.get_collection(path_secrets_poetry=PATH_SECRETS_POETRY)
+    fogies.tasks.poetry.get_collection(secrets_poetry_path=SECRETS_POETRY_PATH)
 )
 namespace.add_collection(
     fogies.tasks.access_key.get_collection(aws_environ_factory=_aws_environ_factory)
@@ -58,9 +60,13 @@ namespace.add_collection(
 
 # A collection for subsets of tests.
 _task_all = fogies.tasks.test.get_task_test()
-_task_integration = fogies.tasks.test.get_task_test(path_tests="tests/integration")
-_task_terraform = fogies.tasks.test.get_task_test(path_tests="tests/terraform")
-_task_unit = fogies.tasks.test.get_task_test(path_tests="tests/unit")
+_task_integration = fogies.tasks.test.get_task_test(
+    tests_path=pathlib.Path("tests/integration")
+)
+_task_terraform = fogies.tasks.test.get_task_test(
+    tests_path=pathlib.Path("tests/terraform")
+)
+_task_unit = fogies.tasks.test.get_task_test(tests_path=pathlib.Path("tests/unit"))
 
 _collection_tests = Collection("test")
 _collection_tests.add_task(_task_all, name="all")

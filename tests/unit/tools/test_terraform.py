@@ -3,12 +3,12 @@
 import subprocess
 
 from fogies.tools.terraform import terraform
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 
 def test_terraform_is_available() -> None:
     """Context manager provides a working executable."""
-    with terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf:
+    with terraform(binary_cache_path=STAGING_BINARY_CACHE_PATH) as tf:
         # Verify the executable exists.
         assert tf.binary_path.exists()
 

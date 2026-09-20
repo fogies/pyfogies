@@ -20,7 +20,7 @@ from fogies.tools.aws_environ import (
     aws_environ_from_profile,
     load_aws_profile_from_config,
 )
-from tasks.paths import PATH_SECRETS_AWS
+from tasks.paths import SECRETS_AWS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 
 
@@ -32,7 +32,7 @@ def test_aws_environ_from_profile_sets_variables(
     monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
 
     profile = load_aws_profile_from_config(
-        config_path=PATH_SECRETS_AWS, profile_name=pyfogies_test_config.aws.profile
+        config_path=SECRETS_AWS_PATH, profile_name=pyfogies_test_config.aws.profile
     )
 
     with aws_environ_from_profile(profile=profile, raise_if_env_exists=False) as env:
@@ -90,7 +90,7 @@ def test_aws_environ_from_config_reads_selected_profile(
     monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
 
     profile = load_aws_profile_from_config(
-        config_path=PATH_SECRETS_AWS, profile_name=pyfogies_test_config.aws.profile
+        config_path=SECRETS_AWS_PATH, profile_name=pyfogies_test_config.aws.profile
     )
 
     config_path = tmp_path / "test_aws_environ.toml"

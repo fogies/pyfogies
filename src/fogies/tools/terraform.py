@@ -196,10 +196,10 @@ def terraform_templated(
     _TEMPLATED_PLACEHOLDERS is empty.
     """
     rendered: dict[pathlib.Path, list[str]] = {}
-    for path_current in module_path.rglob("*.tf"):
-        if ".terraform" in path_current.relative_to(module_path).parts:
+    for current_path in module_path.rglob("*.tf"):
+        if ".terraform" in current_path.relative_to(module_path).parts:
             continue
-        content = path_current.read_text(encoding="utf-8")
+        content = current_path.read_text(encoding="utf-8")
         placeholders_found = [
             placeholder
             for placeholder in _TEMPLATED_PLACEHOLDERS
@@ -214,10 +214,10 @@ def terraform_templated(
                 placeholder, _TEMPLATED_PLACEHOLDERS[placeholder]
             )
 
-        templated_path = path_current.with_name(path_current.name + ".templated")
-        _ = path_current.rename(templated_path)
-        _ = path_current.write_text(rendered_content, encoding="utf-8")
-        rendered[path_current] = placeholders_found
+        templated_path = current_path.with_name(current_path.name + ".templated")
+        _ = current_path.rename(templated_path)
+        _ = current_path.write_text(rendered_content, encoding="utf-8")
+        rendered[current_path] = placeholders_found
 
     try:
         yield rendered

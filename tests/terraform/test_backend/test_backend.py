@@ -18,7 +18,7 @@ from fogies.tools.terraform import (
 )
 from fogies.tools.terraform_backend import terraform_backend
 from tasks.paths import (
-    PATH_STAGING_BINARY_CACHE,
+    STAGING_BINARY_CACHE_PATH,
 )
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates
@@ -78,7 +78,7 @@ def nested_backend_output(
             ),
         ) as tfvars_path,
         terraform_backend(
-            binary_cache_path=PATH_STAGING_BINARY_CACHE,
+            binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=module_path,
             backend_status_path=nested_backend_status_path,
@@ -161,7 +161,7 @@ def test_state_a_and_state_b(
             variables=_TestStateVars(test_value=expected_value_b),
         ) as tfvars_b,
         terraform_output(
-            binary_cache_path=PATH_STAGING_BINARY_CACHE,
+            binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=state_a_module_path,
             backend=nested_backend_output["test-state-a"],
@@ -177,7 +177,7 @@ def test_state_a_and_state_b(
             output_model=_TestStateOutput,
         ) as output_a,
         terraform_output(
-            binary_cache_path=PATH_STAGING_BINARY_CACHE,
+            binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=state_b_module_path,
             backend=nested_backend_output["test-state-b"],

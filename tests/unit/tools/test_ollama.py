@@ -3,12 +3,12 @@
 import subprocess
 
 from fogies.tools.ollama import ollama
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 
 def test_ollama_is_available() -> None:
     """Context manager provides a working executable."""
-    with ollama(binary_cache_path=PATH_STAGING_BINARY_CACHE) as ol:
+    with ollama(binary_cache_path=STAGING_BINARY_CACHE_PATH) as ol:
         # Verify the executable exists.
         assert ol.binary_path.exists()
 

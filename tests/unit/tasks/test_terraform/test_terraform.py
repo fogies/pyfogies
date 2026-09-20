@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from fogies.tasks.terraform import get_task_apply, get_task_destroy
 from fogies.tools.terraform import terraform_tfvars
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 _MODULE_PATH = pathlib.Path(__file__).parent
 
@@ -30,7 +30,7 @@ def test_task_apply_and_destroy(
 
     task_apply = get_task_apply(
         module_path=_MODULE_PATH,
-        binary_cache_path=PATH_STAGING_BINARY_CACHE,
+        binary_cache_path=STAGING_BINARY_CACHE_PATH,
         tfvars_factory=lambda: terraform_tfvars(
             path=tmp_path / "test.tfvars.json",
             variables=_TestVars(content=expected_content),
@@ -39,7 +39,7 @@ def test_task_apply_and_destroy(
     )
     task_destroy = get_task_destroy(
         module_path=_MODULE_PATH,
-        binary_cache_path=PATH_STAGING_BINARY_CACHE,
+        binary_cache_path=STAGING_BINARY_CACHE_PATH,
         tfvars_factory=lambda: terraform_tfvars(
             path=tmp_path / "test.tfvars.json",
             variables=_TestVars(content=expected_content),
@@ -73,7 +73,7 @@ def test_task_apply_and_destroy_run_twice(
 
     task_apply = get_task_apply(
         module_path=_MODULE_PATH,
-        binary_cache_path=PATH_STAGING_BINARY_CACHE,
+        binary_cache_path=STAGING_BINARY_CACHE_PATH,
         tfvars_factory=lambda: terraform_tfvars(
             path=tmp_path / "test.tfvars.json",
             variables=_TestVars(content=expected_content),
@@ -82,7 +82,7 @@ def test_task_apply_and_destroy_run_twice(
     )
     task_destroy = get_task_destroy(
         module_path=_MODULE_PATH,
-        binary_cache_path=PATH_STAGING_BINARY_CACHE,
+        binary_cache_path=STAGING_BINARY_CACHE_PATH,
         tfvars_factory=lambda: terraform_tfvars(
             path=tmp_path / "test.tfvars.json",
             variables=_TestVars(content=expected_content),

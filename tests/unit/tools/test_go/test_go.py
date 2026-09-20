@@ -4,7 +4,7 @@ import pathlib
 
 from fogies.tools.command import CommandParams, command_run
 from fogies.tools.go import go
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 
 def test_go_install_builds_and_runs_local_module(tmp_path: pathlib.Path) -> None:
@@ -13,7 +13,7 @@ def test_go_install_builds_and_runs_local_module(tmp_path: pathlib.Path) -> None
     gobin_path = tmp_path / "gobin"
     command_params = CommandParams(in_stream=False, cwd=module_path)
 
-    with go(binary_cache_path=PATH_STAGING_BINARY_CACHE) as go_tool:
+    with go(binary_cache_path=STAGING_BINARY_CACHE_PATH) as go_tool:
         install_result = go_tool.install(
             command_params=command_params,
             module=".",

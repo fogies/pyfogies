@@ -16,7 +16,7 @@ from fogies.tools.ollama import (
     ollama,
     ollama_client,
 )
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 _TEST_OLLAMA_MODEL = "llama3.1:8b"
 
@@ -29,7 +29,7 @@ _CHAT_RETRY_LOG_PATH = pathlib.Path(__file__).parent / "test_ollama_chat_retry.l
 
 def test_ollama_lock_context() -> None:
     """State access without the lock raises AssertionError."""
-    with ollama(binary_cache_path=PATH_STAGING_BINARY_CACHE) as ol:
+    with ollama(binary_cache_path=STAGING_BINARY_CACHE_PATH) as ol:
         with pytest.raises(AssertionError):
             _ = ol.pid
         with pytest.raises(AssertionError):
@@ -42,12 +42,12 @@ def test_ollama_lock_context() -> None:
 
 def test_ollama_refcount_management() -> None:
     """Test ollama_client increments and decrements refcount."""
-    with ollama(binary_cache_path=PATH_STAGING_BINARY_CACHE) as ol:
+    with ollama(binary_cache_path=STAGING_BINARY_CACHE_PATH) as ol:
         with ol.lock():
             initial_refcount = ol.refcount
             started_pid = None
 
-            with ollama_client(binary_cache_path=PATH_STAGING_BINARY_CACHE):
+            with ollama_client(binary_cache_path=STAGING_BINARY_CACHE_PATH):
                 assert ol.refcount == initial_refcount + 1
                 if initial_refcount == 0:
                     started_pid = ol.pid
@@ -57,7 +57,7 @@ def test_ollama_refcount_management() -> None:
                     assert started_process.is_running()
                     assert started_process.status() != psutil.STATUS_ZOMBIE
 
-                with ollama_client(binary_cache_path=PATH_STAGING_BINARY_CACHE):
+                with ollama_client(binary_cache_path=STAGING_BINARY_CACHE_PATH):
                     assert ol.refcount == initial_refcount + 2
 
                 assert ol.refcount == initial_refcount + 1
@@ -81,7 +81,7 @@ def test_ollama_client_basic_query() -> None:
     """Test ollama_client can handle a small multi-turn sequence."""
     model = _TEST_OLLAMA_MODEL
 
-    with ollama_client(binary_cache_path=PATH_STAGING_BINARY_CACHE) as client:
+    with ollama_client(binary_cache_path=STAGING_BINARY_CACHE_PATH) as client:
         # Pull the model (will no-op if already present).
         _ = client.pull(model)
 
@@ -144,7 +144,7 @@ def test_ollama_client_structured_output() -> None:
 
     model = _TEST_OLLAMA_MODEL
 
-    with ollama_client(binary_cache_path=PATH_STAGING_BINARY_CACHE) as client:
+    with ollama_client(binary_cache_path=STAGING_BINARY_CACHE_PATH) as client:
         _ = client.pull(model)
 
         # Retries transient connection resets (observed as WinError 10054).

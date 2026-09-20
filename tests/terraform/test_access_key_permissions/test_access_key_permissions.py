@@ -37,7 +37,7 @@ from fogies.tools.terraform import (
     terraform_tfvars,
 )
 from fogies.typing import boto_client_iam
-from tasks.paths import PATH_STAGING_BINARY_CACHE, PATH_TEST_BACKEND_STATUS
+from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates
 
@@ -177,13 +177,13 @@ def access_key_permissions_output(
             ),
         ) as tfvars_path,
         terraform_output(
-            binary_cache_path=PATH_STAGING_BINARY_CACHE,
+            binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=module_path,
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
             backend=backend,
-            backend_status_path=PATH_TEST_BACKEND_STATUS,
+            backend_status_path=TEST_BACKEND_STATUS_PATH,
             init_on_entry=True,
             init_params=InitParams(upgrade=True, reconfigure=True),
             apply_on_entry=True,
