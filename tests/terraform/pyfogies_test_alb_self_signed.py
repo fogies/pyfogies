@@ -108,6 +108,7 @@ def pyfogies_test_alb_self_signed(
             output_model=_TfAlbSelfSignedOutput,
         ) as tf_output,
     ):
+        assert tf_output is not None
         _wait_for_alb(tf_output.alb.alb_dns_name)
         yield PyfogiesTestAlbOutput(
             alb=tf_output.alb,

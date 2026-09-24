@@ -100,6 +100,7 @@ def alb_dns_output(
             output_model=_AlbDnsOutput,
         ) as output,
     ):
+        assert output is not None
         for hostname in output.hostnames:
             _wait_for_dns(hostname)
             _wait_for_https(hostname)

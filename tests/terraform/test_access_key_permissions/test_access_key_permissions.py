@@ -193,6 +193,7 @@ def access_key_permissions_output(
             output_model=_TestOutput,
         ) as output,
     ):
+        assert output is not None
         yield output
 
 

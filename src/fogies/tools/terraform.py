@@ -11,7 +11,7 @@ from http.client import HTTPResponse
 from typing import NewType, TypeVar, cast
 
 from invoke.runners import Result
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, ValidationError
 
 from fogies.terraform.backend import (
     BackendConfig,
@@ -380,7 +380,7 @@ class _Terraform:
         command_params: CommandParams,
         module_path: pathlib.Path,
         output_model: type[TerraformOutputModel],
-    ) -> TerraformOutputModel:
+    ) -> TerraformOutputModel | None:
         """Run terraform output -json and parse the result into a Pydantic model.
 
         *module_path* is the folder containing the Terraform files (used as
@@ -391,6 +391,13 @@ class _Terraform:
         live echo, since this method exists to parse it into output_model,
         not to display it -- callers that want to show values print
         output_model themselves.
+
+        Returns None if Terraform reports no outputs at all, which is its
+        normal answer before anything is applied and after everything is
+        destroyed, and *output_model* can't be built from nothing. A model
+        that accepts no outputs (e.g. all fields optional) is returned as
+        usual. Outputs that exist but don't match *output_model* raise
+        pydantic's ValidationError.
         """
         command_params = dataclasses.replace(
             command_params.require_cwd(module_path), hide=True
@@ -407,7 +414,12 @@ class _Terraform:
         recovered_values = {
             name: entry.value for name, entry in parsed_terraform_output.root.items()
         }
-        return output_model.model_validate(recovered_values)
+        try:
+            return output_model.model_validate(recovered_values)
+        except ValidationError:
+            if not recovered_values:
+                return None
+            raise
 
 
 @contextmanager
@@ -564,13 +576,14 @@ def terraform_output(
     destroy_on_exit: bool = False,
     destroy_params: DestroyParams | None = None,
     output_model: type[TerraformOutputModel],
-) -> Generator[TerraformOutputModel]:
+) -> Generator[TerraformOutputModel | None]:
     """Run the terraform context manager, call output() internally, and yield the parsed result.
 
     All entry/exit parameters are passed through to terraform(); the caller
     sets *init_on_entry*, *apply_on_entry*, and *destroy_on_exit* as needed.
     Yields the output model; destroy runs on exit when *destroy_on_exit* is true.
     *version* when None uses the bundled default Terraform version.
+    Yields None if Terraform reports no outputs; see output().
 
     *backend_status_path* and *backend* are passed through to terraform();
     see its docstring.

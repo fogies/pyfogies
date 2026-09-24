@@ -102,6 +102,7 @@ def ecs_output(
             output_model=_TestEcsOutput,
         ) as output,
     ):
+        assert output is not None
         _wait_for_ecs(pyfogies_test_alb_self_signed, pem_tmp)
         yield output
 
