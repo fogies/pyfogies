@@ -83,18 +83,19 @@ def _username_from_iam_arn(arn: str) -> str:
     """Return the IAM username from an IAM user's ARN.
 
     IAM users have ARNs of the form
-    arn:aws:iam::<account-id>:user/<path/>username. Raises ValueError for any
-    other ARN shape (e.g. an assumed-role or federated-session identity),
-    since those don't identify a static-credential IAM user.
+    arn:aws:iam::<account-id>:user/<path/>username. The account root user's
+    ARN, arn:aws:iam::<account-id>:root, has no username and maps to "root".
+    Raises ValueError for any other ARN shape (e.g. an assumed-role or
+    federated-session identity), since those don't identify a static-credential
+    IAM user.
     """
     arn_parts = arn.split(":")
-    if (
-        len(arn_parts) != 6
-        or arn_parts[2] != "iam"
-        or not arn_parts[5].startswith("user/")
-    ):
-        raise ValueError("Expected an IAM user ARN, got '{}'".format(arn))
-    return arn_parts[5].rsplit("/", 1)[-1]
+    if len(arn_parts) == 6 and arn_parts[2] == "iam":
+        if arn_parts[5] == "root":
+            return "root"
+        if arn_parts[5].startswith("user/"):
+            return arn_parts[5].rsplit("/", 1)[-1]
+    raise ValueError("Expected an IAM user ARN, got '{}'".format(arn))
 
 
 @contextlib.contextmanager

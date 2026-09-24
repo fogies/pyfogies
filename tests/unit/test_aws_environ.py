@@ -155,6 +155,7 @@ def test_load_aws_profile_from_config_raises_for_missing_file(
     [
         ("arn:aws:iam::123456789012:user/alice", "alice"),
         ("arn:aws:iam::123456789012:user/team/alice", "alice"),
+        ("arn:aws:iam::123456789012:root", "root"),
         ("arn:aws:sts::123456789012:assumed-role/SomeRole/session-name", None),
         ("not-an-arn", None),
     ],
