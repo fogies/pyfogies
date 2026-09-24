@@ -102,7 +102,9 @@ def _print_user_key_overview(
 def get_task_create(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="create")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="create", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_create(context: Context, *, prompt: bool = False, username: str) -> None:
         """
         Create an IAM user and an associated access key.
@@ -126,7 +128,9 @@ def get_task_create(
 def get_task_delete(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="delete")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="delete", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_delete(context: Context, *, prompt: bool = False, username: str) -> None:
         """
         Delete an IAM user with no remaining access keys.
@@ -158,7 +162,9 @@ def get_task_delete(
 def get_task_delete_key(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="delete-key")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="delete-key", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_delete_key(
         context: Context, *, prompt: bool = False, username: str
     ) -> None:
@@ -229,7 +235,9 @@ def get_task_list(
 def get_task_rotate_key(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="rotate-key")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="rotate-key", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_rotate_key(
         context: Context, *, prompt: bool = False, username: str
     ) -> None:
