@@ -13,6 +13,10 @@ terraform {
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = var.tags
+  }
 }
 
 variable "region" {
@@ -59,7 +63,6 @@ module "alb_dns" {
   alb_dns_name       = var.alb_dns_name
   alb_zone_id        = var.alb_zone_id
   listener_https_arn = var.listener_https_arn
-  tags               = var.tags
 }
 
 output "hostname" {

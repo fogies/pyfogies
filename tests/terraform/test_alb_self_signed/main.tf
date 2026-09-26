@@ -17,6 +17,10 @@ terraform {
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = var.tags
+  }
 }
 
 variable "region" {
@@ -50,7 +54,6 @@ module "alb_sg" {
 
   name   = var.alb_name
   vpc_id = var.vpc_id
-  tags   = var.tags
 }
 
 module "alb" {
@@ -61,7 +64,6 @@ module "alb" {
   subnet_ids              = var.subnet_ids
   security_group_ids      = [module.alb_sg.security_group_id]
   self_signed_certificate = true
-  tags                    = var.tags
 }
 
 output "alb_security_group_id" {
