@@ -1,10 +1,17 @@
 """Test Terraform access-key-permissions module.
 
 No mocks: creates a real, disposable IAM user, applies the module against
-it with a few related low-stakes permissions (read-only EC2 "describe"
-calls), and confirms with a real AWS policy evaluation (IAM's own
-SimulatePrincipalPolicy) that the granted permissions are allowed and a
-related but ungranted one is denied.
+it, and confirms with a real AWS policy evaluation (IAM's own
+SimulatePrincipalPolicy) that the granted permissions are allowed and
+ungranted ones are denied. What matters is the resulting authorization
+decision, not how the module wired it up internally.
+
+The module grants permissions via statements (an inline policy), via
+policies (attached managed policies), or both, so each of those is applied
+and checked in turn, reusing one disposable user across all three. The
+statements grant is a few low-stakes read-only EC2 "describe" calls; the
+policies grant is AWS's S3 read-only policy. They cover disjoint services,
+so a decision can only come from the grant that is supposed to provide it.
 
 SimulatePrincipalPolicy, not a live EC2 call, is deliberate: EC2's own
 authorization cache for a newly attached policy was observed (via direct
@@ -24,7 +31,6 @@ import pytest
 from pydantic import BaseModel
 
 import fogies.aws_access_key as aws_access_key
-from fogies.terraform.access_key_permissions import AccessKeyPermissionsOutput
 from fogies.terraform.backend import BackendOutput
 from fogies.tools.aws_environ import AwsEnviron, AwsProfile
 from fogies.tools.command import CommandParams
@@ -32,7 +38,7 @@ from fogies.tools.terraform import (
     ApplyParams,
     DestroyParams,
     InitParams,
-    terraform_output,
+    terraform,
     terraform_tfbackend,
     terraform_tfvars,
 )
@@ -44,26 +50,74 @@ from tests.terraform.backend import PyfogiesTestBackendStates
 # Shared by the access_key_username fixture below and by
 # _delete_stale_access_key_users, which sweeps by this prefix since it
 # can't know a prior run's exact suffix.
-_USERNAME_PREFIX = "pyfogies-test-access-key-permissions-"
+_TEST_USERNAME_PREFIX = "pyfogies-test-access-key-permissions-"
 
-# Mirrors the actions granted in main.tf's access_key_permissions module.
-_GRANTED_ACTIONS = [
+# The statements grant: related read-only actions in a single service.
+_EC2_ACTIONS = [
     "ec2:DescribeAvailabilityZones",
     "ec2:DescribeRegions",
     "ec2:DescribeVpcs",
 ]
 
-# Related to the granted actions (same service), but deliberately not granted.
+# The same service as the statements grant, but deliberately not granted by anything.
 _UNGRANTED_ACTION = "ec2:DescribeInstances"
 
+# The policies grant: AWS's own S3 read-only policy, and an action it allows.
+# A different service from _EC2_ACTIONS, so the two grants stay distinguishable.
+_MANAGED_POLICY_ARN = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+_MANAGED_ACTION = "s3:ListAllMyBuckets"
 
-class _TestVars(BaseModel):
+
+class _Statement(BaseModel):
+    effect: str
+    actions: list[str]
+    resources: list[str]
+
+
+class _Scenario(BaseModel):
+    """One way of granting permissions, and what it should and shouldn't allow."""
+
+    name: str
+    policies: list[str]
+    statements: list[_Statement]
+    allowed: list[str]
+    denied: list[str]
+
+
+_EC2_STATEMENTS = [
+    _Statement(effect="Allow", actions=_EC2_ACTIONS, resources=["*"]),
+]
+
+_SCENARIOS = [
+    _Scenario(
+        name="statements",
+        policies=[],
+        statements=_EC2_STATEMENTS,
+        allowed=_EC2_ACTIONS,
+        denied=[_UNGRANTED_ACTION, _MANAGED_ACTION],
+    ),
+    _Scenario(
+        name="policies",
+        policies=[_MANAGED_POLICY_ARN],
+        statements=[],
+        allowed=[_MANAGED_ACTION],
+        denied=[*_EC2_ACTIONS, _UNGRANTED_ACTION],
+    ),
+    _Scenario(
+        name="both",
+        policies=[_MANAGED_POLICY_ARN],
+        statements=_EC2_STATEMENTS,
+        allowed=[*_EC2_ACTIONS, _MANAGED_ACTION],
+        denied=[_UNGRANTED_ACTION],
+    ),
+]
+
+
+class _TestAccessKeyPermissionsVars(BaseModel):
     region: str
     username: str
-
-
-class _TestOutput(BaseModel):
-    access_key_permissions: AccessKeyPermissionsOutput
+    policies: list[str]
+    statements: list[_Statement]
 
 
 def _delete_user_and_keys(
@@ -99,7 +153,7 @@ def _delete_stale_access_key_users(
     prior run's leftover -- sweep by the shared prefix instead.
     """
     for user in aws_access_key.list_users():
-        if user.username.startswith(_USERNAME_PREFIX):
+        if user.username.startswith(_TEST_USERNAME_PREFIX):
             _delete_user_and_keys(
                 username=user.username,
                 protected_key_id=protected_key_id,
@@ -117,7 +171,7 @@ def access_key_username() -> str:
     runs) can leave a stale "no policy" result that blocks a fresh grant
     for an unpredictably long time.
     """
-    return _USERNAME_PREFIX + uuid.uuid4().hex[:8]
+    return _TEST_USERNAME_PREFIX + uuid.uuid4().hex[:8]
 
 
 @pytest.fixture(scope="module")
@@ -145,19 +199,24 @@ def access_key_user(
         )
 
 
-@pytest.fixture(scope="module")
-def access_key_permissions_output(
+@pytest.mark.parametrize("scenario", _SCENARIOS, ids=[s.name for s in _SCENARIOS])
+def test_access_key_permissions_grants_and_restricts(
     pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
     access_key_username: str,
     access_key_user: AwsProfile,
-    tmp_path_factory: pytest.TempPathFactory,
-) -> Iterator[_TestOutput]:
-    """Apply the access-key-permissions module for access_key_user; yield output; destroy on teardown."""
-    _ = access_key_user  # dependency only: must exist first, and outlive this fixture.
+    scenario: _Scenario,
+    tmp_path: pathlib.Path,
+) -> None:
+    """Every action the scenario grants is allowed; every other one is not.
+
+    One IAM user for the whole module, reused across scenarios; each
+    scenario applies the module against it, checks the result, then
+    destroys before the next one applies.
+    """
+    _ = access_key_user  # dependency only: must exist first, and outlive this test.
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent
-    tmp_path = tmp_path_factory.mktemp("test-access-key-permissions")
     tfbackend_path = tmp_path / "test-access-key-permissions.tfbackend"
     tfvars_path = tmp_path / "test-access-key-permissions.tfvars.json"
 
@@ -172,11 +231,14 @@ def access_key_permissions_output(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_TestVars(
-                region=pyfogies_test_config.aws.region, username=access_key_username
+            variables=_TestAccessKeyPermissionsVars(
+                region=pyfogies_test_config.aws.region,
+                username=access_key_username,
+                policies=scenario.policies,
+                statements=scenario.statements,
             ),
         ) as tfvars_path,
-        terraform_output(
+        terraform(
             binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=module_path,
@@ -190,49 +252,18 @@ def access_key_permissions_output(
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
-            output_model=_TestOutput,
-        ) as output,
+        ),
     ):
-        assert output is not None
-        yield output
+        iam = boto_client_iam()
+        user_arn = iam.get_user(UserName=access_key_username)["User"]["Arn"]
 
+        results = iam.simulate_principal_policy(
+            PolicySourceArn=user_arn,
+            ActionNames=[*scenario.allowed, *scenario.denied],
+        )["EvaluationResults"]
+        decisions = {r["EvalActionName"]: r["EvalDecision"] for r in results}
 
-def test_access_key_permissions_output(
-    access_key_username: str,
-    access_key_permissions_output: _TestOutput,
-) -> None:
-    """Applying the module outputs the granted user's name and policy."""
-    output = access_key_permissions_output.access_key_permissions
-    assert output.username == access_key_username
-    policy = output.policy
-    assert len(policy.statements) == 1
-    statement = policy.statements[0]
-    assert statement.effect == "Allow"
-    assert statement.resources == ["*"]
-    # aws_iam_policy_document does not preserve declaration order for actions.
-    assert set(statement.actions) == set(_GRANTED_ACTIONS)
-
-
-def test_access_key_permissions_grants_and_restricts(
-    access_key_username: str,
-    access_key_permissions_output: _TestOutput,
-) -> None:
-    """Every granted permission is allowed; a related but ungranted one is denied.
-
-    access_key_user isn't referenced directly here (SimulatePrincipalPolicy
-    only needs the username), but access_key_permissions_output already
-    depends on it, so it exists and outlives this test regardless.
-    """
-    _ = access_key_permissions_output
-    iam = boto_client_iam()
-    user_arn = iam.get_user(UserName=access_key_username)["User"]["Arn"]
-
-    results = iam.simulate_principal_policy(
-        PolicySourceArn=user_arn,
-        ActionNames=[*_GRANTED_ACTIONS, _UNGRANTED_ACTION],
-    )["EvaluationResults"]
-    decisions = {r["EvalActionName"]: r["EvalDecision"] for r in results}
-
-    for action in _GRANTED_ACTIONS:
-        assert decisions[action] == "allowed", action
-    assert decisions[_UNGRANTED_ACTION] != "allowed"
+        for action in scenario.allowed:
+            assert decisions[action] == "allowed", action
+        for action in scenario.denied:
+            assert decisions[action] != "allowed", action

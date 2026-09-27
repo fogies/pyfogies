@@ -25,25 +25,26 @@ variable "username" {
   type        = string
 }
 
+variable "policies" {
+  description = "Managed policy ARNs to attach."
+  type        = list(string)
+  default     = []
+}
+
+variable "statements" {
+  description = "Inline policy statements to grant."
+  type = list(object({
+    effect    = string
+    actions   = list(string)
+    resources = list(string)
+  }))
+  default = []
+}
+
 module "access_key_permissions" {
   source = "../../../terraform/access_key_permissions"
 
-  username = var.username
-  name     = "test"
-  statements = [
-    {
-      effect = "Allow"
-      actions = [
-        "ec2:DescribeAvailabilityZones",
-        "ec2:DescribeRegions",
-        "ec2:DescribeVpcs",
-      ]
-      resources = ["*"]
-    }
-  ]
-}
-
-output "access_key_permissions" {
-  description = "Entire access-key-permissions module output."
-  value       = module.access_key_permissions
+  username   = var.username
+  policies   = var.policies
+  statements = var.statements
 }
