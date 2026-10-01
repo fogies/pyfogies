@@ -35,6 +35,22 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0-dev.9] (2026-10-01)
+
+### Added
+- Added `version_format` to `pyfogies_version`. ([#9](https://github.com/fogies/pyfogies/pull/9))
+
+### Changed
+- Refactored `access-key` task parameters to be explicit. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Refactored for consistent `_path` suffix. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Refactored `Terraform.output` to allow `None`. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Refactored Terraform `access_key_permissions` module. ([#9](https://github.com/fogies/pyfogies/pull/9))
+
+### Fixed
+- Fixed support for AWS root credentials. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Fixed deprecation in Terraform `ecr` module. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Fixed missing `tags` in Terraform `alb` module. ([#9](https://github.com/fogies/pyfogies/pull/9))
+
 ## [0.0.0-dev.8] (2026-09-18)
 
 ### Added
