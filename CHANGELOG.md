@@ -44,12 +44,12 @@ Will not document changes to agent configuration used in development.
 - Refactored `access-key` task parameters to be explicit. ([#9](https://github.com/fogies/pyfogies/pull/9))
 - Refactored for consistent `_path` suffix. ([#9](https://github.com/fogies/pyfogies/pull/9))
 - Refactored `Terraform.output` to allow `None`. ([#9](https://github.com/fogies/pyfogies/pull/9))
-- Refactored Terraform `access_key_permissions` module. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Refactored Terraform module for `access_key_permissions`. ([#9](https://github.com/fogies/pyfogies/pull/9))
 
 ### Fixed
 - Fixed support for AWS root credentials. ([#9](https://github.com/fogies/pyfogies/pull/9))
-- Fixed deprecation in Terraform `ecr` module. ([#9](https://github.com/fogies/pyfogies/pull/9))
-- Fixed missing `tags` in Terraform `alb` module. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Fixed deprecation in Terraform module for `ecr`. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Fixed missing `tags` in Terraform module for `alb`. ([#9](https://github.com/fogies/pyfogies/pull/9))
 
 ## [0.0.0-dev.8] (2026-09-18)
 
@@ -104,7 +104,7 @@ Will not document changes to agent configuration used in development.
 - Improved tool for `command`. ([#5](https://github.com/fogies/pyfogies/pull/5))
 
 ### Tests
-- Refactored tests ([#5](https://github.com/fogies/pyfogies/pull/5)).
+- Refactored tests. ([#5](https://github.com/fogies/pyfogies/pull/5))
 - Extended testing for Terraform modules. ([#5](https://github.com/fogies/pyfogies/pull/5))
 
 ## [0.0.0-dev.4] (2026-04-14)
@@ -121,11 +121,11 @@ Will not document changes to agent configuration used in development.
 
 ### Added
 - Added tools for `aws_environ`, `command`, `environ`, `ollama`, `terraform`. ([#2](https://github.com/fogies/pyfogies/pull/2))
-- Added Terraform module for `backend`. ([#2](https://github.com/fogies/pyfogies/pull/2)).
+- Added Terraform module for `backend`. ([#2](https://github.com/fogies/pyfogies/pull/2))
 
 ### Tests
 - Added testing for Terraform modules. ([#2](https://github.com/fogies/pyfogies/pull/2))
-- Extended testing of tools. ([#2](https://github.com/fogies/pyfogies/pull/2)).
+- Extended testing of tools. ([#2](https://github.com/fogies/pyfogies/pull/2))
 
 ## [0.0.0-dev.1] (2025-12-23)
 
