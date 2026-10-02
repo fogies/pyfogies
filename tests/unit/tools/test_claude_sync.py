@@ -3,7 +3,7 @@
 import subprocess
 
 from fogies.tools.claude_sync import claude_sync
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 
 def test_claude_sync_is_available() -> None:
@@ -15,7 +15,7 @@ def test_claude_sync_is_available() -> None:
     controlled fixture.
     """
     with claude_sync(
-        binary_cache_path=PATH_STAGING_BINARY_CACHE, raise_if_env_exists=False
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
     ) as cs:
         # Verify the executable exists.
         assert cs.binary_path.exists()

@@ -11,6 +11,10 @@ terraform {
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = var.tags
+  }
 }
 
 variable "name" {
@@ -41,7 +45,6 @@ module "backend" {
   name   = var.name
   region = var.region
   states = var.states
-  tags   = var.tags
 }
 
 output "backend" {

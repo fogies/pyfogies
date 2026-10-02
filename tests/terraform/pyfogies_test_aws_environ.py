@@ -5,7 +5,7 @@ from collections.abc import Iterator
 import pytest
 
 from fogies.tools.aws_environ import AwsEnviron, aws_environ_from_config
-from tasks.paths import PATH_SECRETS_AWS
+from tasks.paths import SECRETS_AWS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 
 
@@ -15,7 +15,7 @@ def pyfogies_test_aws_environ(
 ) -> Iterator[AwsEnviron]:
     """Set AWS credentials from the configured profile; yield the active environment."""
     with aws_environ_from_config(
-        config_path=PATH_SECRETS_AWS,
+        config_path=SECRETS_AWS_PATH,
         profile_name=pyfogies_test_config.aws.profile,
         raise_if_env_exists=False,
     ) as aws_env:

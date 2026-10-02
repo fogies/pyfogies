@@ -3,6 +3,7 @@
 import pathlib
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from typing import Literal, overload
 
 from fogies.terraform.backend import (
     BackendOutput,
@@ -17,6 +18,50 @@ from fogies.tools.terraform import (
     TerraformOutputModel,
     terraform,
 )
+
+
+@overload
+@contextmanager
+def terraform_backend(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend_status_path: pathlib.Path,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: Literal[True],
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
+) -> Generator[TerraformOutputModel]: ...
+
+
+@overload
+@contextmanager
+def terraform_backend(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend_status_path: pathlib.Path,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: bool = False,
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
+) -> Generator[TerraformOutputModel | None]: ...
 
 
 @contextmanager
@@ -37,13 +82,18 @@ def terraform_backend(
     destroy_params: DestroyParams | None = None,
     output_model: type[TerraformOutputModel],
     output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
-) -> Generator[TerraformOutputModel]:
+) -> Generator[TerraformOutputModel | None]:
     """Apply and/or destroy a Terraform backend module, with state tracking.
 
     Mirrors terraform_output(), adding backend status tracking and safe
     state-object deletion before destroy. backend_status_path is updated
     after apply (applied=True) and after destroy (applied=False).
     output_model_get_backend extracts BackendOutput from the output model.
+
+    Yields None only when apply_on_entry is False and the module has no
+    outputs, i.e. nothing is applied. Destroy still runs then. Never None
+    when apply_on_entry is true, as the Literal[True] overload above tells
+    callers; the assert below is what actually enforces that at runtime.
     """
     with terraform(
         version=version,
@@ -59,16 +109,15 @@ def terraform_backend(
         destroy_on_exit=False,  # Intentionally false, destroy handled in finally block.
     ) as tf:
         output: TerraformOutputModel | None = None
-        output_succeeded = False
         try:
             output = tf.output(
                 command_params=command_params,
                 module_path=module_path,
                 output_model=output_model,
             )
-            output_succeeded = True
 
             if apply_on_entry:
+                assert output is not None
                 backend_status = BackendStatus.load(path=backend_status_path)
                 backend_status.backend.applied = True
                 backend_status.save(path=backend_status_path)
@@ -76,11 +125,10 @@ def terraform_backend(
             yield output
         finally:
             # Destroy handled in three steps. State object deletion is skipped
-            # if output() failed (bucket name unknown); destroy still runs.
+            # if there's no output (output() failed or nothing is applied, so
+            # the bucket name is unknown); destroy still runs.
             if destroy_on_exit:
-                if output_succeeded:
-                    # Known from output_succeeded = True.
-                    assert output is not None
+                if output is not None:
                     # Raises if any state still has resources,
                     # so nothing is deleted unless all states are empty.
                     backend_delete_state_objects(

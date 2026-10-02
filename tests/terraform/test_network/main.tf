@@ -13,6 +13,10 @@ terraform {
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = var.tags
+  }
 }
 
 variable "region" {
@@ -31,7 +35,6 @@ module "network" {
 
   region                  = var.region
   availability_zone_count = 2
-  tags                    = var.tags
 }
 
 output "network" {

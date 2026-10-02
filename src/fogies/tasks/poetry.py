@@ -32,17 +32,17 @@ def get_task_build() -> Task[Callable[[Context], None]]:
     return cast(Task[Callable[[Context], None]], task_build)
 
 
-def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], None]]:
+def get_task_publish(*, secrets_poetry_path: Path) -> Task[Callable[[Context], None]]:
     @task(name="publish")  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_publish(context: Context) -> None:
         """
         Publish package to PyPI.
         """
         ensure_from_template(
-            path=path_secrets_poetry, template_factory=poetry_toml_template_factory
+            path=secrets_poetry_path, template_factory=poetry_toml_template_factory
         )
 
-        with path_secrets_poetry.open("rb") as handle:
+        with secrets_poetry_path.open("rb") as handle:
             secrets_poetry = tomllib.load(handle)
 
         api_key: str = cast(str, secrets_poetry["pypi"]["api_key"])
@@ -62,14 +62,14 @@ def get_task_publish(*, path_secrets_poetry: Path) -> Task[Callable[[Context], N
     return cast(Task[Callable[[Context], None]], task_publish)
 
 
-def get_collection(*, path_secrets_poetry: Path) -> Collection:
+def get_collection(*, secrets_poetry_path: Path) -> Collection:
     """
     Get a collection of tasks.
     """
     namespace = Collection("poetry")
 
     task_build = get_task_build()
-    task_publish = get_task_publish(path_secrets_poetry=path_secrets_poetry)
+    task_publish = get_task_publish(secrets_poetry_path=secrets_poetry_path)
 
     namespace.add_task(task_build)
     namespace.add_task(task_publish)

@@ -31,6 +31,8 @@ resource "aws_acm_certificate" "self_signed" {
   count            = var.self_signed_certificate ? 1 : 0
   private_key      = tls_private_key.key[0].private_key_pem
   certificate_body = tls_self_signed_cert.cert[0].cert_pem
+
+  tags = var.tags
 }
 
 locals {

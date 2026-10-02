@@ -7,11 +7,11 @@ import pytest
 from pydantic import BaseModel
 
 from fogies.templates import ensure_from_template
-from tasks.paths import PATH_SECRETS_PYFOGIES_TESTS, PATH_TEMPLATE_PYFOGIES_TESTS
+from tasks.paths import SECRETS_PYFOGIES_TESTS_PATH, TEMPLATE_PYFOGIES_TESTS_PATH
 
 
 def _pyfogies_tests_toml_template_factory() -> str:
-    return PATH_TEMPLATE_PYFOGIES_TESTS.read_text(encoding="utf-8")
+    return TEMPLATE_PYFOGIES_TESTS_PATH.read_text(encoding="utf-8")
 
 
 class _AwsConfig(BaseModel):
@@ -46,4 +46,4 @@ class PyfogiesTestsConfig(BaseModel):
 @pytest.fixture(scope="session")
 def pyfogies_test_config() -> PyfogiesTestsConfig:
     """Load and return pyfogies test configuration from pyfogies-tests.toml."""
-    return PyfogiesTestsConfig.load(path=PATH_SECRETS_PYFOGIES_TESTS)
+    return PyfogiesTestsConfig.load(path=SECRETS_PYFOGIES_TESTS_PATH)

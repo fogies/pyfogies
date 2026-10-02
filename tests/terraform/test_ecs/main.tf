@@ -13,6 +13,10 @@ terraform {
 
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = var.tags
+  }
 }
 
 variable "region" {
@@ -57,7 +61,6 @@ module "ecs_sg" {
   name                  = var.name
   vpc_id                = var.vpc_id
   alb_security_group_id = var.alb_security_group_id
-  tags                  = var.tags
 }
 
 module "cloudwatch" {
@@ -65,7 +68,6 @@ module "cloudwatch" {
 
   name              = "/ecs/${var.name}"
   retention_in_days = 7
-  tags              = var.tags
 }
 
 module "ecs" {
@@ -86,7 +88,6 @@ module "ecs" {
   desired_count          = 1
   deregistration_delay   = 15 # Low for fast teardown; production default is 300s.
   stop_timeout           = 5  # Low for fast teardown; production default is 30s.
-  tags                   = var.tags
 }
 
 output "cloudwatch" {

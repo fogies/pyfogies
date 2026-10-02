@@ -18,7 +18,7 @@ from fogies.tools.terraform import (
     terraform_tfbackend,
     terraform_tfvars,
 )
-from tasks.paths import PATH_STAGING_BINARY_CACHE
+from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 
 class _ToolVars(BaseModel):
@@ -190,7 +190,7 @@ def test_terraform_init_apply_output_destroy(tmp_path: pathlib.Path) -> None:
                 test_content=expected_file_content,
             ),
         ) as tfvars_path,
-        terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf,
+        terraform(binary_cache_path=STAGING_BINARY_CACHE_PATH) as tf,
     ):
         init_result = tf.init(
             command_params=command_params,
@@ -237,7 +237,7 @@ def test_terraform_apply_resolves_relative_tfvars_path(
     was when tfvars_path was written; a relative path must still resolve
     against that original cwd, not against module_path.
     """
-    binary_cache_path = PATH_STAGING_BINARY_CACHE.resolve()
+    binary_cache_path = STAGING_BINARY_CACHE_PATH.resolve()
     module_path = pathlib.Path(__file__).parent / "valid"
 
     work_dir = tmp_path / "work"
@@ -308,7 +308,7 @@ def test_terraform_entry_exit(tmp_path: pathlib.Path) -> None:
             ),
         ) as tfvars_path,
         terraform(
-            binary_cache_path=PATH_STAGING_BINARY_CACHE,
+            binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=module_path,
             tfvars_path=tfvars_path,
@@ -354,7 +354,7 @@ def test_terraform_output(tmp_path: pathlib.Path) -> None:
             ),
         ) as tfvars_path,
         terraform_output(
-            binary_cache_path=PATH_STAGING_BINARY_CACHE,
+            binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=module_path,
             tfvars_path=tfvars_path,
@@ -393,7 +393,7 @@ def test_terraform_apply_partial_failure_still_destroys(tmp_path: pathlib.Path) 
         # local_file resource behind when the unrelated null_resource fails --
         # otherwise the assertions below would pass vacuously even without the
         # fix, since there would be nothing to clean up in the first place.
-        with terraform(binary_cache_path=PATH_STAGING_BINARY_CACHE) as tf:
+        with terraform(binary_cache_path=STAGING_BINARY_CACHE_PATH) as tf:
             _ = tf.init(
                 command_params=command_params,
                 module_path=module_path,
@@ -425,7 +425,7 @@ def test_terraform_apply_partial_failure_still_destroys(tmp_path: pathlib.Path) 
         # terraform()'s apply/finally ordering was fixed for.
         with pytest.raises(UnexpectedExit):
             with terraform(
-                binary_cache_path=PATH_STAGING_BINARY_CACHE,
+                binary_cache_path=STAGING_BINARY_CACHE_PATH,
                 command_params=command_params,
                 module_path=module_path,
                 tfvars_path=tfvars_path,
@@ -459,7 +459,7 @@ def test_terraform_output_invalid_module_raises(tmp_path: pathlib.Path) -> None:
     ) as tfvars_path:
         with pytest.raises(UnexpectedExit):
             with terraform_output(
-                binary_cache_path=PATH_STAGING_BINARY_CACHE,
+                binary_cache_path=STAGING_BINARY_CACHE_PATH,
                 command_params=command_params,
                 module_path=module_path,
                 tfvars_path=tfvars_path,

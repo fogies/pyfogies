@@ -13,11 +13,11 @@ from invoke.tasks import Task, task
 
 import fogies.aws_access_key as aws_access_key
 from fogies.tools.aws_environ import (
+    AwsEnviron,
     AwsEnvironFactory,
     AwsProfile,
     aws_environ_from_profile,
 )
-from fogies.typing import boto_client_sts
 
 
 def _prompt_admin_credentials() -> tuple[str, str]:
@@ -30,16 +30,17 @@ def _prompt_admin_credentials() -> tuple[str, str]:
 @contextlib.contextmanager
 def _resolve_admin_environ(
     *, aws_environ_factory: AwsEnvironFactory | None, prompt: bool
-) -> Generator[str]:
+) -> Generator[AwsEnviron]:
     """Enter the configured AWS environment, or prompt for admin credentials.
 
     Prompts if aws_environ_factory is None, or if prompt is True (e.g. to use
     different/elevated credentials for a single run). Prompted credentials
-    are never written anywhere. Yields the active access key ID.
+    are never written anywhere. Yields the active environment, which
+    identifies the caller's username and access key ID.
     """
     if aws_environ_factory is not None and not prompt:
         with aws_environ_factory() as env:
-            yield env.aws_access_key_id
+            yield env
         return
 
     access_key_id, secret_access_key = _prompt_admin_credentials()
@@ -58,14 +59,7 @@ def _resolve_admin_environ(
             )
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
-        yield env.aws_access_key_id
-
-
-def _caller_username() -> str:
-    """Return the IAM username that owns the active credentials, via STS."""
-    arn = boto_client_sts().get_caller_identity()["Arn"]
-    # ARN format for IAM users: arn:aws:iam::123456789012:user/username
-    return arn.split("/")[-1]
+        yield env
 
 
 def _print_toml_block(*, profile: AwsProfile) -> None:
@@ -102,7 +96,9 @@ def _print_user_key_overview(
 def get_task_create(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="create")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="create", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_create(context: Context, *, prompt: bool = False, username: str) -> None:
         """
         Create an IAM user and an associated access key.
@@ -126,7 +122,9 @@ def get_task_create(
 def get_task_delete(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="delete")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="delete", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_delete(context: Context, *, prompt: bool = False, username: str) -> None:
         """
         Delete an IAM user with no remaining access keys.
@@ -138,8 +136,7 @@ def get_task_delete(
         _ = context
         with _resolve_admin_environ(
             aws_environ_factory=aws_environ_factory, prompt=prompt
-        ):
-            protected_username = _caller_username()
+        ) as admin:
             confirm = (
                 input("Delete IAM user '{}'? [y/N] ".format(username)).strip().lower()
             )
@@ -148,7 +145,7 @@ def get_task_delete(
                 return
             aws_access_key.delete_user(
                 username=username,
-                protected_usernames={protected_username},
+                protected_usernames={admin.username},
             )
         print("Deleted IAM user '{}'.".format(username))
 
@@ -158,7 +155,9 @@ def get_task_delete(
 def get_task_delete_key(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="delete-key")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="delete-key", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_delete_key(
         context: Context, *, prompt: bool = False, username: str
     ) -> None:
@@ -172,7 +171,7 @@ def get_task_delete_key(
         _ = context
         with _resolve_admin_environ(
             aws_environ_factory=aws_environ_factory, prompt=prompt
-        ) as admin_key_id:
+        ) as admin:
             keys = aws_access_key.get_keys(username=username)
             target = keys.previous or keys.current
             if target is None:
@@ -192,7 +191,7 @@ def get_task_delete_key(
             aws_access_key.delete_key(
                 username=username,
                 key_id=key_id,
-                protected_key_ids={admin_key_id},
+                protected_key_ids={admin.aws_access_key_id},
             )
         print("Deleted key {}.".format(key_id))
 
@@ -229,7 +228,9 @@ def get_task_list(
 def get_task_rotate_key(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="rotate-key")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="rotate-key", positional=[]
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_rotate_key(
         context: Context, *, prompt: bool = False, username: str
     ) -> None:
@@ -243,7 +244,7 @@ def get_task_rotate_key(
         _ = context
         with _resolve_admin_environ(
             aws_environ_factory=aws_environ_factory, prompt=prompt
-        ) as admin_key_id:
+        ) as admin:
             keys = aws_access_key.get_keys(username=username)
             if keys.previous is not None:
                 _print_user_key_overview(username=username, keys=keys)
@@ -258,7 +259,7 @@ def get_task_rotate_key(
                     return
             new_profile = aws_access_key.rotate_key(
                 username=username,
-                protected_key_ids={admin_key_id},
+                protected_key_ids={admin.aws_access_key_id},
             )
         print("Created access key {}.".format(new_profile.aws_access_key_id))
         _print_toml_block(profile=new_profile)

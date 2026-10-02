@@ -1,9 +1,9 @@
 """Shared constants for backend in Terraform tests."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class PyfogiesTestBackendStates(str, Enum):
+class PyfogiesTestBackendStates(StrEnum):
     TEST_ACCESS_KEY_PERMISSIONS = "test-access-key-permissions"
     TEST_ALB_DNS = "test-alb-dns"
     TEST_ALB_SELF_SIGNED = "test-alb-self-signed"

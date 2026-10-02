@@ -8,10 +8,10 @@ import zipfile
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from http.client import HTTPResponse
-from typing import NewType, TypeVar, cast
+from typing import Literal, NewType, TypeVar, cast, overload
 
 from invoke.runners import Result
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, ValidationError
 
 from fogies.terraform.backend import (
     BackendConfig,
@@ -196,10 +196,10 @@ def terraform_templated(
     _TEMPLATED_PLACEHOLDERS is empty.
     """
     rendered: dict[pathlib.Path, list[str]] = {}
-    for path_current in module_path.rglob("*.tf"):
-        if ".terraform" in path_current.relative_to(module_path).parts:
+    for current_path in module_path.rglob("*.tf"):
+        if ".terraform" in current_path.relative_to(module_path).parts:
             continue
-        content = path_current.read_text(encoding="utf-8")
+        content = current_path.read_text(encoding="utf-8")
         placeholders_found = [
             placeholder
             for placeholder in _TEMPLATED_PLACEHOLDERS
@@ -214,10 +214,10 @@ def terraform_templated(
                 placeholder, _TEMPLATED_PLACEHOLDERS[placeholder]
             )
 
-        templated_path = path_current.with_name(path_current.name + ".templated")
-        _ = path_current.rename(templated_path)
-        _ = path_current.write_text(rendered_content, encoding="utf-8")
-        rendered[path_current] = placeholders_found
+        templated_path = current_path.with_name(current_path.name + ".templated")
+        _ = current_path.rename(templated_path)
+        _ = current_path.write_text(rendered_content, encoding="utf-8")
+        rendered[current_path] = placeholders_found
 
     try:
         yield rendered
@@ -380,7 +380,7 @@ class _Terraform:
         command_params: CommandParams,
         module_path: pathlib.Path,
         output_model: type[TerraformOutputModel],
-    ) -> TerraformOutputModel:
+    ) -> TerraformOutputModel | None:
         """Run terraform output -json and parse the result into a Pydantic model.
 
         *module_path* is the folder containing the Terraform files (used as
@@ -391,6 +391,13 @@ class _Terraform:
         live echo, since this method exists to parse it into output_model,
         not to display it -- callers that want to show values print
         output_model themselves.
+
+        Returns None if Terraform reports no outputs at all, which is its
+        normal answer before anything is applied and after everything is
+        destroyed, and *output_model* can't be built from nothing. A model
+        that accepts no outputs (e.g. all fields optional) is returned as
+        usual. Outputs that exist but don't match *output_model* raise
+        pydantic's ValidationError.
         """
         command_params = dataclasses.replace(
             command_params.require_cwd(module_path), hide=True
@@ -407,7 +414,12 @@ class _Terraform:
         recovered_values = {
             name: entry.value for name, entry in parsed_terraform_output.root.items()
         }
-        return output_model.model_validate(recovered_values)
+        try:
+            return output_model.model_validate(recovered_values)
+        except ValidationError:
+            if not recovered_values:
+                return None
+            raise
 
 
 @contextmanager
@@ -546,6 +558,29 @@ def terraform(
                 backend_status.save(path=backend_status_path)
 
 
+@overload
+@contextmanager
+def terraform_output(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend: BackendConfig | None = None,
+    backend_status_path: pathlib.Path | None = None,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: Literal[True],
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+) -> Generator[TerraformOutputModel]: ...
+
+
+@overload
 @contextmanager
 def terraform_output(
     *,
@@ -564,13 +599,39 @@ def terraform_output(
     destroy_on_exit: bool = False,
     destroy_params: DestroyParams | None = None,
     output_model: type[TerraformOutputModel],
-) -> Generator[TerraformOutputModel]:
+) -> Generator[TerraformOutputModel | None]: ...
+
+
+@contextmanager
+def terraform_output(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend: BackendConfig | None = None,
+    backend_status_path: pathlib.Path | None = None,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: bool = False,
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+) -> Generator[TerraformOutputModel | None]:
     """Run the terraform context manager, call output() internally, and yield the parsed result.
 
     All entry/exit parameters are passed through to terraform(); the caller
     sets *init_on_entry*, *apply_on_entry*, and *destroy_on_exit* as needed.
     Yields the output model; destroy runs on exit when *destroy_on_exit* is true.
     *version* when None uses the bundled default Terraform version.
+    Yields None if Terraform reports no outputs; see output(). When
+    *apply_on_entry* is true, that's never possible -- a successful apply is
+    assumed to always produce the requested output -- so this never yields
+    None then, as the Literal[True] overload above tells callers; the assert
+    below is what actually enforces that assumption at runtime.
 
     *backend_status_path* and *backend* are passed through to terraform();
     see its docstring.
@@ -591,8 +652,11 @@ def terraform_output(
         destroy_on_exit=destroy_on_exit,
         destroy_params=destroy_params,
     ) as tf:
-        yield tf.output(
+        output = tf.output(
             command_params=command_params,
             module_path=module_path,
             output_model=output_model,
         )
+        if apply_on_entry:
+            assert output is not None
+        yield output
