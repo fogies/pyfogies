@@ -116,7 +116,7 @@ def terraform_tfbackend(
     The file is written as flat key/value entries, one per line, e.g.:
 
     region = "us-west-2"
-    bucket = "pyfogies-test-backend-bucket"
+    bucket = "pyfogies-test-backend-session-bucket-us-west-2"
     key = "test-state-a/terraform.tfstate"
     use_lockfile = true
     """

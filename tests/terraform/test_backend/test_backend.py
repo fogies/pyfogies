@@ -36,9 +36,9 @@ class _TestStateOutput(BaseModel):
     test_value: str
 
 
-_TEST_BACKEND_NESTED_NAME = "test-backend-nested"
+_TEST_BACKEND_NESTED_NAME = "pyfogies-test-backend-nested"
 _TEST_BACKEND_NESTED_STATES = ["test-state-a", "test-state-b"]
-_TEST_BACKEND_NESTED_TAGS = {"Project": "test-backend-nested"}
+_TEST_BACKEND_NESTED_TAGS = {"Project": "pyfogies-test-backend-nested"}
 
 
 @pytest.fixture(scope="module")

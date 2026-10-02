@@ -28,9 +28,9 @@ from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates
 
-_TEST_ALB_NAME_SELF_SIGNED = "pyfogies-test-alb-self-signed"
-_TEST_ALB_TAGS_SELF_SIGNED = {"Project": "pyfogies-test-alb-self-signed"}
-_TEST_ALB_MODULE = pathlib.Path(__file__).parent / "test_alb_self_signed"
+_TEST_ALB_SELF_SIGNED_NAME = "pyfogies-test-alb-self-signed"
+_TEST_ALB_SELF_SIGNED_TAGS = {"Project": "pyfogies-test-alb-self-signed"}
+_TEST_ALB_SELF_SIGNED_MODULE = pathlib.Path(__file__).parent / "test_alb_self_signed"
 
 
 class PyfogiesTestAlbOutput(BaseModel):
@@ -70,7 +70,7 @@ def pyfogies_test_alb_self_signed(
 ) -> Iterator[PyfogiesTestAlbOutput]:
     """Session-scoped self-signed ALB. Shared by ALB tests and other test modules."""
     command_params = CommandParams(in_stream=False)
-    module_path = _TEST_ALB_MODULE
+    module_path = _TEST_ALB_SELF_SIGNED_MODULE
     tmp_path = tmp_path_factory.mktemp("pyfogies-test-alb-self-signed")
     tfbackend_path = tmp_path / "pyfogies-test-alb-self-signed.tfbackend"
     tfvars_path = tmp_path / "pyfogies-test-alb-self-signed.tfvars.json"
@@ -85,10 +85,10 @@ def pyfogies_test_alb_self_signed(
             path=tfvars_path,
             variables=_AlbSelfSignedVars(
                 region=pyfogies_test_config.aws.region,
-                alb_name=_TEST_ALB_NAME_SELF_SIGNED,
+                alb_name=_TEST_ALB_SELF_SIGNED_NAME,
                 vpc_id=pyfogies_test_network.vpc_id,
                 subnet_ids=list(pyfogies_test_network.subnet_ids),
-                tags=_TEST_ALB_TAGS_SELF_SIGNED,
+                tags=_TEST_ALB_SELF_SIGNED_TAGS,
             ),
         ) as tfvars_path,
         terraform_output(

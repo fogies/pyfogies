@@ -1,10 +1,10 @@
-# pyfogies test configuration
+# pyfogies tests configuration
 #
 # Copy this file to secrets/pyfogies-tests.toml.
 
 [aws]
 # AWS profile name to use for tests, as defined in secrets/aws.toml.
-profile = "pyfogies-test"
+profile = "pyfogies-tests"
 # AWS region in which to create test resources.
 region = "us-west-2"
 

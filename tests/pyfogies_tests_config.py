@@ -45,5 +45,5 @@ class PyfogiesTestsConfig(BaseModel):
 
 @pytest.fixture(scope="session")
 def pyfogies_test_config() -> PyfogiesTestsConfig:
-    """Load and return pyfogies test configuration from pyfogies-tests.toml."""
+    """Load and return pyfogies tests configuration from pyfogies-tests.toml."""
     return PyfogiesTestsConfig.load(path=SECRETS_PYFOGIES_TESTS_PATH)
