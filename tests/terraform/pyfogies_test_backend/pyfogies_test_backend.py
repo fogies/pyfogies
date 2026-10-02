@@ -70,7 +70,6 @@ def pyfogies_test_backend(
             output_model_get_backend=lambda o: o.backend,
         ) as output,
     ):
-        assert output is not None
         yield output.backend
 
     # Everything is destroyed, so the status file has nothing to report.

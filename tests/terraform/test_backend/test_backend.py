@@ -94,7 +94,6 @@ def nested_backend_output(
             output_model_get_backend=lambda o: o.backend,
         ) as output,
     ):
-        assert output is not None
         yield output.backend
 
 

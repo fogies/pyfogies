@@ -8,7 +8,7 @@ import zipfile
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from http.client import HTTPResponse
-from typing import NewType, TypeVar, cast
+from typing import Literal, NewType, TypeVar, cast, overload
 
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel, ValidationError
@@ -558,6 +558,50 @@ def terraform(
                 backend_status.save(path=backend_status_path)
 
 
+@overload
+@contextmanager
+def terraform_output(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend: BackendConfig | None = None,
+    backend_status_path: pathlib.Path | None = None,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: Literal[True],
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+) -> Generator[TerraformOutputModel]: ...
+
+
+@overload
+@contextmanager
+def terraform_output(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend: BackendConfig | None = None,
+    backend_status_path: pathlib.Path | None = None,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: bool = False,
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+) -> Generator[TerraformOutputModel | None]: ...
+
+
 @contextmanager
 def terraform_output(
     *,
@@ -583,7 +627,11 @@ def terraform_output(
     sets *init_on_entry*, *apply_on_entry*, and *destroy_on_exit* as needed.
     Yields the output model; destroy runs on exit when *destroy_on_exit* is true.
     *version* when None uses the bundled default Terraform version.
-    Yields None if Terraform reports no outputs; see output().
+    Yields None if Terraform reports no outputs; see output(). When
+    *apply_on_entry* is true, that's never possible -- a successful apply is
+    assumed to always produce the requested output -- so this never yields
+    None then, as the Literal[True] overload above tells callers; the assert
+    below is what actually enforces that assumption at runtime.
 
     *backend_status_path* and *backend* are passed through to terraform();
     see its docstring.
@@ -604,8 +652,11 @@ def terraform_output(
         destroy_on_exit=destroy_on_exit,
         destroy_params=destroy_params,
     ) as tf:
-        yield tf.output(
+        output = tf.output(
             command_params=command_params,
             module_path=module_path,
             output_model=output_model,
         )
+        if apply_on_entry:
+            assert output is not None
+        yield output

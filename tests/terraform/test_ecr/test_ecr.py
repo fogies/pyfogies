@@ -72,7 +72,6 @@ def test_ecr_output(
             output_model=_TestEcrOutput,
         ) as output,
     ):
-        assert output is not None
         assert isinstance(output.ecr, EcrOutput)
 
         expected_registry_suffix = ".dkr.ecr.{}.amazonaws.com".format(

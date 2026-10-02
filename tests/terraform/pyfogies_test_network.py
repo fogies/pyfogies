@@ -75,5 +75,4 @@ def pyfogies_test_network(
             output_model=_TestNetworkOutput,
         ) as tf_output,
     ):
-        assert tf_output is not None
         yield tf_output.network

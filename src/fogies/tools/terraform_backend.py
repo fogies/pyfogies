@@ -3,6 +3,7 @@
 import pathlib
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from typing import Literal, overload
 
 from fogies.terraform.backend import (
     BackendOutput,
@@ -17,6 +18,50 @@ from fogies.tools.terraform import (
     TerraformOutputModel,
     terraform,
 )
+
+
+@overload
+@contextmanager
+def terraform_backend(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend_status_path: pathlib.Path,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: Literal[True],
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
+) -> Generator[TerraformOutputModel]: ...
+
+
+@overload
+@contextmanager
+def terraform_backend(
+    *,
+    version: str | None = None,
+    binary_cache_path: pathlib.Path,
+    command_params: CommandParams,
+    module_path: pathlib.Path,
+    backend_status_path: pathlib.Path,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_path: pathlib.Path | None = None,
+    init_on_entry: bool = False,
+    init_params: InitParams | None = None,
+    apply_on_entry: bool = False,
+    apply_params: ApplyParams | None = None,
+    destroy_on_exit: bool = False,
+    destroy_params: DestroyParams | None = None,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
+) -> Generator[TerraformOutputModel | None]: ...
 
 
 @contextmanager
@@ -46,7 +91,9 @@ def terraform_backend(
     output_model_get_backend extracts BackendOutput from the output model.
 
     Yields None only when apply_on_entry is False and the module has no
-    outputs, i.e. nothing is applied. Destroy still runs then.
+    outputs, i.e. nothing is applied. Destroy still runs then. Never None
+    when apply_on_entry is true, as the Literal[True] overload above tells
+    callers; the assert below is what actually enforces that at runtime.
     """
     with terraform(
         version=version,

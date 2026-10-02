@@ -103,7 +103,6 @@ def get_task_backend_apply(
                 )
             )
 
-            assert output_result is not None
             if output:
                 print(output_model_get_backend(output_result).model_dump_json(indent=2))
 

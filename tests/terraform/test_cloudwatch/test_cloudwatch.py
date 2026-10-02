@@ -91,7 +91,6 @@ def cloudwatch_output(
             output_model=_TestCloudwatchOutput,
         ) as output,
     ):
-        assert output is not None
         yield output
 
 
