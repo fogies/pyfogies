@@ -55,7 +55,9 @@ namespace.add_collection(
     fogies.tasks.poetry.get_collection(secrets_poetry_path=SECRETS_POETRY_PATH)
 )
 namespace.add_collection(
-    fogies.tasks.access_key.get_collection(aws_environ_factory=_aws_environ_factory)
+    fogies.tasks.access_key.get_collection(
+        collection_name="access-key", aws_environ_factory=_aws_environ_factory
+    )
 )
 
 # A collection for subsets of tests.

@@ -4,6 +4,7 @@ import pathlib
 from contextlib import ExitStack
 from typing import Callable, cast
 
+from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
@@ -192,3 +193,41 @@ def get_task_destroy(
             )
 
     return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_destroy)
+
+
+def get_collection(
+    *,
+    collection_name: str,
+    binary_cache_path: pathlib.Path,
+    module_path: pathlib.Path,
+    aws_environ_factory: AwsEnvironFactory | None = None,
+    backend: BackendConfig | None = None,
+    backend_status_path: pathlib.Path | None = None,
+    tfbackend_factory: TfbackendFactory | None = None,
+    tfvars_factory: TfvarsFactory | None = None,
+) -> Collection:
+    """Get a collection of tasks for applying and destroying a Terraform configuration."""
+    collection = Collection(collection_name)
+    collection.add_task(
+        get_task_apply(
+            binary_cache_path=binary_cache_path,
+            module_path=module_path,
+            aws_environ_factory=aws_environ_factory,
+            backend=backend,
+            backend_status_path=backend_status_path,
+            tfbackend_factory=tfbackend_factory,
+            tfvars_factory=tfvars_factory,
+        )
+    )
+    collection.add_task(
+        get_task_destroy(
+            binary_cache_path=binary_cache_path,
+            module_path=module_path,
+            aws_environ_factory=aws_environ_factory,
+            backend=backend,
+            backend_status_path=backend_status_path,
+            tfbackend_factory=tfbackend_factory,
+            tfvars_factory=tfvars_factory,
+        )
+    )
+    return collection

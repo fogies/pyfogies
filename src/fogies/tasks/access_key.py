@@ -268,10 +268,10 @@ def get_task_rotate_key(
 
 
 def get_collection(
-    *, aws_environ_factory: AwsEnvironFactory | None = None
+    *, collection_name: str, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Collection:
     """Get a collection of tasks for managing IAM users and access keys."""
-    collection = Collection("access-key")
+    collection = Collection(collection_name)
     collection.add_task(get_task_create(aws_environ_factory=aws_environ_factory))
     collection.add_task(get_task_delete(aws_environ_factory=aws_environ_factory))
     collection.add_task(get_task_delete_key(aws_environ_factory=aws_environ_factory))
