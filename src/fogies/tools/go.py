@@ -4,24 +4,23 @@ import io
 import pathlib
 import shutil
 import sys
-import urllib.request
 import zipfile
 from collections.abc import Generator
 from contextlib import contextmanager
-from http.client import HTTPResponse
-from typing import cast
 
 from invoke.runners import Result
 
+from fogies.download_verified import download_verified
 from fogies.tools.command import CommandParams, command_run
 from fogies.tools.environ import environ
 
-# Most recent first; _KNOWN_VERSIONS[0] is the default.
-_KNOWN_VERSIONS = [
-    "1.27.1",
-]
+# Most recent first; the first is the default. Each maps to the SHA-256 of its
+# downloaded archive, from the file list at https://go.dev/dl/?mode=json.
+_KNOWN_VERSIONS = {
+    "1.27.1": "a3911b5e0e1b1053f25ed0675f4c1c6aad1e2bfcf253df2b9be4caabd2edd95d",
+}
 
-_DEFAULT_VERSION = _KNOWN_VERSIONS[0]
+_DEFAULT_VERSION = next(iter(_KNOWN_VERSIONS))
 
 _GO_URL_TEMPLATE = "https://go.dev/dl/go{version}.windows-amd64.zip"
 
@@ -122,9 +121,7 @@ def go(
         binary_cache_path.mkdir(parents=True, exist_ok=True)
         try:
             url = _GO_URL_TEMPLATE.format(version=version)
-            response = cast(HTTPResponse, urllib.request.urlopen(url))
-            with response:
-                zip_bytes: bytes = response.read()
+            zip_bytes = download_verified(url=url, sha256=_KNOWN_VERSIONS[version])
 
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
                 zf.extractall(extract_path)

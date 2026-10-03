@@ -3,16 +3,15 @@ import io
 import json
 import pathlib
 import sys
-import urllib.request
 import zipfile
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
-from http.client import HTTPResponse
-from typing import Literal, NewType, TypeVar, cast, overload
+from typing import Literal, NewType, TypeVar, overload
 
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel, ValidationError
 
+from fogies.download_verified import download_verified
 from fogies.terraform.backend import (
     BackendConfig,
     BackendStatus,
@@ -45,13 +44,14 @@ class DestroyParams:
     auto_approve: bool = False
 
 
-# Most recent first; _KNOWN_VERSIONS[0] is the default.
+# Most recent first; the first is the default. Each maps to the SHA-256 of its
+# downloaded archive, from terraform_<version>_SHA256SUMS on releases.hashicorp.com.
 # Versions must be ~> 1.15, because modules rely on `const = true` variables.
-_KNOWN_VERSIONS = [
-    "1.16.3",
-]
+_KNOWN_VERSIONS = {
+    "1.16.3": "6f908a90e5637afe72705290afd1cd71fc4f2877303ca77f05a8c6ead196b11c",
+}
 
-_DEFAULT_VERSION = _KNOWN_VERSIONS[0]
+_DEFAULT_VERSION = next(iter(_KNOWN_VERSIONS))
 
 _TERRAFORM_URL_TEMPLATE = (
     "https://releases.hashicorp.com/terraform"
@@ -490,9 +490,7 @@ def terraform(
         binary_cache_path.mkdir(parents=True, exist_ok=True)
         try:
             url = _TERRAFORM_URL_TEMPLATE.format(version=version)
-            response = cast(HTTPResponse, urllib.request.urlopen(url))
-            with response:
-                zip_bytes: bytes = response.read()
+            zip_bytes = download_verified(url=url, sha256=_KNOWN_VERSIONS[version])
 
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
                 _ = exe_path.write_bytes(zf.read("terraform.exe"))
