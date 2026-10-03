@@ -123,7 +123,7 @@ def terraform_tfbackend(
     if path.suffixes[-1:] != [".tfbackend"]:
         raise ValueError("Path '{}' must end with '.tfbackend'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
+    with path.open("w", encoding="utf-8", newline="\n") as f:
         _ = f.write('region = "{}"\n'.format(backend.region))
         _ = f.write('bucket = "{}"\n'.format(backend.bucket_name))
         _ = f.write('key = "{}"\n'.format(backend.key))
@@ -154,7 +154,7 @@ def terraform_tfvars(
     if suffixes[-2:] != [".tfvars", ".json"]:
         raise ValueError("Path '{}' must end with '.tfvars.json'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
+    with path.open("w", encoding="utf-8", newline="\n") as f:
         json.dump(variables.model_dump(mode="json"), f, indent=2)
     try:
         yield TfvarsPath(path)
@@ -216,7 +216,7 @@ def terraform_templated(
 
         templated_path = current_path.with_name(current_path.name + ".templated")
         _ = current_path.rename(templated_path)
-        _ = current_path.write_text(rendered_content, encoding="utf-8")
+        _ = current_path.write_text(rendered_content, encoding="utf-8", newline="\n")
         rendered[current_path] = placeholders_found
 
     try:

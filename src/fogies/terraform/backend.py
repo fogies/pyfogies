@@ -218,5 +218,5 @@ class BackendStatus(BaseModel):
                 state_table = cast(Table, states_table[name])
                 state_table["applied"] = entry.applied
 
-        with path.open("w", encoding="utf-8") as f:
+        with path.open("w", encoding="utf-8", newline="\n") as f:
             _ = f.write(tomlkit.dumps(doc))

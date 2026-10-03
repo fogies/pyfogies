@@ -138,7 +138,7 @@ class _Ollama:
         pid_path = self._pid_path
 
         text = "{}\n".format(pid.model_dump_json())
-        _ = pid_path.write_text(text, encoding="utf-8")
+        _ = pid_path.write_text(text, encoding="utf-8", newline="\n")
 
     def set_refcount(self, count: int) -> None:
         """Set the managed server refcount state."""
@@ -149,6 +149,7 @@ class _Ollama:
         _ = refcount_path.write_text(
             "{}\n".format(count),
             encoding="utf-8",
+            newline="\n",
         )
 
 
