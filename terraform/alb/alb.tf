@@ -35,6 +35,10 @@ resource "aws_lb_listener" "listener_https" {
   protocol          = "HTTPS"
   certificate_arn   = local.certificate_arn
 
+  # Require TLS 1.2 or later, restricted to forward-secret ciphers, 
+  # with hybrid post-quantum key exchange for clients that support it.
+  ssl_policy = "ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09"
+
   default_action {
     type = "fixed-response"
 
