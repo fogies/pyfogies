@@ -1,16 +1,16 @@
 data "aws_route53_zone" "existing" {
-  count = var.create_zone ? 0 : 1
+  count = var.mode == "existing" ? 1 : 0
   name  = var.zone_name
 }
 
 resource "aws_route53_zone" "zone" {
-  count = var.create_zone ? 1 : 0
+  count = local.create_zone ? 1 : 0
   name  = var.zone_name
   tags  = var.tags
 }
 
 resource "aws_route53domains_registered_domain" "domain" {
-  count       = var.create_zone ? 1 : 0
+  count       = var.mode == "registered" ? 1 : 0
   provider    = aws.us_east_1
   domain_name = var.zone_name
   tags        = var.tags
@@ -24,6 +24,8 @@ resource "aws_route53domains_registered_domain" "domain" {
 }
 
 locals {
-  zone_id      = var.create_zone ? aws_route53_zone.zone[0].zone_id : data.aws_route53_zone.existing[0].zone_id
-  name_servers = var.create_zone ? aws_route53_zone.zone[0].name_servers : data.aws_route53_zone.existing[0].name_servers
+  create_zone = var.mode != "existing"
+
+  zone_id      = local.create_zone ? aws_route53_zone.zone[0].zone_id : data.aws_route53_zone.existing[0].zone_id
+  name_servers = local.create_zone ? aws_route53_zone.zone[0].name_servers : data.aws_route53_zone.existing[0].name_servers
 }
