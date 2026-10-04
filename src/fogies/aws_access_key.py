@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from mypy_boto3_iam.type_defs import AccessKeyMetadataTypeDef
 
 
-class _IamAccessKeyInfo(BaseModel):
+class IamAccessKeyInfo(BaseModel):
     key_id: str
     status: str
     created: datetime.datetime | None
@@ -22,11 +22,11 @@ class _IamAccessKeyInfo(BaseModel):
 
 
 class IamAccessKeys(BaseModel):
-    current: _IamAccessKeyInfo | None  # newest key
-    previous: _IamAccessKeyInfo | None  # oldest key; only present when two keys exist
+    current: IamAccessKeyInfo | None  # newest key
+    previous: IamAccessKeyInfo | None  # oldest key; only present when two keys exist
 
 
-class _IamUserInfo(BaseModel):
+class IamUserInfo(BaseModel):
     username: str
     keys: IamAccessKeys
 
@@ -47,11 +47,11 @@ def get_keys(*, username: str) -> IamAccessKeys:
         reverse=True,
     )
 
-    def _to_info(raw_key: AccessKeyMetadataTypeDef) -> _IamAccessKeyInfo:
+    def _to_info(raw_key: AccessKeyMetadataTypeDef) -> IamAccessKeyInfo:
         key_id = raw_key.get("AccessKeyId", "")
         last_used_response = iam.get_access_key_last_used(AccessKeyId=key_id)
         last_used = last_used_response["AccessKeyLastUsed"].get("LastUsedDate")
-        return _IamAccessKeyInfo(
+        return IamAccessKeyInfo(
             key_id=key_id,
             status=raw_key.get("Status", ""),
             created=raw_key.get("CreateDate"),
@@ -64,7 +64,7 @@ def get_keys(*, username: str) -> IamAccessKeys:
     )
 
 
-def list_users() -> list[_IamUserInfo]:
+def list_users() -> list[IamUserInfo]:
     """List all IAM users (sorted by name) and their access keys."""
     iam = boto_client_iam()
     raw_users = [
@@ -73,9 +73,7 @@ def list_users() -> list[_IamUserInfo]:
         for user in page["Users"]
     ]
     users = [
-        _IamUserInfo(
-            username=user["UserName"], keys=get_keys(username=user["UserName"])
-        )
+        IamUserInfo(username=user["UserName"], keys=get_keys(username=user["UserName"]))
         for user in raw_users
     ]
     return sorted(users, key=lambda u: u.username)
