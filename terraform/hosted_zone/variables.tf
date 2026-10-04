@@ -7,7 +7,7 @@ variable "mode" {
   description = <<-EOT
     How the hosted zone is provided:
       registered: create zone for a domain registered in this account.
-      delegated:  create zone for a domain registered elsewhere.
+      delegated:  create zone for a domain delegated from elsewhere.
       existing:   use an existing hosted zone.
   EOT
   type        = string
