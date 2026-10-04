@@ -1,4 +1,4 @@
-"""Typing helpers for cleanly annotating loosely-typed third-party APIs."""
+"""Typed factories for boto3 clients."""
 
 from __future__ import annotations
 

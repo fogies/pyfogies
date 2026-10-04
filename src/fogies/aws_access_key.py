@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from fogies.boto_clients import boto_client_iam
 from fogies.tools.aws_environ import AwsProfile
-from fogies.typing import boto_client_iam
 
 if TYPE_CHECKING:
     from mypy_boto3_iam.type_defs import AccessKeyMetadataTypeDef

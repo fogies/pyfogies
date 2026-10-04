@@ -31,6 +31,7 @@ import pytest
 from pydantic import BaseModel
 
 import fogies.aws_access_key as aws_access_key
+from fogies.boto_clients import boto_client_iam
 from fogies.terraform.backend import BackendOutput
 from fogies.tools.aws_environ import AwsEnviron, AwsProfile
 from fogies.tools.command import CommandParams
@@ -42,7 +43,6 @@ from fogies.tools.terraform import (
     terraform_tfbackend,
     terraform_tfvars,
 )
-from fogies.typing import boto_client_iam
 from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates

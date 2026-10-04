@@ -4,7 +4,7 @@ import pathlib
 
 import requests
 
-from fogies.typing import boto_client_elbv2
+from fogies.boto_clients import boto_client_elbv2
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.pyfogies_test_alb_self_signed import PyfogiesTestAlbOutput
 

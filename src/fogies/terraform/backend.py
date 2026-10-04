@@ -8,9 +8,9 @@ import tomlkit
 from pydantic import BaseModel, ConfigDict
 from tomlkit.items import Table
 
+from fogies.boto_clients import boto_client_s3
 from fogies.templates import backend_status_toml_template_factory, ensure_from_template
 from fogies.tools.boto import s3_delete_keys
-from fogies.typing import boto_client_s3
 
 
 class BackendVars(BaseModel):

@@ -7,6 +7,7 @@ import pytest
 import requests
 from pydantic import BaseModel
 
+from fogies.boto_clients import boto_client_ec2, boto_client_ecs
 from fogies.ready_poll import (
     READY_POLL_EXCEPTIONS_HTTP,
     READY_POLL_TIMING_LONG,
@@ -25,7 +26,6 @@ from fogies.tools.terraform import (
     terraform_tfbackend,
     terraform_tfvars,
 )
-from fogies.typing import boto_client_ec2, boto_client_ecs
 from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates

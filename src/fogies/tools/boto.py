@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from fogies.typing import boto_client_s3
+from fogies.boto_clients import boto_client_s3
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import ErrorTypeDef, ObjectIdentifierTypeDef
