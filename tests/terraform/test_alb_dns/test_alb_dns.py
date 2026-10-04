@@ -27,12 +27,14 @@ from fogies.tools.terraform import (
 from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates
-from tests.terraform.pyfogies_test_alb_self_signed import PyfogiesTestAlbOutput
+from tests.terraform.pyfogies_test_alb_self_signed import (
+    PyfogiesTestAlbSelfSignedOutput,
+)
 
 _TEST_ALB_DNS_TAGS = {"Project": "pyfogies-test-alb-dns"}
 
 
-class _AlbDnsVars(BaseModel):
+class _TestAlbDnsVars(BaseModel):
     region: str
     hosted_zone_name: str
     alb_dns_name: str
@@ -41,7 +43,7 @@ class _AlbDnsVars(BaseModel):
     tags: dict[str, str] = {}
 
 
-class _AlbDnsOutput(BaseModel):
+class _TestAlbDnsOutput(BaseModel):
     hostname: str
     hostnames: list[str]
 
@@ -50,9 +52,9 @@ class _AlbDnsOutput(BaseModel):
 def alb_dns_output(
     pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
-    pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput,
+    pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
     tmp_path_factory: pytest.TempPathFactory,
-) -> Iterator[_AlbDnsOutput]:
+) -> Iterator[_TestAlbDnsOutput]:
     """Create a Route 53 alias record pointing to the shared ALB; yield output; destroy on teardown.
 
     Skipped when [domain] is absent from pyfogies-tests.toml.
@@ -74,7 +76,7 @@ def alb_dns_output(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_AlbDnsVars(
+            variables=_TestAlbDnsVars(
                 region=pyfogies_test_config.aws.region,
                 hosted_zone_name=pyfogies_test_config.domain.zone_name,
                 alb_dns_name=pyfogies_test_alb_self_signed.alb.alb_dns_name,
@@ -97,7 +99,7 @@ def alb_dns_output(
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
-            output_model=_AlbDnsOutput,
+            output_model=_TestAlbDnsOutput,
         ) as output,
     ):
         for hostname in output.hostnames:
@@ -124,7 +126,7 @@ def _wait_for_https(hostname: str) -> None:
             )
 
 
-def test_alb_dns_http_redirects_to_https(alb_dns_output: _AlbDnsOutput) -> None:
+def test_alb_dns_http_redirects_to_https(alb_dns_output: _TestAlbDnsOutput) -> None:
     """HTTP request to each hostname returns a 301 redirect to HTTPS."""
     for hostname in alb_dns_output.hostnames:
         response = requests.get(
@@ -142,7 +144,7 @@ def test_alb_dns_http_redirects_to_https(alb_dns_output: _AlbDnsOutput) -> None:
         )
 
 
-def test_alb_dns_https_reachable(alb_dns_output: _AlbDnsOutput) -> None:
+def test_alb_dns_https_reachable(alb_dns_output: _TestAlbDnsOutput) -> None:
     """HTTPS request to each hostname succeeds with the ACM certificate."""
     for hostname in alb_dns_output.hostnames:
         response = requests.get("https://{}".format(hostname), timeout=5)

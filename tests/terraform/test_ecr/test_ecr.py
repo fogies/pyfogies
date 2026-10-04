@@ -22,7 +22,7 @@ from tests.terraform.backend import PyfogiesTestBackendStates
 _TEST_ECR_TAGS = {"Project": "pyfogies-test-ecr"}
 
 
-class _TestRegionVars(BaseModel):
+class _TestEcrVars(BaseModel):
     region: str
     tags: dict[str, str] = {}
 
@@ -51,7 +51,7 @@ def test_ecr_output(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_TestRegionVars(
+            variables=_TestEcrVars(
                 region=pyfogies_test_config.aws.region, tags=_TEST_ECR_TAGS
             ),
         ) as tfvars_path,

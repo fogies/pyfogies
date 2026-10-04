@@ -33,22 +33,17 @@ _TEST_ALB_SELF_SIGNED_TAGS = {"Project": "pyfogies-test-alb-self-signed"}
 _TEST_ALB_SELF_SIGNED_MODULE = pathlib.Path(__file__).parent / "test_alb_self_signed"
 
 
-class PyfogiesTestAlbOutput(BaseModel):
+class PyfogiesTestAlbSelfSignedOutput(BaseModel):
     alb: AlbOutput
     alb_security_group_id: str
 
 
-class _AlbSelfSignedVars(BaseModel):
+class _TestAlbSelfSignedVars(BaseModel):
     region: str
     alb_name: str
     vpc_id: str
     subnet_ids: list[str]
     tags: dict[str, str] = {}
-
-
-class _TfAlbSelfSignedOutput(BaseModel):
-    alb: AlbOutput
-    alb_security_group_id: str
 
 
 def _wait_for_alb(dns_name: str) -> None:
@@ -67,7 +62,7 @@ def pyfogies_test_alb_self_signed(
     pyfogies_test_backend: BackendOutput,
     pyfogies_test_network: NetworkOutput,
     tmp_path_factory: pytest.TempPathFactory,
-) -> Iterator[PyfogiesTestAlbOutput]:
+) -> Iterator[PyfogiesTestAlbSelfSignedOutput]:
     """Session-scoped self-signed ALB. Shared by ALB tests and other test modules."""
     command_params = CommandParams(in_stream=False)
     module_path = _TEST_ALB_SELF_SIGNED_MODULE
@@ -83,7 +78,7 @@ def pyfogies_test_alb_self_signed(
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
-            variables=_AlbSelfSignedVars(
+            variables=_TestAlbSelfSignedVars(
                 region=pyfogies_test_config.aws.region,
                 alb_name=_TEST_ALB_SELF_SIGNED_NAME,
                 vpc_id=pyfogies_test_network.vpc_id,
@@ -105,11 +100,8 @@ def pyfogies_test_alb_self_signed(
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
-            output_model=_TfAlbSelfSignedOutput,
+            output_model=PyfogiesTestAlbSelfSignedOutput,
         ) as tf_output,
     ):
         _wait_for_alb(tf_output.alb.alb_dns_name)
-        yield PyfogiesTestAlbOutput(
-            alb=tf_output.alb,
-            alb_security_group_id=tf_output.alb_security_group_id,
-        )
+        yield tf_output

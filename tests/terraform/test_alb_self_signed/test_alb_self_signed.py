@@ -6,10 +6,14 @@ import requests
 
 from fogies.boto_clients import boto_client_elbv2
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
-from tests.terraform.pyfogies_test_alb_self_signed import PyfogiesTestAlbOutput
+from tests.terraform.pyfogies_test_alb_self_signed import (
+    PyfogiesTestAlbSelfSignedOutput,
+)
 
 
-def test_alb_output(pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput) -> None:
+def test_alb_output(
+    pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
+) -> None:
     """ALB output contains expected ARNs and DNS name."""
     assert pyfogies_test_alb_self_signed.alb.alb_arn.startswith(
         "arn:aws:elasticloadbalancing:"
@@ -26,7 +30,7 @@ def test_alb_output(pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput) -> Non
 
 
 def test_alb_https_listener_ssl_policy(
-    pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput,
+    pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
     pyfogies_test_config: PyfogiesTestsConfig,
 ) -> None:
     """HTTPS listener uses the restricted TLS 1.2 and 1.3 post-quantum security policy."""
@@ -40,7 +44,7 @@ def test_alb_https_listener_ssl_policy(
 
 
 def test_alb_http_redirects_to_https(
-    pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput,
+    pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
 ) -> None:
     """HTTP request returns 301 redirect to HTTPS."""
     http_response = requests.get(
@@ -57,7 +61,7 @@ def test_alb_http_redirects_to_https(
 
 
 def test_alb_https_reachable(
-    pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput,
+    pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
     tmp_path: pathlib.Path,
 ) -> None:
     """HTTPS is reachable and returns the fixed-response body containing the ALB ARN."""

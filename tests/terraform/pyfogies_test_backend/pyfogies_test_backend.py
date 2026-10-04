@@ -24,7 +24,7 @@ _TEST_BACKEND_SESSION_NAME = "pyfogies-test-backend-session"
 _TEST_BACKEND_SESSION_TAGS = {"Project": "pyfogies-test-backend-session"}
 
 
-class _PyFogiesTestBackendOutput(BaseModel):
+class _PyfogiesTestBackendOutput(BaseModel):
     backend: BackendOutput
 
 
@@ -66,7 +66,7 @@ def pyfogies_test_backend(
             apply_params=ApplyParams(auto_approve=True),
             destroy_on_exit=True,
             destroy_params=DestroyParams(auto_approve=True),
-            output_model=_PyFogiesTestBackendOutput,
+            output_model=_PyfogiesTestBackendOutput,
             output_model_get_backend=lambda o: o.backend,
         ) as output,
     ):

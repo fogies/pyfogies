@@ -29,7 +29,9 @@ from fogies.tools.terraform import (
 from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates
-from tests.terraform.pyfogies_test_alb_self_signed import PyfogiesTestAlbOutput
+from tests.terraform.pyfogies_test_alb_self_signed import (
+    PyfogiesTestAlbSelfSignedOutput,
+)
 
 _TEST_ECS_NAME = "pyfogies-test-ecs"
 _TEST_ECS_TAGS = {"Project": "pyfogies-test-ecs"}
@@ -55,7 +57,7 @@ def ecs_output(
     pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
     pyfogies_test_network: NetworkOutput,
-    pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput,
+    pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[_TestEcsOutput]:
     """Apply CloudWatch and ECS modules using the shared ALB; yield output; destroy on teardown."""
@@ -106,7 +108,7 @@ def ecs_output(
         yield output
 
 
-def _wait_for_ecs(alb: PyfogiesTestAlbOutput, pem_tmp: pathlib.Path) -> None:
+def _wait_for_ecs(alb: PyfogiesTestAlbSelfSignedOutput, pem_tmp: pathlib.Path) -> None:
     """Poll the ALB until the ECS service is healthy and serving traffic."""
     verify: str | bool
     if alb.alb.certificate_pem is not None:
@@ -169,7 +171,7 @@ def test_ecs_output(ecs_output: _TestEcsOutput) -> None:
 
 def test_ecs_https_serves_nginx(
     ecs_output: _TestEcsOutput,
-    pyfogies_test_alb_self_signed: PyfogiesTestAlbOutput,
+    pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
     tmp_path: pathlib.Path,
 ) -> None:
     """HTTPS request reaches the ECS service and nginx returns 200."""
