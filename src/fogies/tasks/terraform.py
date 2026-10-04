@@ -41,7 +41,15 @@ def get_task_apply(
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
-    @task(name="apply")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="apply",
+        help={
+            "init": "Include terraform init. Skip with --no-init.",
+            "init_upgrade": "During init, upgrade providers.",
+            "init_reconfigure": "During init, reconfigure the backend.",
+            "apply_auto_approve": "Skip interactive confirmation.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
         context: Context,
         init: bool = default_init,
@@ -51,14 +59,6 @@ def get_task_apply(
     ) -> None:
         """
         Apply a Terraform configuration.
-
-        Flags:
-          --init                Run terraform init before apply (downloads providers, sets up backend).
-          --init-upgrade        Pass -upgrade to init; checks for newer provider versions within constraints.
-          --init-reconfigure    Pass -reconfigure to init; re-initializes backend from scratch.
-          --apply-auto-approve  Skip Terraform's interactive confirmation prompt.
-
-        --init-upgrade and --init-reconfigure require --init.
         """
         if init_upgrade and not init:
             raise ValueError("--init-upgrade requires --init")
@@ -128,7 +128,15 @@ def get_task_destroy(
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
-    @task(name="destroy")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="destroy",
+        help={
+            "init": "Include terraform init. Skip with --no-init.",
+            "init_upgrade": "During init, upgrade providers.",
+            "init_reconfigure": "During init, reconfigure the backend.",
+            "destroy_auto_approve": "Skip interactive confirmation.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(
         context: Context,
         init: bool = default_init,
@@ -138,14 +146,6 @@ def get_task_destroy(
     ) -> None:
         """
         Destroy a Terraform configuration.
-
-        Flags:
-          --init                 Run terraform init before destroy (downloads providers, sets up backend).
-          --init-upgrade         Pass -upgrade to init; checks for newer provider versions within constraints.
-          --init-reconfigure     Pass -reconfigure to init; re-initializes backend from scratch.
-          --destroy-auto-approve Skip Terraform's interactive confirmation prompt.
-
-        --init-upgrade and --init-reconfigure require --init.
         """
         if init_upgrade and not init:
             raise ValueError("--init-upgrade requires --init")
