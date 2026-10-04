@@ -33,7 +33,6 @@ variable "tags" {
 module "network" {
   source = "../../../terraform/network"
 
-  region                  = var.region
   availability_zone_count = 2
 }
 

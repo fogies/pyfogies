@@ -73,7 +73,6 @@ module "cloudwatch" {
 module "ecs" {
   source = "../../../terraform/ecs"
 
-  region                 = var.region
   name                   = var.name
   vpc_id                 = var.vpc_id
   subnet_ids             = var.subnet_ids

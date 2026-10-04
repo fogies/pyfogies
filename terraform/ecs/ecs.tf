@@ -1,3 +1,5 @@
+data "aws_region" "current" {}
+
 data "aws_iam_policy_document" "ecs_assume_role" {
   statement {
     effect = "Allow"
@@ -77,7 +79,7 @@ resource "aws_ecs_task_definition" "task" {
           logDriver = "awslogs"
           options = {
             awslogs-group         = var.log_group_name
-            awslogs-region        = var.region
+            awslogs-region        = data.aws_region.current.region
             awslogs-stream-prefix = "ecs"
           }
         }

@@ -43,7 +43,6 @@ module "backend" {
   source = "../../../terraform/backend"
 
   name   = var.name
-  region = var.region
   states = var.states
 }
 

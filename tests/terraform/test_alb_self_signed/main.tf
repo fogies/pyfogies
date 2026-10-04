@@ -59,7 +59,6 @@ module "alb_sg" {
 module "alb" {
   source = "../../../terraform/alb"
 
-  region                  = var.region
   name                    = var.alb_name
   subnet_ids              = var.subnet_ids
   security_group_ids      = [module.alb_sg.security_group_id]

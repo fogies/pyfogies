@@ -1,10 +1,16 @@
+data "aws_region" "current" {}
+
+locals {
+  region = data.aws_region.current.region
+}
+
 # Use a single bucket. 
 # Different states will be stored using keys.
 resource "aws_s3_bucket" "state" {
   # We include the region in the bucket name
   # because of the large delays associated with deleting and creating a bucket in a different region.
   # This ensures a unique name in any region.
-  bucket = "${var.name}-bucket-${var.region}"
+  bucket = "${var.name}-bucket-${local.region}"
 
   # Explicitly and intentionally false. 
   # Resources with every state must be explicitly destroyed before the bucket can be deleted.
@@ -14,7 +20,7 @@ resource "aws_s3_bucket" "state" {
 
   tags = merge(
     {
-      Name = "${var.name}-bucket-${var.region}"
+      Name = "${var.name}-bucket-${local.region}"
     },
     var.tags,
   )

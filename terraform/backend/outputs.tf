@@ -5,7 +5,7 @@ output "bucket_name" {
 
 output "region" {
   description = "AWS region in which the backend resources were created."
-  value       = var.region
+  value       = local.region
 }
 
 output "state_keys" {

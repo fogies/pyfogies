@@ -33,7 +33,6 @@ variable "tags" {
 module "ecr" {
   source = "../../../terraform/ecr"
 
-  region                     = var.region
   repositories               = ["pyfogies-test-ecr-a", "pyfogies-test-ecr-b"]
   lifecycle_keep_count_limit = 10
   lifecycle_keep_days_limit  = 180
