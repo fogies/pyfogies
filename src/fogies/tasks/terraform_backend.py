@@ -18,7 +18,6 @@ from fogies.tools.terraform import (
     InitParams,
     TerraformOutputModel,
     TfvarsFactory,
-    terraform_templated,
 )
 from fogies.tools.terraform_backend import terraform_backend
 
@@ -70,12 +69,6 @@ def get_task_backend_apply(
         )
 
         with ExitStack() as stack:
-            rendered = stack.enter_context(terraform_templated(module_path=module_path))
-            if rendered:
-                print("Rendered templated placeholders:")
-                for rendered_path, placeholders in rendered.items():
-                    print("  {}: {}".format(rendered_path, ", ".join(placeholders)))
-
             if aws_environ_factory is not None:
                 _ = stack.enter_context(aws_environ_factory())
 
@@ -156,12 +149,6 @@ def get_task_backend_destroy(
         )
 
         with ExitStack() as stack:
-            rendered = stack.enter_context(terraform_templated(module_path=module_path))
-            if rendered:
-                print("Rendered templated placeholders:")
-                for rendered_path, placeholders in rendered.items():
-                    print("  {}: {}".format(rendered_path, ", ".join(placeholders)))
-
             if aws_environ_factory is not None:
                 _ = stack.enter_context(aws_environ_factory())
 

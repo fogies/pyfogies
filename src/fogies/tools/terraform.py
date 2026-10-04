@@ -97,12 +97,6 @@ TfvarsContextManager = AbstractContextManager[TfvarsPath]
 TfbackendFactory = Callable[[], TfbackendContextManager]
 TfvarsFactory = Callable[[], TfvarsContextManager]
 
-# Type for passing a terraform_templated() context manager into a task
-# factory, to be entered when the task actually runs. Same factory rationale
-# as TfbackendFactory/TfvarsFactory above.
-TerraformTemplatedContextManager = AbstractContextManager[dict[pathlib.Path, list[str]]]
-TerraformTemplatedFactory = Callable[[], TerraformTemplatedContextManager]
-
 
 @contextmanager
 def terraform_tfbackend(
@@ -161,71 +155,6 @@ def terraform_tfvars(
     finally:
         if delete_on_exit and path.exists():
             path.unlink()
-
-
-# Maps a placeholder string to the value that replaces it, wherever it
-# appears in a file rendered by terraform_templated. Empty for now: this
-# previously held __PYFOGIES_VERSION__, substituting the installed pyfogies
-# version into a module source's ref=, e.g. for hosted_zone.tf. That's no
-# longer needed as of Terraform 1.15+, which natively supports a `const =
-# true` variable in a module's source/version (see e.g.
-# fogies-infrastructure's `pyfogies_version` variable), resolved via
-# -var-file passed to `terraform init` (see _Terraform.init()'s tfvars_path).
-# Left in place, empty, since the same rename/render/restore mechanism could
-# still be useful for some future value Terraform itself can't parameterize.
-_TEMPLATED_PLACEHOLDERS: dict[str, str] = {}
-
-
-@contextmanager
-def terraform_templated(
-    *, module_path: pathlib.Path
-) -> Generator[dict[pathlib.Path, list[str]]]:
-    """Render each placeholder in _TEMPLATED_PLACEHOLDERS into every matching .tf file.
-
-    A templated file is checked in as an ordinary .tf file, with a
-    placeholder embedded somewhere a real value can't go directly (e.g. a
-    module source's ref=, which must be a literal), so tools like `terraform
-    fmt` keep formatting it normally. Terraform can't load the placeholder
-    directly, so for each .tf file found anywhere under *module_path* that
-    contains one (skipping .terraform/, where Terraform caches downloaded
-    modules), entry renames it to "<name>.tf.templated" and writes a rendered
-    copy back under its original name for Terraform to load. On exit, each
-    rendered file is removed and the original is restored to its original
-    name. Yields a mapping from each rendered path to the placeholders that
-    were substituted in it. A no-op (empty mapping) while
-    _TEMPLATED_PLACEHOLDERS is empty.
-    """
-    rendered: dict[pathlib.Path, list[str]] = {}
-    for current_path in module_path.rglob("*.tf"):
-        if ".terraform" in current_path.relative_to(module_path).parts:
-            continue
-        content = current_path.read_text(encoding="utf-8")
-        placeholders_found = [
-            placeholder
-            for placeholder in _TEMPLATED_PLACEHOLDERS
-            if placeholder in content
-        ]
-        if not placeholders_found:
-            continue
-
-        rendered_content = content
-        for placeholder in placeholders_found:
-            rendered_content = rendered_content.replace(
-                placeholder, _TEMPLATED_PLACEHOLDERS[placeholder]
-            )
-
-        templated_path = current_path.with_name(current_path.name + ".templated")
-        _ = current_path.rename(templated_path)
-        _ = current_path.write_text(rendered_content, encoding="utf-8", newline="\n")
-        rendered[current_path] = placeholders_found
-
-    try:
-        yield rendered
-    finally:
-        for rendered_path in rendered:
-            templated_path = rendered_path.with_name(rendered_path.name + ".templated")
-            rendered_path.unlink(missing_ok=True)
-            _ = templated_path.rename(rendered_path)
 
 
 class _Terraform:
