@@ -35,6 +35,20 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0-dev.10] (2026-10-05)
+
+### Changed
+- Refactored `get_collection` support in tasks. ([#10](https://github.com/fogies/pyfogies/pull/10))
+- Refactored Terraform module for `hosted_zone` to support `mode`. ([#10](https://github.com/fogies/pyfogies/pull/10))
+
+### Removed
+- Removed `terraform_templated`. ([#10](https://github.com/fogies/pyfogies/pull/10))
+- Removed misleading `region` variable from Terraform modules. ([#10](https://github.com/fogies/pyfogies/pull/10))
+
+### Security
+- Added `download_verified` for SHA-256 verification of tool downloads. ([#10](https://github.com/fogies/pyfogies/pull/10))
+- Updated Terraform module for `alb` to apply `ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09`. ([#10](https://github.com/fogies/pyfogies/pull/10))
+
 ## [0.0.0-dev.9] (2026-10-01)
 
 ### Added
