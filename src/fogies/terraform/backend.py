@@ -8,9 +8,9 @@ import tomlkit
 from pydantic import BaseModel, ConfigDict
 from tomlkit.items import Table
 
+from fogies.boto_clients import boto_client_s3
 from fogies.templates import backend_status_toml_template_factory, ensure_from_template
 from fogies.tools.boto import s3_delete_keys
-from fogies.typing import boto_client_s3
 
 
 class BackendVars(BaseModel):
@@ -218,5 +218,5 @@ class BackendStatus(BaseModel):
                 state_table = cast(Table, states_table[name])
                 state_table["applied"] = entry.applied
 
-        with path.open("w", encoding="utf-8") as f:
+        with path.open("w", encoding="utf-8", newline="\n") as f:
             _ = f.write(tomlkit.dumps(doc))

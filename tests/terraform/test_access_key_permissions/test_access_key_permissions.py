@@ -31,6 +31,7 @@ import pytest
 from pydantic import BaseModel
 
 import fogies.aws_access_key as aws_access_key
+from fogies.boto_clients import boto_client_iam
 from fogies.terraform.backend import BackendOutput
 from fogies.tools.aws_environ import AwsEnviron, AwsProfile
 from fogies.tools.command import CommandParams
@@ -42,7 +43,6 @@ from fogies.tools.terraform import (
     terraform_tfbackend,
     terraform_tfvars,
 )
-from fogies.typing import boto_client_iam
 from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates
@@ -175,7 +175,7 @@ def access_key_username() -> str:
 
 
 @pytest.fixture(scope="module")
-def access_key_user(
+def access_key_profile(
     access_key_username: str, pyfogies_test_aws_environ: AwsEnviron
 ) -> Iterator[AwsProfile]:
     """Create a disposable IAM user with an access key; delete both on teardown.
@@ -204,7 +204,7 @@ def test_access_key_permissions_grants_and_restricts(
     pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_backend: BackendOutput,
     access_key_username: str,
-    access_key_user: AwsProfile,
+    access_key_profile: AwsProfile,
     scenario: _Scenario,
     tmp_path: pathlib.Path,
 ) -> None:
@@ -214,7 +214,7 @@ def test_access_key_permissions_grants_and_restricts(
     scenario applies the module against it, checks the result, then
     destroys before the next one applies.
     """
-    _ = access_key_user  # dependency only: must exist first, and outlive this test.
+    _ = access_key_profile  # dependency only: must exist first, and outlive this test.
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent
     tfbackend_path = tmp_path / "test-access-key-permissions.tfbackend"

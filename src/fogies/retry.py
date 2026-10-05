@@ -28,7 +28,7 @@ def _log_retry(log_path: pathlib.Path) -> Callable[[tenacity.RetryCallState], No
             type(exception).__name__,
             exception,
         )
-        with log_path.open("a", encoding="utf-8") as f:
+        with log_path.open("a", encoding="utf-8", newline="\n") as f:
             _ = f.write(line)
 
     return log_it

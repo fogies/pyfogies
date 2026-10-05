@@ -1,8 +1,3 @@
-variable "region" {
-  description = "AWS region in which to create ECS resources."
-  type        = string
-}
-
 variable "name" {
   description = "Base name for ECS resources (cluster, service, task definition, IAM roles)."
   type        = string

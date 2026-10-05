@@ -5,6 +5,7 @@ from collections.abc import Callable
 from contextlib import ExitStack
 from typing import cast
 
+from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
@@ -17,7 +18,6 @@ from fogies.tools.terraform import (
     InitParams,
     TerraformOutputModel,
     TfvarsFactory,
-    terraform_templated,
 )
 from fogies.tools.terraform_backend import terraform_backend
 
@@ -36,28 +36,25 @@ def get_task_backend_apply(
     default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
-    default_output: bool = False,
-) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
-    @task(name="apply")  # pyright: ignore[reportUntypedFunctionDecorator]
+) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
+    @task(
+        name="apply",
+        help={
+            "init": "Include terraform init. Skip with --no-init.",
+            "init_upgrade": "During init, upgrade providers.",
+            "init_reconfigure": "During init, reconfigure the backend.",
+            "apply_auto_approve": "Skip interactive confirmation.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
         context: Context,
         init: bool = default_init,
         init_upgrade: bool = default_init_upgrade,
         init_reconfigure: bool = default_init_reconfigure,
         apply_auto_approve: bool = default_apply_auto_approve,
-        output: bool = default_output,
     ) -> None:
         """
         Apply a Terraform backend configuration, and record it as applied.
-
-        Flags:
-          --init                Run terraform init before apply (downloads providers, sets up backend).
-          --init-upgrade        Pass -upgrade to init; checks for newer provider versions within constraints.
-          --init-reconfigure    Pass -reconfigure to init; re-initializes backend from scratch.
-          --apply-auto-approve  Skip Terraform's interactive confirmation prompt.
-          --output              Print terraform output as JSON after apply.
-
-        --init-upgrade and --init-reconfigure require --init.
         """
         if init_upgrade and not init:
             raise ValueError("--init-upgrade requires --init")
@@ -72,12 +69,6 @@ def get_task_backend_apply(
         )
 
         with ExitStack() as stack:
-            rendered = stack.enter_context(terraform_templated(module_path=module_path))
-            if rendered:
-                print("Rendered templated placeholders:")
-                for rendered_path, placeholders in rendered.items():
-                    print("  {}: {}".format(rendered_path, ", ".join(placeholders)))
-
             if aws_environ_factory is not None:
                 _ = stack.enter_context(aws_environ_factory())
 
@@ -85,7 +76,7 @@ def get_task_backend_apply(
                 stack.enter_context(tfvars_factory()) if tfvars_factory else None
             )
 
-            output_result = stack.enter_context(
+            _ = stack.enter_context(
                 terraform_backend(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
@@ -103,12 +94,7 @@ def get_task_backend_apply(
                 )
             )
 
-            if output:
-                print(output_model_get_backend(output_result).model_dump_json(indent=2))
-
-    return cast(
-        Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_apply
-    )
+    return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_apply)
 
 
 def get_task_backend_destroy(
@@ -126,7 +112,15 @@ def get_task_backend_destroy(
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    @task(name="destroy")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="destroy",
+        help={
+            "init": "Include terraform init. Skip with --no-init.",
+            "init_upgrade": "During init, upgrade providers.",
+            "init_reconfigure": "During init, reconfigure the backend.",
+            "destroy_auto_approve": "Skip interactive confirmation.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(
         context: Context,
         init: bool = default_init,
@@ -141,14 +135,6 @@ def get_task_backend_destroy(
         declares is empty of resources, then clears the bucket's state
         objects before destroying it. Refuses (raises) if any declared state
         still has resources, regardless of how this task is invoked.
-
-        Flags:
-          --init                 Run terraform init before destroy (downloads providers, sets up backend).
-          --init-upgrade         Pass -upgrade to init; checks for newer provider versions within constraints.
-          --init-reconfigure     Pass -reconfigure to init; re-initializes backend from scratch.
-          --destroy-auto-approve Skip Terraform's interactive confirmation prompt.
-
-        --init-upgrade and --init-reconfigure require --init.
         """
         if init_upgrade and not init:
             raise ValueError("--init-upgrade requires --init")
@@ -163,12 +149,6 @@ def get_task_backend_destroy(
         )
 
         with ExitStack() as stack:
-            rendered = stack.enter_context(terraform_templated(module_path=module_path))
-            if rendered:
-                print("Rendered templated placeholders:")
-                for rendered_path, placeholders in rendered.items():
-                    print("  {}: {}".format(rendered_path, ", ".join(placeholders)))
-
             if aws_environ_factory is not None:
                 _ = stack.enter_context(aws_environ_factory())
 
@@ -195,3 +175,44 @@ def get_task_backend_destroy(
             )
 
     return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_destroy)
+
+
+def get_collection(
+    *,
+    collection_name: str,
+    binary_cache_path: pathlib.Path,
+    module_path: pathlib.Path,
+    aws_environ_factory: AwsEnvironFactory | None = None,
+    backend_status_path: pathlib.Path,
+    tfbackend_path: pathlib.Path | None = None,
+    tfvars_factory: TfvarsFactory | None = None,
+    output_model: type[TerraformOutputModel],
+    output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
+) -> Collection:
+    """Get a collection of tasks for applying and destroying a Terraform backend configuration."""
+    collection = Collection(collection_name)
+    collection.add_task(
+        get_task_backend_apply(
+            binary_cache_path=binary_cache_path,
+            module_path=module_path,
+            aws_environ_factory=aws_environ_factory,
+            backend_status_path=backend_status_path,
+            tfbackend_path=tfbackend_path,
+            tfvars_factory=tfvars_factory,
+            output_model=output_model,
+            output_model_get_backend=output_model_get_backend,
+        )
+    )
+    collection.add_task(
+        get_task_backend_destroy(
+            binary_cache_path=binary_cache_path,
+            module_path=module_path,
+            aws_environ_factory=aws_environ_factory,
+            backend_status_path=backend_status_path,
+            tfbackend_path=tfbackend_path,
+            tfvars_factory=tfvars_factory,
+            output_model=output_model,
+            output_model_get_backend=output_model_get_backend,
+        )
+    )
+    return collection

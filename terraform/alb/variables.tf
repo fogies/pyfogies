@@ -1,8 +1,3 @@
-variable "region" {
-  description = "AWS region in which to create ALB resources."
-  type        = string
-}
-
 variable "name" {
   description = "Name of the ALB."
   type        = string

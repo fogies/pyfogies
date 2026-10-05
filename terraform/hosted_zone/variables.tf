@@ -3,9 +3,19 @@ variable "zone_name" {
   type        = string
 }
 
-variable "create_zone" {
-  description = "If true, create the hosted zone and update the domain registration's name servers. If false, use the existing hosted zone."
-  type        = bool
+variable "mode" {
+  description = <<-EOT
+    How the hosted zone is provided:
+      registered: create zone for a domain registered in this account.
+      delegated:  create zone for a domain delegated from elsewhere.
+      existing:   use an existing hosted zone.
+  EOT
+  type        = string
+
+  validation {
+    condition     = contains(["registered", "delegated", "existing"], var.mode)
+    error_message = "mode must be one of: registered, delegated, existing."
+  }
 }
 
 variable "tags" {

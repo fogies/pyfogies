@@ -4,7 +4,6 @@ import io
 import os
 import pathlib
 import sys
-from unittest.mock import patch
 
 import pytest
 
@@ -48,10 +47,9 @@ def test_resolve_command_no_cwd() -> None:
 def test_resolve_command_with_cwd_in_path() -> None:
     """With cwd set, a command that does not point to a file should resolve on the path."""
     cwd = pathlib.Path("workingdir", "workingdir")
-    cmd_in_path = pathlib.Path("command")
-    # No executable at the path, so use the path as given.
-    with patch.object(pathlib.Path, "exists", return_value=False):
-        assert _resolve_command(cmd_in_path, cwd) == str(cmd_in_path)
+    # A name no executable or file will have, so use the path as given.
+    cmd_in_path = pathlib.Path("pyfogies-test-no-such-command")
+    assert _resolve_command(cmd_in_path, cwd) == str(cmd_in_path)
 
 
 def test_resolve_command_with_cwd_executable(

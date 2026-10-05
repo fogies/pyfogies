@@ -4,12 +4,9 @@ import shutil
 import socket
 import subprocess
 import sys
-import urllib.request
 import zipfile
 from collections.abc import Generator
 from contextlib import contextmanager
-from http.client import HTTPResponse
-from typing import cast
 
 import ollama as _ollama_client
 import psutil
@@ -17,16 +14,18 @@ import tenacity
 from filelock import BaseFileLock, FileLock
 from pydantic import BaseModel
 
+from fogies.download_verified import download_verified
 from fogies.ready_poll import READY_POLL_TIMING_SHORT, ready_poll
 
-# Most recent first; _KNOWN_VERSIONS[0] is the default.
-_KNOWN_VERSIONS = [
-    "0.34.2",
-    "0.32.5",
-    "0.17.7",
-]
+# Most recent first; the first is the default. Each maps to the SHA-256 of its
+# downloaded archive, from the sha256sum.txt published with each release.
+_KNOWN_VERSIONS = {
+    "0.34.2": "8f3fd071a2a2f9497b562f43502c77c2b701a99d1ee5dfda28da8c786373063b",
+    "0.32.5": "7c941ae084569d298062d29f8139163a3187c76dbca0479c70d085e78fd8c7bb",
+    "0.17.7": "67710550b4b77d86dc307b52d84cb3b5780847d5468428325470e37e1a394a72",
+}
 
-_DEFAULT_VERSION = _KNOWN_VERSIONS[0]
+_DEFAULT_VERSION = next(iter(_KNOWN_VERSIONS))
 
 _OLLAMA_URL_TEMPLATE = (
     "https://github.com/ollama/ollama/releases/download"
@@ -139,7 +138,7 @@ class _Ollama:
         pid_path = self._pid_path
 
         text = "{}\n".format(pid.model_dump_json())
-        _ = pid_path.write_text(text, encoding="utf-8")
+        _ = pid_path.write_text(text, encoding="utf-8", newline="\n")
 
     def set_refcount(self, count: int) -> None:
         """Set the managed server refcount state."""
@@ -150,6 +149,7 @@ class _Ollama:
         _ = refcount_path.write_text(
             "{}\n".format(count),
             encoding="utf-8",
+            newline="\n",
         )
 
 
@@ -270,9 +270,7 @@ def ollama(
         version_dir.mkdir(parents=True, exist_ok=True)
         try:
             url = _OLLAMA_URL_TEMPLATE.format(version=version)
-            response = cast(HTTPResponse, urllib.request.urlopen(url))
-            with response:
-                zip_bytes: bytes = response.read()
+            zip_bytes = download_verified(url=url, sha256=_KNOWN_VERSIONS[version])
 
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
                 zf.extractall(version_dir)

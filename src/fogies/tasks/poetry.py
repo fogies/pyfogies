@@ -47,16 +47,17 @@ def get_task_publish(*, secrets_poetry_path: Path) -> Task[Callable[[Context], N
 
         api_key: str = cast(str, secrets_poetry["pypi"]["api_key"])
 
+        # Read the PyPI token from the environment,
+        # so it is not echoed to the terminal as exposed to other processes.
         _ = context.run(
             command=" ".join(
                 [
                     "poetry",
                     "publish",
-                    "--username __token__",
-                    "--password {}".format(api_key),
                 ]
             ),
             echo=True,
+            env={"POETRY_PYPI_TOKEN_PYPI": api_key},
         )
 
     return cast(Task[Callable[[Context], None]], task_publish)

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 import pytest
 from pydantic import BaseModel
 
+from fogies.boto_clients import boto_client_logs
 from fogies.ready_poll import READY_POLL_TIMING_SHORT, ready_poll
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.cloudwatch import CloudwatchOutput
@@ -23,7 +24,6 @@ from fogies.tools.terraform import (
     terraform_tfbackend,
     terraform_tfvars,
 )
-from fogies.typing import boto_client_logs
 from tasks.paths import STAGING_BINARY_CACHE_PATH, TEST_BACKEND_STATUS_PATH
 from tests.pyfogies_tests_config import PyfogiesTestsConfig
 from tests.terraform.backend import PyfogiesTestBackendStates

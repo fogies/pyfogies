@@ -11,9 +11,9 @@ from typing import cast
 import botocore.exceptions
 from pydantic import BaseModel
 
+from fogies.boto_clients import boto_client_sts
 from fogies.templates import aws_toml_template_factory, ensure_from_template
 from fogies.tools.environ import environ
-from fogies.typing import boto_client_sts
 
 
 class AwsProfile(BaseModel):

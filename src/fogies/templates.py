@@ -33,7 +33,7 @@ def ensure_from_template(
     if path.exists():
         return
     path.parent.mkdir(parents=True, exist_ok=True)
-    _ = path.write_text(template_factory(), encoding="utf-8")
+    _ = path.write_text(template_factory(), encoding="utf-8", newline="\n")
     if raise_if_file_not_found:
         raise FileNotFoundError(
             "Expected file '{}' was not found, was created from template.".format(path)

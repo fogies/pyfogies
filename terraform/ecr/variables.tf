@@ -1,8 +1,3 @@
-variable "region" {
-  description = "AWS region in which to create ECR resources."
-  type        = string
-}
-
 variable "repositories" {
   description = "Names of ECR repositories to create."
   type        = set(string)

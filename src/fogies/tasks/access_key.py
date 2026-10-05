@@ -97,15 +97,16 @@ def get_task_create(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
     @task(
-        name="create", positional=[]
+        name="create",
+        positional=[],
+        help={
+            "prompt": "Prompt for admin credentials.",
+            "username": "IAM username.",
+        },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_create(context: Context, *, prompt: bool = False, username: str) -> None:
         """
         Create an IAM user and an associated access key.
-
-        Flags:
-          --prompt    Prompt for admin credentials.
-          --username  IAM username.
         """
         _ = context
         with _resolve_admin_environ(
@@ -123,15 +124,16 @@ def get_task_delete(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
     @task(
-        name="delete", positional=[]
+        name="delete",
+        positional=[],
+        help={
+            "prompt": "Prompt for admin credentials.",
+            "username": "IAM username.",
+        },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_delete(context: Context, *, prompt: bool = False, username: str) -> None:
         """
         Delete an IAM user with no remaining access keys.
-
-        Flags:
-          --prompt    Prompt for admin credentials.
-          --username  IAM username.
         """
         _ = context
         with _resolve_admin_environ(
@@ -156,17 +158,18 @@ def get_task_delete_key(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
     @task(
-        name="delete-key", positional=[]
+        name="delete-key",
+        positional=[],
+        help={
+            "prompt": "Prompt for admin credentials.",
+            "username": "IAM username.",
+        },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_delete_key(
         context: Context, *, prompt: bool = False, username: str
     ) -> None:
         """
         Delete the oldest access key for an IAM user.
-
-        Flags:
-          --prompt    Prompt for admin credentials.
-          --username  IAM username.
         """
         _ = context
         with _resolve_admin_environ(
@@ -201,13 +204,15 @@ def get_task_delete_key(
 def get_task_list(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
-    @task(name="list")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="list",
+        help={
+            "prompt": "Prompt for admin credentials.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_list(context: Context, *, prompt: bool = False) -> None:
         """
         List all IAM users and their access keys.
-
-        Flags:
-          --prompt  Prompt for admin credentials.
         """
         _ = context
         with _resolve_admin_environ(
@@ -229,17 +234,18 @@ def get_task_rotate_key(
     *, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Task[Callable[..., None]]:
     @task(
-        name="rotate-key", positional=[]
+        name="rotate-key",
+        positional=[],
+        help={
+            "prompt": "Prompt for admin credentials.",
+            "username": "IAM username.",
+        },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_rotate_key(
         context: Context, *, prompt: bool = False, username: str
     ) -> None:
         """
         Add a new access key to an existing IAM user.
-
-        Flags:
-          --prompt    Prompt for admin credentials instead of using the configured AWS environment.
-          --username  IAM username to rotate a key for.
         """
         _ = context
         with _resolve_admin_environ(
@@ -268,10 +274,10 @@ def get_task_rotate_key(
 
 
 def get_collection(
-    *, aws_environ_factory: AwsEnvironFactory | None = None
+    *, collection_name: str, aws_environ_factory: AwsEnvironFactory | None = None
 ) -> Collection:
     """Get a collection of tasks for managing IAM users and access keys."""
-    collection = Collection("access-key")
+    collection = Collection(collection_name)
     collection.add_task(get_task_create(aws_environ_factory=aws_environ_factory))
     collection.add_task(get_task_delete(aws_environ_factory=aws_environ_factory))
     collection.add_task(get_task_delete_key(aws_environ_factory=aws_environ_factory))

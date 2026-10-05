@@ -3,16 +3,15 @@ import io
 import json
 import pathlib
 import sys
-import urllib.request
 import zipfile
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
-from http.client import HTTPResponse
-from typing import Literal, NewType, TypeVar, cast, overload
+from typing import Literal, NewType, TypeVar, overload
 
 from invoke.runners import Result
 from pydantic import BaseModel, RootModel, ValidationError
 
+from fogies.download_verified import download_verified
 from fogies.terraform.backend import (
     BackendConfig,
     BackendStatus,
@@ -45,13 +44,14 @@ class DestroyParams:
     auto_approve: bool = False
 
 
-# Most recent first; _KNOWN_VERSIONS[0] is the default.
+# Most recent first; the first is the default. Each maps to the SHA-256 of its
+# downloaded archive, from terraform_<version>_SHA256SUMS on releases.hashicorp.com.
 # Versions must be ~> 1.15, because modules rely on `const = true` variables.
-_KNOWN_VERSIONS = [
-    "1.16.3",
-]
+_KNOWN_VERSIONS = {
+    "1.16.3": "6f908a90e5637afe72705290afd1cd71fc4f2877303ca77f05a8c6ead196b11c",
+}
 
-_DEFAULT_VERSION = _KNOWN_VERSIONS[0]
+_DEFAULT_VERSION = next(iter(_KNOWN_VERSIONS))
 
 _TERRAFORM_URL_TEMPLATE = (
     "https://releases.hashicorp.com/terraform"
@@ -97,12 +97,6 @@ TfvarsContextManager = AbstractContextManager[TfvarsPath]
 TfbackendFactory = Callable[[], TfbackendContextManager]
 TfvarsFactory = Callable[[], TfvarsContextManager]
 
-# Type for passing a terraform_templated() context manager into a task
-# factory, to be entered when the task actually runs. Same factory rationale
-# as TfbackendFactory/TfvarsFactory above.
-TerraformTemplatedContextManager = AbstractContextManager[dict[pathlib.Path, list[str]]]
-TerraformTemplatedFactory = Callable[[], TerraformTemplatedContextManager]
-
 
 @contextmanager
 def terraform_tfbackend(
@@ -116,14 +110,14 @@ def terraform_tfbackend(
     The file is written as flat key/value entries, one per line, e.g.:
 
     region = "us-west-2"
-    bucket = "pyfogies-test-backend-bucket"
+    bucket = "pyfogies-test-backend-session-bucket-us-west-2"
     key = "test-state-a/terraform.tfstate"
     use_lockfile = true
     """
     if path.suffixes[-1:] != [".tfbackend"]:
         raise ValueError("Path '{}' must end with '.tfbackend'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
+    with path.open("w", encoding="utf-8", newline="\n") as f:
         _ = f.write('region = "{}"\n'.format(backend.region))
         _ = f.write('bucket = "{}"\n'.format(backend.bucket_name))
         _ = f.write('key = "{}"\n'.format(backend.key))
@@ -154,78 +148,13 @@ def terraform_tfvars(
     if suffixes[-2:] != [".tfvars", ".json"]:
         raise ValueError("Path '{}' must end with '.tfvars.json'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
+    with path.open("w", encoding="utf-8", newline="\n") as f:
         json.dump(variables.model_dump(mode="json"), f, indent=2)
     try:
         yield TfvarsPath(path)
     finally:
         if delete_on_exit and path.exists():
             path.unlink()
-
-
-# Maps a placeholder string to the value that replaces it, wherever it
-# appears in a file rendered by terraform_templated. Empty for now: this
-# previously held __PYFOGIES_VERSION__, substituting the installed pyfogies
-# version into a module source's ref=, e.g. for hosted_zone.tf. That's no
-# longer needed as of Terraform 1.15+, which natively supports a `const =
-# true` variable in a module's source/version (see e.g.
-# fogies-infrastructure's `pyfogies_version` variable), resolved via
-# -var-file passed to `terraform init` (see _Terraform.init()'s tfvars_path).
-# Left in place, empty, since the same rename/render/restore mechanism could
-# still be useful for some future value Terraform itself can't parameterize.
-_TEMPLATED_PLACEHOLDERS: dict[str, str] = {}
-
-
-@contextmanager
-def terraform_templated(
-    *, module_path: pathlib.Path
-) -> Generator[dict[pathlib.Path, list[str]]]:
-    """Render each placeholder in _TEMPLATED_PLACEHOLDERS into every matching .tf file.
-
-    A templated file is checked in as an ordinary .tf file, with a
-    placeholder embedded somewhere a real value can't go directly (e.g. a
-    module source's ref=, which must be a literal), so tools like `terraform
-    fmt` keep formatting it normally. Terraform can't load the placeholder
-    directly, so for each .tf file found anywhere under *module_path* that
-    contains one (skipping .terraform/, where Terraform caches downloaded
-    modules), entry renames it to "<name>.tf.templated" and writes a rendered
-    copy back under its original name for Terraform to load. On exit, each
-    rendered file is removed and the original is restored to its original
-    name. Yields a mapping from each rendered path to the placeholders that
-    were substituted in it. A no-op (empty mapping) while
-    _TEMPLATED_PLACEHOLDERS is empty.
-    """
-    rendered: dict[pathlib.Path, list[str]] = {}
-    for current_path in module_path.rglob("*.tf"):
-        if ".terraform" in current_path.relative_to(module_path).parts:
-            continue
-        content = current_path.read_text(encoding="utf-8")
-        placeholders_found = [
-            placeholder
-            for placeholder in _TEMPLATED_PLACEHOLDERS
-            if placeholder in content
-        ]
-        if not placeholders_found:
-            continue
-
-        rendered_content = content
-        for placeholder in placeholders_found:
-            rendered_content = rendered_content.replace(
-                placeholder, _TEMPLATED_PLACEHOLDERS[placeholder]
-            )
-
-        templated_path = current_path.with_name(current_path.name + ".templated")
-        _ = current_path.rename(templated_path)
-        _ = current_path.write_text(rendered_content, encoding="utf-8")
-        rendered[current_path] = placeholders_found
-
-    try:
-        yield rendered
-    finally:
-        for rendered_path in rendered:
-            templated_path = rendered_path.with_name(rendered_path.name + ".templated")
-            rendered_path.unlink(missing_ok=True)
-            _ = templated_path.rename(rendered_path)
 
 
 class _Terraform:
@@ -490,9 +419,7 @@ def terraform(
         binary_cache_path.mkdir(parents=True, exist_ok=True)
         try:
             url = _TERRAFORM_URL_TEMPLATE.format(version=version)
-            response = cast(HTTPResponse, urllib.request.urlopen(url))
-            with response:
-                zip_bytes: bytes = response.read()
+            zip_bytes = download_verified(url=url, sha256=_KNOWN_VERSIONS[version])
 
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
                 _ = exe_path.write_bytes(zf.read("terraform.exe"))
