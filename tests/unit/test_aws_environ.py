@@ -7,6 +7,7 @@ validate.
 """
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,7 @@ def test_aws_environ_from_profile_sets_variables(
 
     with aws_environ_from_profile(profile=profile, raise_if_env_exists=False) as env:
         assert env.profile == profile.name
+        assert re.fullmatch(r"\d{12}", env.account_id)
         assert env.aws_access_key_id == profile.aws_access_key_id
         assert os.environ.get("AWS_ACCESS_KEY_ID") == profile.aws_access_key_id
         assert os.environ.get("AWS_SECRET_ACCESS_KEY") == profile.aws_secret_access_key
