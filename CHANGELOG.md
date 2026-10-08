@@ -35,6 +35,15 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0-dev.11] (2026-10-08)
+
+### Changed
+- Refactored `AwsEnviron` to provide `account_id`. ([#11](https://github.com/fogies/pyfogies/pull/11))
+- Refactored for naming clarity around Terraform modules for `backend`. ([#11](https://github.com/fogies/pyfogies/pull/11))
+
+### Security
+- Refactored to require S3 buckets are created in account regional namespace. ([#11](https://github.com/fogies/pyfogies/pull/11))
+
 ## [0.0.0-dev.10] (2026-10-05)
 
 ### Changed
