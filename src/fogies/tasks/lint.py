@@ -9,7 +9,9 @@ from invoke.tasks import Task, task
 
 
 def get_task_lint() -> Task[Callable[[Context], None]]:
-    @task(name="lint")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="lint", auto_shortflags=False
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_lint(context: Context) -> None:
         """
         Run linting.

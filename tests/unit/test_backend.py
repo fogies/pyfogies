@@ -47,11 +47,11 @@ def test_backend_config_bucket_name_length_limit() -> None:
 
 def test_backend_config_bucket_name() -> None:
     """The bucket name has the account regional namespace suffix."""
-    config = BackendConfig.for_state(
+    backend_config = BackendConfig.for_state(
         backend_name="my-backend", region="us-west-2", state_name="state-a"
     )
 
     assert (
-        config.bucket_name(account_id="111122223333")
+        backend_config.bucket_name(account_id="111122223333")
         == "my-backend-111122223333-us-west-2-an"
     )

@@ -26,7 +26,9 @@ def get_task_format(
     if not (fmt_black or fmt_isort or fmt_terraform):
         raise ValueError("At least one fmt flag must be set.")
 
-    @task(name="format")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="format", auto_shortflags=False
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_format(context: Context) -> None:
         """
         Apply code formatting.

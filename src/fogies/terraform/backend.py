@@ -80,7 +80,7 @@ class BackendOutput(BaseModel):
     region: str
     state_keys: dict[str, str]
 
-    def config(self, *, state_name: str) -> BackendConfig:
+    def backend_config(self, *, state_name: str) -> BackendConfig:
         """Return connection config for one of this backend's declared states.
 
         Raises ValueError if state_name is not declared as part of the backend.
@@ -101,7 +101,7 @@ class BackendOutput(BaseModel):
         )
 
     def __getitem__(self, state_name: str) -> BackendConfig:
-        return self.config(state_name=state_name)
+        return self.backend_config(state_name=state_name)
 
 
 def backend_delete_state_objects(*, output: BackendOutput) -> None:
@@ -137,16 +137,18 @@ def backend_delete_state_objects(*, output: BackendOutput) -> None:
     )
 
 
-def backend_state_resources(*, config: BackendConfig, account_id: str) -> list[object]:
-    """Return config's resources from the backend bucket.
+def backend_state_resources(
+    *, backend_config: BackendConfig, account_id: str
+) -> list[object]:
+    """Return backend_config's resources from the backend bucket.
 
     Returns an empty list if the state's object is absent (never applied) or
     has no resources.
     """
     return _state_resources(
-        bucket_name=config.bucket_name(account_id=account_id),
-        region=config.region,
-        key=config.key,
+        bucket_name=backend_config.bucket_name(account_id=account_id),
+        region=backend_config.region,
+        key=backend_config.key,
     )
 
 

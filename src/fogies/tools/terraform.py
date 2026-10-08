@@ -477,7 +477,8 @@ def terraform(
                 backend_status.states[backend_config.state_name] = BackendStatusEntry(
                     applied=bool(
                         backend_state_resources(
-                            config=backend_config, account_id=aws_environ.account_id
+                            backend_config=backend_config,
+                            account_id=aws_environ.account_id,
                         )
                     )
                 )
@@ -501,7 +502,8 @@ def terraform(
                 backend_status.states[backend_config.state_name] = BackendStatusEntry(
                     applied=bool(
                         backend_state_resources(
-                            config=backend_config, account_id=aws_environ.account_id
+                            backend_config=backend_config,
+                            account_id=aws_environ.account_id,
                         )
                     )
                 )

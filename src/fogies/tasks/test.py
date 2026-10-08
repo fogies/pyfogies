@@ -14,7 +14,9 @@ from invoke.tasks import Task, task
 def get_task_test(
     *, tests_path: pathlib.Path | None = None
 ) -> Task[Callable[[Context], None]]:
-    @task(name="test")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="test", auto_shortflags=False
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_test(context: Context) -> None:
         """
         Run tests.

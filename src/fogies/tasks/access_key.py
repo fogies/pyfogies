@@ -98,6 +98,7 @@ def get_task_create(
 ) -> Task[Callable[..., None]]:
     @task(
         name="create",
+        auto_shortflags=False,
         positional=[],
         help={
             "prompt": "Prompt for admin credentials.",
@@ -125,6 +126,7 @@ def get_task_delete(
 ) -> Task[Callable[..., None]]:
     @task(
         name="delete",
+        auto_shortflags=False,
         positional=[],
         help={
             "prompt": "Prompt for admin credentials.",
@@ -159,6 +161,7 @@ def get_task_delete_key(
 ) -> Task[Callable[..., None]]:
     @task(
         name="delete-key",
+        auto_shortflags=False,
         positional=[],
         help={
             "prompt": "Prompt for admin credentials.",
@@ -206,6 +209,7 @@ def get_task_list(
 ) -> Task[Callable[..., None]]:
     @task(
         name="list",
+        auto_shortflags=False,
         help={
             "prompt": "Prompt for admin credentials.",
         },
@@ -235,6 +239,7 @@ def get_task_rotate_key(
 ) -> Task[Callable[..., None]]:
     @task(
         name="rotate-key",
+        auto_shortflags=False,
         positional=[],
         help={
             "prompt": "Prompt for admin credentials.",

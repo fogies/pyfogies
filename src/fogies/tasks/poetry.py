@@ -14,7 +14,9 @@ from fogies.templates import ensure_from_template, poetry_toml_template_factory
 
 
 def get_task_build() -> Task[Callable[[Context], None]]:
-    @task(name="build")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="build", auto_shortflags=False
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_build(context: Context) -> None:
         """
         Build package artifacts.
@@ -33,7 +35,9 @@ def get_task_build() -> Task[Callable[[Context], None]]:
 
 
 def get_task_publish(*, secrets_poetry_path: Path) -> Task[Callable[[Context], None]]:
-    @task(name="publish")  # pyright: ignore[reportUntypedFunctionDecorator]
+    @task(
+        name="publish", auto_shortflags=False
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_publish(context: Context) -> None:
         """
         Publish package to PyPI.
