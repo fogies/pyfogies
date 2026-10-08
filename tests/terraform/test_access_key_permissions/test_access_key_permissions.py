@@ -202,6 +202,7 @@ def access_key_profile(
 @pytest.mark.parametrize("scenario", _SCENARIOS, ids=[s.name for s in _SCENARIOS])
 def test_access_key_permissions_grants_and_restricts(
     pyfogies_test_config: PyfogiesTestsConfig,
+    pyfogies_test_aws_environ: AwsEnviron,
     pyfogies_test_backend: BackendOutput,
     access_key_username: str,
     access_key_profile: AwsProfile,
@@ -228,6 +229,7 @@ def test_access_key_permissions_grants_and_restricts(
         terraform_tfbackend(
             path=tfbackend_path,
             backend=backend,
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
@@ -245,6 +247,7 @@ def test_access_key_permissions_grants_and_restricts(
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
             backend=backend,
+            aws_environ=pyfogies_test_aws_environ,
             backend_status_path=TEST_BACKEND_STATUS_PATH,
             init_on_entry=True,
             init_params=InitParams(upgrade=True, reconfigure=True),

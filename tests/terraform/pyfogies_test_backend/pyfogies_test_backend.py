@@ -48,9 +48,9 @@ def pyfogies_test_backend(
         terraform_tfvars(
             path=tfvars_path,
             variables=BackendVars(
-                name=_TEST_BACKEND_SESSION_NAME,
+                backend_name=_TEST_BACKEND_SESSION_NAME,
                 region=pyfogies_test_config.aws.region,
-                states=list(PyfogiesTestBackendStates),
+                state_names=list(PyfogiesTestBackendStates),
                 tags=_TEST_BACKEND_SESSION_TAGS,
             ),
         ) as tfvars_path,

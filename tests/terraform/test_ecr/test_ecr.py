@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.ecr import EcrOutput
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -33,6 +34,7 @@ class _TestEcrOutput(BaseModel):
 
 def test_ecr_output(
     pyfogies_test_config: PyfogiesTestsConfig,
+    pyfogies_test_aws_environ: AwsEnviron,
     pyfogies_test_backend: BackendOutput,
     tmp_path: pathlib.Path,
 ) -> None:
@@ -48,6 +50,7 @@ def test_ecr_output(
         terraform_tfbackend(
             path=tfbackend_path,
             backend=backend,
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
@@ -62,6 +65,7 @@ def test_ecr_output(
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
             backend=backend,
+            aws_environ=pyfogies_test_aws_environ,
             backend_status_path=TEST_BACKEND_STATUS_PATH,
             init_on_entry=True,
             init_params=InitParams(upgrade=True, reconfigure=True),

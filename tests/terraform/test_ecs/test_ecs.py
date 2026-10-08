@@ -17,6 +17,7 @@ from fogies.terraform.backend import BackendOutput
 from fogies.terraform.cloudwatch import CloudwatchOutput
 from fogies.terraform.ecs import EcsOutput
 from fogies.terraform.network import NetworkOutput
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -55,6 +56,7 @@ class _TestEcsOutput(BaseModel):
 @pytest.fixture(scope="module")
 def ecs_output(
     pyfogies_test_config: PyfogiesTestsConfig,
+    pyfogies_test_aws_environ: AwsEnviron,
     pyfogies_test_backend: BackendOutput,
     pyfogies_test_network: NetworkOutput,
     pyfogies_test_alb_self_signed: PyfogiesTestAlbSelfSignedOutput,
@@ -74,6 +76,7 @@ def ecs_output(
         terraform_tfbackend(
             path=tfbackend_path,
             backend=backend,
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
@@ -94,6 +97,7 @@ def ecs_output(
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
             backend=backend,
+            aws_environ=pyfogies_test_aws_environ,
             backend_status_path=TEST_BACKEND_STATUS_PATH,
             init_on_entry=True,
             init_params=InitParams(upgrade=True, reconfigure=True),

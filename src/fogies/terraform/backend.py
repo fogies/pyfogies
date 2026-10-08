@@ -24,23 +24,6 @@ class BackendVars(BaseModel):
 _BUCKET_NAME_MAX_LENGTH = 63
 
 
-def backend_bucket_name(*, backend_name: str, region: str, account_id: str) -> str:
-    """Return the account regional namespace bucket name of a backend.
-
-    Mirrors the bucket naming of the backend Terraform module. Raises
-    ValueError if *backend_name* leaves no room for the account and region suffix.
-    """
-    bucket_name = "{}-{}-{}-an".format(backend_name, account_id, region)
-    if len(bucket_name) > _BUCKET_NAME_MAX_LENGTH:
-        raise ValueError(
-            "Backend name '{}' makes a bucket name longer than {} characters".format(
-                backend_name,
-                _BUCKET_NAME_MAX_LENGTH,
-            )
-        )
-    return bucket_name
-
-
 class BackendConfig(BaseModel):
     """Connection config for a single state within an S3 Terraform backend.
 
@@ -74,12 +57,21 @@ class BackendConfig(BaseModel):
         )
 
     def bucket_name(self, *, account_id: str) -> str:
-        """Return the name of the backend bucket in the given account."""
-        return backend_bucket_name(
-            backend_name=self.backend_name,
-            region=self.region,
-            account_id=account_id,
-        )
+        """Return the name of the backend bucket in the given account.
+
+        Mirrors the bucket naming of the backend Terraform module. Raises
+        ValueError if the backend name leaves no room for the account and
+        region suffix.
+        """
+        bucket_name = "{}-{}-{}-an".format(self.backend_name, account_id, self.region)
+        if len(bucket_name) > _BUCKET_NAME_MAX_LENGTH:
+            raise ValueError(
+                "Backend name '{}' makes a bucket name longer than {} characters".format(
+                    self.backend_name,
+                    _BUCKET_NAME_MAX_LENGTH,
+                )
+            )
+        return bucket_name
 
 
 class BackendOutput(BaseModel):
