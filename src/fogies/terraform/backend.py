@@ -14,68 +14,94 @@ from fogies.tools.boto import s3_delete_keys
 
 
 class BackendVars(BaseModel):
-    name: str
+    backend_name: str
     region: str
-    states: list[str]
+    state_names: list[str]
     tags: dict[str, str] = {}
 
 
-class BackendConfig(BaseModel):
-    """Connection info for a single state within an S3 Terraform backend.
+# S3 limits the length of a bucket name.
+_BUCKET_NAME_MAX_LENGTH = 63
 
-    Unlike a Terraform backend module's output, this does not describe every
-    state sharing a backend bucket. It describes only the one state a
-    consumer wants to connect to.
+
+class BackendConfig(BaseModel):
+    """Connection config for a single state within an S3 Terraform backend.
+
+    The bucket name includes the AWS account ID, which is not stored in code.
+    A config is safe to create at import time; bucket_name() is given the
+    account ID (e.g. from AwsEnviron) when the bucket is actually needed. This
+    lets a tenant point at an already-applied backend without knowing about
+    any other state sharing its bucket.
     """
 
-    state: str
-    bucket_name: str
+    state_name: str
+    backend_name: str
     region: str
     key: str
 
     @staticmethod
-    def for_state(*, name: str, region: str, state: str) -> "BackendConfig":
-        """Return connection config for a state, without applying the backend module.
+    def for_state(
+        *, backend_name: str, region: str, state_name: str
+    ) -> "BackendConfig":
+        """Return config for a state, without applying the backend module.
 
-        Mirrors the bucket and key naming the backend Terraform module derives
+        Mirrors the key naming the backend Terraform module derives
         internally, so a tenant can point at an already-applied backend without
         knowing about any other state sharing its bucket.
         """
         return BackendConfig(
-            state=state,
-            bucket_name="{}-bucket-{}".format(name, region),
+            state_name=state_name,
+            backend_name=backend_name,
             region=region,
-            key="{}/terraform.tfstate".format(state),
+            key="{}/terraform.tfstate".format(state_name),
         )
+
+    def bucket_name(self, *, account_id: str) -> str:
+        """Return the name of the backend bucket in the given account.
+
+        Mirrors the bucket naming of the backend Terraform module. Raises
+        ValueError if the backend name leaves no room for the account and
+        region suffix.
+        """
+        bucket_name = "{}-{}-{}-an".format(self.backend_name, account_id, self.region)
+        if len(bucket_name) > _BUCKET_NAME_MAX_LENGTH:
+            raise ValueError(
+                "Backend name '{}' makes a bucket name longer than {} characters".format(
+                    self.backend_name,
+                    _BUCKET_NAME_MAX_LENGTH,
+                )
+            )
+        return bucket_name
 
 
 class BackendOutput(BaseModel):
+    backend_name: str
     bucket_name: str
     region: str
     state_keys: dict[str, str]
 
-    def config(self, *, state: str) -> BackendConfig:
+    def config(self, *, state_name: str) -> BackendConfig:
         """Return connection config for one of this backend's declared states.
 
-        Raises ValueError if state is not declared as part of the backend.
+        Raises ValueError if state_name is not declared as part of the backend.
         """
-        if state not in self.state_keys:
+        if state_name not in self.state_keys:
             raise ValueError(
                 "State '{}' is not declared as part of backend. Declared states: {}.".format(
-                    state,
+                    state_name,
                     ", ".join(sorted(self.state_keys)),
                 )
             )
 
         return BackendConfig(
-            state=state,
-            bucket_name=self.bucket_name,
+            state_name=state_name,
+            backend_name=self.backend_name,
             region=self.region,
-            key=self.state_keys[state],
+            key=self.state_keys[state_name],
         )
 
-    def __getitem__(self, state: str) -> BackendConfig:
-        return self.config(state=state)
+    def __getitem__(self, state_name: str) -> BackendConfig:
+        return self.config(state_name=state_name)
 
 
 def backend_delete_state_objects(*, output: BackendOutput) -> None:
@@ -111,15 +137,23 @@ def backend_delete_state_objects(*, output: BackendOutput) -> None:
     )
 
 
-def backend_state_resources(*, config: BackendConfig) -> list[object]:
+def backend_state_resources(*, config: BackendConfig, account_id: str) -> list[object]:
     """Return config's resources from the backend bucket.
 
     Returns an empty list if the state's object is absent (never applied) or
     has no resources.
     """
-    client = boto_client_s3(region=config.region)
+    return _state_resources(
+        bucket_name=config.bucket_name(account_id=account_id),
+        region=config.region,
+        key=config.key,
+    )
+
+
+def _state_resources(*, bucket_name: str, region: str, key: str) -> list[object]:
+    client = boto_client_s3(region=region)
     try:
-        response = client.get_object(Bucket=config.bucket_name, Key=config.key)
+        response = client.get_object(Bucket=bucket_name, Key=key)
     except client.exceptions.NoSuchKey:
         return []
 
@@ -134,10 +168,14 @@ def backend_states_with_resources(*, output: BackendOutput) -> dict[str, list[ob
     Empty if every declared state is empty.
     """
     states_with_resources: dict[str, list[object]] = {}
-    for state in output.state_keys:
-        resources = backend_state_resources(config=output.config(state=state))
+    for state_name in output.state_keys:
+        resources = _state_resources(
+            bucket_name=output.bucket_name,
+            region=output.region,
+            key=output.state_keys[state_name],
+        )
         if resources:
-            states_with_resources[state] = resources
+            states_with_resources[state_name] = resources
     return states_with_resources
 
 
@@ -167,8 +205,8 @@ class BackendStatus(BaseModel):
 
         status = BackendStatus.load(path=path)
         status.backend.applied = True
-        applied = status.states.get(name, BackendStatusEntry()).applied
-        status.states[name] = BackendStatusEntry(applied=True)
+        applied = status.states.get(state_name, BackendStatusEntry()).applied
+        status.states[state_name] = BackendStatusEntry(applied=True)
         status.save(path=path)
     """
 
@@ -212,10 +250,10 @@ class BackendStatus(BaseModel):
             if "states" not in doc:
                 doc["states"] = tomlkit.table(is_super_table=True)
             states_table = cast(Table, doc["states"])
-            for name, entry in self.states.items():
-                if name not in states_table:
-                    states_table[name] = tomlkit.table()
-                state_table = cast(Table, states_table[name])
+            for state_name, entry in self.states.items():
+                if state_name not in states_table:
+                    states_table[state_name] = tomlkit.table()
+                state_table = cast(Table, states_table[state_name])
                 state_table["applied"] = entry.applied
 
         with path.open("w", encoding="utf-8", newline="\n") as f:

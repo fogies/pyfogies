@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.network import NetworkOutput
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -37,6 +38,7 @@ class _TestNetworkOutput(BaseModel):
 @pytest.fixture(scope="session")
 def pyfogies_test_network(
     pyfogies_test_config: PyfogiesTestsConfig,
+    pyfogies_test_aws_environ: AwsEnviron,
     pyfogies_test_backend: BackendOutput,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[NetworkOutput]:
@@ -45,12 +47,13 @@ def pyfogies_test_network(
     tmp_path = tmp_path_factory.mktemp("pyfogies-test-network")
     tfbackend_path = tmp_path / "pyfogies-test-network.tfbackend"
     tfvars_path = tmp_path / "pyfogies-test-network.tfvars.json"
-    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_NETWORK]
+    backend_config = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_NETWORK]
 
     with (
         terraform_tfbackend(
             path=tfbackend_path,
-            backend=backend,
+            backend_config=backend_config,
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
@@ -64,7 +67,8 @@ def pyfogies_test_network(
             module_path=_TEST_NETWORK_MODULE,
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
-            backend=backend,
+            backend_config=backend_config,
+            aws_environ=pyfogies_test_aws_environ,
             backend_status_path=TEST_BACKEND_STATUS_PATH,
             init_on_entry=True,
             init_params=InitParams(upgrade=True, reconfigure=True),

@@ -6,7 +6,13 @@ from collections.abc import Iterator
 import pytest
 from pydantic import BaseModel
 
-from fogies.terraform.backend import BackendOutput, BackendStatus, BackendVars
+from fogies.terraform.backend import (
+    BackendConfig,
+    BackendOutput,
+    BackendStatus,
+    BackendVars,
+)
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -52,6 +58,7 @@ def nested_backend_status_path(
 @pytest.fixture(scope="module")
 def nested_backend_output(
     pyfogies_test_config: PyfogiesTestsConfig,
+    pyfogies_test_aws_environ: AwsEnviron,
     pyfogies_test_backend: BackendOutput,
     nested_backend_status_path: pathlib.Path,
     tmp_path_factory: pytest.TempPathFactory,
@@ -66,14 +73,17 @@ def nested_backend_output(
     with (
         terraform_tfbackend(
             path=tfbackend_path,
-            backend=pyfogies_test_backend[PyfogiesTestBackendStates.TEST_BACKEND],
+            backend_config=pyfogies_test_backend[
+                PyfogiesTestBackendStates.TEST_BACKEND
+            ],
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
             variables=BackendVars(
-                name=_TEST_BACKEND_NESTED_NAME,
+                backend_name=_TEST_BACKEND_NESTED_NAME,
                 region=pyfogies_test_config.aws.region,
-                states=_TEST_BACKEND_NESTED_STATES,
+                state_names=_TEST_BACKEND_NESTED_STATES,
                 tags=_TEST_BACKEND_NESTED_TAGS,
             ),
         ) as tfvars_path,
@@ -106,12 +116,16 @@ def test_backend_status_applied(
     assert BackendStatus.load(path=nested_backend_status_path).backend.applied is True
 
 
-def test_backend_output(nested_backend_output: BackendOutput) -> None:
+def test_backend_output(
+    pyfogies_test_aws_environ: AwsEnviron,
+    nested_backend_output: BackendOutput,
+) -> None:
     """Backend module output matches expected bucket and state keys."""
-    expected_bucket_name = "{}-bucket-{}".format(
-        _TEST_BACKEND_NESTED_NAME,
-        nested_backend_output.region,
-    )
+    expected_bucket_name = BackendConfig.for_state(
+        backend_name=_TEST_BACKEND_NESTED_NAME,
+        region=nested_backend_output.region,
+        state_name=_TEST_BACKEND_NESTED_STATES[0],
+    ).bucket_name(account_id=pyfogies_test_aws_environ.account_id)
     expected_state_keys = {
         s: "{}/terraform.tfstate".format(s) for s in _TEST_BACKEND_NESTED_STATES
     }
@@ -122,6 +136,7 @@ def test_backend_output(nested_backend_output: BackendOutput) -> None:
 
 
 def test_state_a_and_state_b(
+    pyfogies_test_aws_environ: AwsEnviron,
     nested_backend_output: BackendOutput,
     nested_backend_status_path: pathlib.Path,
     tmp_path: pathlib.Path,
@@ -146,11 +161,13 @@ def test_state_a_and_state_b(
     with (
         terraform_tfbackend(
             path=tfbackend_a_path,
-            backend=nested_backend_output["test-state-a"],
+            backend_config=nested_backend_output["test-state-a"],
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_a_path,
         terraform_tfbackend(
             path=tfbackend_b_path,
-            backend=nested_backend_output["test-state-b"],
+            backend_config=nested_backend_output["test-state-b"],
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_b_path,
         terraform_tfvars(
             path=tfvars_a,
@@ -164,7 +181,8 @@ def test_state_a_and_state_b(
             binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=state_a_module_path,
-            backend=nested_backend_output["test-state-a"],
+            backend_config=nested_backend_output["test-state-a"],
+            aws_environ=pyfogies_test_aws_environ,
             backend_status_path=nested_backend_status_path,
             tfvars_path=tfvars_a,
             tfbackend_path=tfbackend_a_path,
@@ -180,7 +198,8 @@ def test_state_a_and_state_b(
             binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=state_b_module_path,
-            backend=nested_backend_output["test-state-b"],
+            backend_config=nested_backend_output["test-state-b"],
+            aws_environ=pyfogies_test_aws_environ,
             backend_status_path=nested_backend_status_path,
             tfvars_path=tfvars_b,
             tfbackend_path=tfbackend_b_path,
@@ -208,6 +227,7 @@ def test_state_a_and_state_b(
 
 
 def test_invalid_state_c(
+    pyfogies_test_aws_environ: AwsEnviron,
     nested_backend_output: BackendOutput,
     tmp_path: pathlib.Path,
 ) -> None:
@@ -218,7 +238,8 @@ def test_invalid_state_c(
         with (
             terraform_tfbackend(
                 path=tfbackend_c_path,
-                backend=nested_backend_output["invalid_state_c"],
+                backend_config=nested_backend_output["invalid_state_c"],
+                aws_environ=pyfogies_test_aws_environ,
             ) as tfbackend_c_path,
         ):
             # Apply should fail.

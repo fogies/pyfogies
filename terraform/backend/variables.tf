@@ -1,10 +1,10 @@
-variable "name" {
+variable "backend_name" {
   description = "Base prefix for backend resources (used to derive bucket name)."
   type        = string
 }
 
-variable "states" {
-  description = "Logical names of Terraform states to manage within this backend."
+variable "state_names" {
+  description = "Names of Terraform states to manage within this backend."
   type        = list(string)
 }
 

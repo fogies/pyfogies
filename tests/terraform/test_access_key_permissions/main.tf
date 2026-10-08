@@ -32,7 +32,7 @@ variable "policies" {
 }
 
 variable "statements" {
-  description = "Inline policy statements to grant."
+  description = "Policy statements to grant."
   type = list(object({
     effect    = string
     actions   = list(string)

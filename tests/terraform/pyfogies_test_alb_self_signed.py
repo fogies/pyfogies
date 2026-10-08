@@ -15,6 +15,7 @@ from fogies.ready_poll import (
 from fogies.terraform.alb import AlbOutput
 from fogies.terraform.backend import BackendOutput
 from fogies.terraform.network import NetworkOutput
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -59,6 +60,7 @@ def _wait_for_alb(dns_name: str) -> None:
 @pytest.fixture(scope="session")
 def pyfogies_test_alb_self_signed(
     pyfogies_test_config: PyfogiesTestsConfig,
+    pyfogies_test_aws_environ: AwsEnviron,
     pyfogies_test_backend: BackendOutput,
     pyfogies_test_network: NetworkOutput,
     tmp_path_factory: pytest.TempPathFactory,
@@ -69,12 +71,15 @@ def pyfogies_test_alb_self_signed(
     tmp_path = tmp_path_factory.mktemp("pyfogies-test-alb-self-signed")
     tfbackend_path = tmp_path / "pyfogies-test-alb-self-signed.tfbackend"
     tfvars_path = tmp_path / "pyfogies-test-alb-self-signed.tfvars.json"
-    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_ALB_SELF_SIGNED]
+    backend_config = pyfogies_test_backend[
+        PyfogiesTestBackendStates.TEST_ALB_SELF_SIGNED
+    ]
 
     with (
         terraform_tfbackend(
             path=tfbackend_path,
-            backend=backend,
+            backend_config=backend_config,
+            aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
             path=tfvars_path,
@@ -92,7 +97,8 @@ def pyfogies_test_alb_self_signed(
             module_path=module_path,
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
-            backend=backend,
+            backend_config=backend_config,
+            aws_environ=pyfogies_test_aws_environ,
             backend_status_path=TEST_BACKEND_STATUS_PATH,
             init_on_entry=True,
             init_params=InitParams(upgrade=True, reconfigure=True),

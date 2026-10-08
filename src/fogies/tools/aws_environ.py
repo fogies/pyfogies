@@ -26,6 +26,7 @@ class AwsProfile(BaseModel):
 
 class AwsEnviron(BaseModel):
     profile: str
+    account_id: str
     username: str
     aws_access_key_id: str
 
@@ -127,11 +128,11 @@ def aws_environ_from_profile(
     yielding, raising ValueError immediately rather than letting some later,
     unrelated AWS call fail confusingly. The extra round trip is minor next
     to the time lost misdiagnosing an unclear downstream error. That same
-    call's identity ARN also supplies the yielded username, so callers never
-    need a second STS call just to learn it.
+    call's identity also supplies the yielded account ID and username, so
+    callers never need a second STS call just to learn them.
 
-    Yields an :class:`AwsEnviron` describing which profile, IAM username,
-    and key ID are active.
+    Yields an :class:`AwsEnviron` describing which profile, account ID, IAM
+    username, and key ID are active.
     """
     variables: dict[str, str] = {
         "AWS_ACCESS_KEY_ID": profile.aws_access_key_id,
@@ -151,6 +152,7 @@ def aws_environ_from_profile(
         username = _username_from_iam_arn(identity["Arn"])
         yield AwsEnviron(
             profile=profile.name,
+            account_id=identity["Account"],
             username=username,
             aws_access_key_id=profile.aws_access_key_id,
         )
@@ -172,7 +174,8 @@ def aws_environ_from_config(
     config file. See aws_environ_from_profile() for credential validation
     and for raise_if_env_exists/raise_if_env_changed defaults.
 
-    Yields an :class:`AwsEnviron` describing which profile and key ID are active.
+    Yields an :class:`AwsEnviron` describing which profile, account ID, IAM
+    username, and key ID are active.
     """
     aws_profile = load_aws_profile_from_config(
         config_path=config_path, profile_name=profile_name

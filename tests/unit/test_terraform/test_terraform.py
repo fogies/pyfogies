@@ -7,6 +7,7 @@ from invoke.exceptions import UnexpectedExit
 from pydantic import BaseModel
 
 from fogies.terraform.backend import BackendConfig
+from fogies.tools.aws_environ import AwsEnviron
 from fogies.tools.command import CommandParams
 from fogies.tools.terraform import (
     ApplyParams,
@@ -49,17 +50,22 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
 
 def test_terraform_tfbackend(tmp_path: pathlib.Path) -> None:
     """terraform_tfbackend writes the file and yields the path; delete_on_exit removes the file."""
-    backend = BackendConfig(
-        state="test-state",
-        bucket_name="my-bucket",
-        region="us-west-2",
-        key="test-state/terraform.tfstate",
+    backend_config = BackendConfig.for_state(
+        backend_name="my-backend", region="us-west-2", state_name="test-state"
+    )
+    aws_environ = AwsEnviron(
+        profile="test",
+        account_id="111122223333",
+        username="test-user",
+        aws_access_key_id="AKIAIOSFODNN7EXAMPLE",
     )
     path = tmp_path / "backend.tfbackend"
-    with terraform_tfbackend(path=path, backend=backend) as backend_path:
+    with terraform_tfbackend(
+        path=path, backend_config=backend_config, aws_environ=aws_environ
+    ) as backend_path:
         text = backend_path.read_text(encoding="utf-8")
         assert 'region = "us-west-2"' in text
-        assert 'bucket = "my-bucket"' in text
+        assert 'bucket = "my-backend-111122223333-us-west-2-an"' in text
         assert 'key = "test-state/terraform.tfstate"' in text
         assert "use_lockfile = true" in text
     assert not path.exists()

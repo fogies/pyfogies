@@ -19,7 +19,7 @@ provider "aws" {
   }
 }
 
-variable "name" {
+variable "backend_name" {
   description = "Base prefix for backend resources."
   type        = string
 }
@@ -29,8 +29,8 @@ variable "region" {
   type        = string
 }
 
-variable "states" {
-  description = "Logical names of Terraform states to manage within this backend."
+variable "state_names" {
+  description = "Names of Terraform states to manage within this backend."
   type        = list(string)
   default     = []
 }
@@ -44,8 +44,8 @@ variable "tags" {
 module "backend" {
   source = "../../../../terraform/backend"
 
-  name   = var.name
-  states = var.states
+  backend_name = var.backend_name
+  state_names  = var.state_names
 }
 
 output "backend" {
