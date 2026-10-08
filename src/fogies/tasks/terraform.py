@@ -37,6 +37,12 @@ def get_task_apply(
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     if backend is not None and tfbackend_factory is None:
         raise ValueError("tfbackend_factory is required when backend is set")
+    if (backend is not None or tfbackend_factory is not None) and (
+        aws_environ_factory is None
+    ):
+        raise ValueError(
+            "aws_environ_factory is required when backend or tfbackend_factory is set"
+        )
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
@@ -72,11 +78,16 @@ def get_task_apply(
         )
 
         with ExitStack() as stack:
-            if aws_environ_factory is not None:
-                _ = stack.enter_context(aws_environ_factory())
+            aws_environ = (
+                stack.enter_context(aws_environ_factory())
+                if aws_environ_factory
+                else None
+            )
 
             tfbackend_path = (
-                stack.enter_context(tfbackend_factory()) if tfbackend_factory else None
+                stack.enter_context(tfbackend_factory(aws_environ))
+                if tfbackend_factory and aws_environ
+                else None
             )
             tfvars_path = (
                 stack.enter_context(tfvars_factory()) if tfvars_factory else None
@@ -88,6 +99,7 @@ def get_task_apply(
                     command_params=command_params,
                     module_path=module_path,
                     backend=backend,
+                    aws_environ=aws_environ,
                     backend_status_path=backend_status_path,
                     tfbackend_path=tfbackend_path,
                     tfvars_path=tfvars_path,
@@ -118,6 +130,12 @@ def get_task_destroy(
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     if backend is not None and tfbackend_factory is None:
         raise ValueError("tfbackend_factory is required when backend is set")
+    if (backend is not None or tfbackend_factory is not None) and (
+        aws_environ_factory is None
+    ):
+        raise ValueError(
+            "aws_environ_factory is required when backend or tfbackend_factory is set"
+        )
     if (backend_status_path is None) != (backend is None):
         raise ValueError("backend_status_path and backend must be provided together")
 
@@ -153,11 +171,16 @@ def get_task_destroy(
         )
 
         with ExitStack() as stack:
-            if aws_environ_factory is not None:
-                _ = stack.enter_context(aws_environ_factory())
+            aws_environ = (
+                stack.enter_context(aws_environ_factory())
+                if aws_environ_factory
+                else None
+            )
 
             tfbackend_path = (
-                stack.enter_context(tfbackend_factory()) if tfbackend_factory else None
+                stack.enter_context(tfbackend_factory(aws_environ))
+                if tfbackend_factory and aws_environ
+                else None
             )
             tfvars_path = (
                 stack.enter_context(tfvars_factory()) if tfvars_factory else None
@@ -169,6 +192,7 @@ def get_task_destroy(
                     command_params=command_params,
                     module_path=module_path,
                     backend=backend,
+                    aws_environ=aws_environ,
                     backend_status_path=backend_status_path,
                     tfbackend_path=tfbackend_path,
                     tfvars_path=tfvars_path,

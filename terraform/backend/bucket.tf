@@ -1,16 +1,25 @@
+data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
   region = data.aws_region.current.region
+
+  # We include the region in the bucket name
+  # because of the large delays associated with deleting and creating a bucket in a different region.
+  # The account regional namespace also requires the region in the name.
+  #
+  # A bucket in the account regional namespace can only be created by this
+  # account, and can never be re-created by another account. The namespace
+  # requires the account ID and region suffix, which count towards the
+  # 63 character limit.
+  bucket_name = "${var.backend_name}-${data.aws_caller_identity.current.account_id}-${local.region}-an"
 }
 
 # Use a single bucket. 
 # Different states will be stored using keys.
 resource "aws_s3_bucket" "state" {
-  # We include the region in the bucket name
-  # because of the large delays associated with deleting and creating a bucket in a different region.
-  # This ensures a unique name in any region.
-  bucket = "${var.name}-bucket-${local.region}"
+  bucket           = local.bucket_name
+  bucket_namespace = "account-regional"
 
   # Explicitly and intentionally false. 
   # Resources with every state must be explicitly destroyed before the bucket can be deleted.
@@ -18,12 +27,14 @@ resource "aws_s3_bucket" "state" {
   # Use backend_delete_state_objects to clear state files after confirming all resources are destroyed.
   force_destroy = false
 
-  tags = merge(
-    {
-      Name = "${var.name}-bucket-${local.region}"
-    },
-    var.tags,
-  )
+  tags = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = length(local.bucket_name) <= 63
+      error_message = "The bucket name, including the account and region suffix, must be at most 63 characters."
+    }
+  }
 }
 
 # Ensure versioning within the bucket.

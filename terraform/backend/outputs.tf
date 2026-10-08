@@ -1,3 +1,8 @@
+output "backend_name" {
+  description = "Name given to the backend, from which the bucket name is derived."
+  value       = var.backend_name
+}
+
 output "bucket_name" {
   description = "Name of the S3 bucket used for Terraform state."
   value       = aws_s3_bucket.state.id
@@ -9,9 +14,9 @@ output "region" {
 }
 
 output "state_keys" {
-  description = "Map of logical state name to key prefix in the state bucket."
+  description = "Map of state name to key prefix in the state bucket."
   value = {
-    for state in var.states :
-    state => "${state}/terraform.tfstate"
+    for state_name in var.state_names :
+    state_name => "${state_name}/terraform.tfstate"
   }
 }
