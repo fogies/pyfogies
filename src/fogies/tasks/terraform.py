@@ -26,7 +26,7 @@ def get_task_apply(
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
     aws_environ_factory: AwsEnvironFactory | None = None,
-    backend: BackendConfig | None = None,
+    backend_config: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_factory: TfbackendFactory | None = None,
     tfvars_factory: TfvarsFactory | None = None,
@@ -35,16 +35,18 @@ def get_task_apply(
     default_init_reconfigure: bool = False,
     default_apply_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    if backend is not None and tfbackend_factory is None:
-        raise ValueError("tfbackend_factory is required when backend is set")
-    if (backend is not None or tfbackend_factory is not None) and (
+    if backend_config is not None and tfbackend_factory is None:
+        raise ValueError("tfbackend_factory is required when backend_config is set")
+    if (backend_config is not None or tfbackend_factory is not None) and (
         aws_environ_factory is None
     ):
         raise ValueError(
-            "aws_environ_factory is required when backend or tfbackend_factory is set"
+            "aws_environ_factory is required when backend_config or tfbackend_factory is set"
         )
-    if (backend_status_path is None) != (backend is None):
-        raise ValueError("backend_status_path and backend must be provided together")
+    if (backend_status_path is None) != (backend_config is None):
+        raise ValueError(
+            "backend_status_path and backend_config must be provided together"
+        )
 
     @task(
         name="apply",
@@ -98,7 +100,7 @@ def get_task_apply(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
                     module_path=module_path,
-                    backend=backend,
+                    backend_config=backend_config,
                     aws_environ=aws_environ,
                     backend_status_path=backend_status_path,
                     tfbackend_path=tfbackend_path,
@@ -119,7 +121,7 @@ def get_task_destroy(
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
     aws_environ_factory: AwsEnvironFactory | None = None,
-    backend: BackendConfig | None = None,
+    backend_config: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_factory: TfbackendFactory | None = None,
     tfvars_factory: TfvarsFactory | None = None,
@@ -128,16 +130,18 @@ def get_task_destroy(
     default_init_reconfigure: bool = False,
     default_destroy_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
-    if backend is not None and tfbackend_factory is None:
-        raise ValueError("tfbackend_factory is required when backend is set")
-    if (backend is not None or tfbackend_factory is not None) and (
+    if backend_config is not None and tfbackend_factory is None:
+        raise ValueError("tfbackend_factory is required when backend_config is set")
+    if (backend_config is not None or tfbackend_factory is not None) and (
         aws_environ_factory is None
     ):
         raise ValueError(
-            "aws_environ_factory is required when backend or tfbackend_factory is set"
+            "aws_environ_factory is required when backend_config or tfbackend_factory is set"
         )
-    if (backend_status_path is None) != (backend is None):
-        raise ValueError("backend_status_path and backend must be provided together")
+    if (backend_status_path is None) != (backend_config is None):
+        raise ValueError(
+            "backend_status_path and backend_config must be provided together"
+        )
 
     @task(
         name="destroy",
@@ -191,7 +195,7 @@ def get_task_destroy(
                     binary_cache_path=binary_cache_path,
                     command_params=command_params,
                     module_path=module_path,
-                    backend=backend,
+                    backend_config=backend_config,
                     aws_environ=aws_environ,
                     backend_status_path=backend_status_path,
                     tfbackend_path=tfbackend_path,
@@ -212,7 +216,7 @@ def get_collection(
     binary_cache_path: pathlib.Path,
     module_path: pathlib.Path,
     aws_environ_factory: AwsEnvironFactory | None = None,
-    backend: BackendConfig | None = None,
+    backend_config: BackendConfig | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_factory: TfbackendFactory | None = None,
     tfvars_factory: TfvarsFactory | None = None,
@@ -224,7 +228,7 @@ def get_collection(
             binary_cache_path=binary_cache_path,
             module_path=module_path,
             aws_environ_factory=aws_environ_factory,
-            backend=backend,
+            backend_config=backend_config,
             backend_status_path=backend_status_path,
             tfbackend_factory=tfbackend_factory,
             tfvars_factory=tfvars_factory,
@@ -235,7 +239,7 @@ def get_collection(
             binary_cache_path=binary_cache_path,
             module_path=module_path,
             aws_environ_factory=aws_environ_factory,
-            backend=backend,
+            backend_config=backend_config,
             backend_status_path=backend_status_path,
             tfbackend_factory=tfbackend_factory,
             tfvars_factory=tfvars_factory,

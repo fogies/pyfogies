@@ -47,12 +47,12 @@ def pyfogies_test_network(
     tmp_path = tmp_path_factory.mktemp("pyfogies-test-network")
     tfbackend_path = tmp_path / "pyfogies-test-network.tfbackend"
     tfvars_path = tmp_path / "pyfogies-test-network.tfvars.json"
-    backend = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_NETWORK]
+    backend_config = pyfogies_test_backend[PyfogiesTestBackendStates.TEST_NETWORK]
 
     with (
         terraform_tfbackend(
             path=tfbackend_path,
-            backend=backend,
+            backend_config=backend_config,
             aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
@@ -67,7 +67,7 @@ def pyfogies_test_network(
             module_path=_TEST_NETWORK_MODULE,
             tfvars_path=tfvars_path,
             tfbackend_path=tfbackend_path,
-            backend=backend,
+            backend_config=backend_config,
             aws_environ=pyfogies_test_aws_environ,
             backend_status_path=TEST_BACKEND_STATUS_PATH,
             init_on_entry=True,

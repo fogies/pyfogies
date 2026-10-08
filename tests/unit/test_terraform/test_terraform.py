@@ -50,7 +50,7 @@ def test_terraform_tfvars(tmp_path: pathlib.Path) -> None:
 
 def test_terraform_tfbackend(tmp_path: pathlib.Path) -> None:
     """terraform_tfbackend writes the file and yields the path; delete_on_exit removes the file."""
-    backend = BackendConfig.for_state(
+    backend_config = BackendConfig.for_state(
         backend_name="my-backend", region="us-west-2", state_name="test-state"
     )
     aws_environ = AwsEnviron(
@@ -61,7 +61,7 @@ def test_terraform_tfbackend(tmp_path: pathlib.Path) -> None:
     )
     path = tmp_path / "backend.tfbackend"
     with terraform_tfbackend(
-        path=path, backend=backend, aws_environ=aws_environ
+        path=path, backend_config=backend_config, aws_environ=aws_environ
     ) as backend_path:
         text = backend_path.read_text(encoding="utf-8")
         assert 'region = "us-west-2"' in text

@@ -73,7 +73,9 @@ def nested_backend_output(
     with (
         terraform_tfbackend(
             path=tfbackend_path,
-            backend=pyfogies_test_backend[PyfogiesTestBackendStates.TEST_BACKEND],
+            backend_config=pyfogies_test_backend[
+                PyfogiesTestBackendStates.TEST_BACKEND
+            ],
             aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_path,
         terraform_tfvars(
@@ -159,12 +161,12 @@ def test_state_a_and_state_b(
     with (
         terraform_tfbackend(
             path=tfbackend_a_path,
-            backend=nested_backend_output["test-state-a"],
+            backend_config=nested_backend_output["test-state-a"],
             aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_a_path,
         terraform_tfbackend(
             path=tfbackend_b_path,
-            backend=nested_backend_output["test-state-b"],
+            backend_config=nested_backend_output["test-state-b"],
             aws_environ=pyfogies_test_aws_environ,
         ) as tfbackend_b_path,
         terraform_tfvars(
@@ -179,7 +181,7 @@ def test_state_a_and_state_b(
             binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=state_a_module_path,
-            backend=nested_backend_output["test-state-a"],
+            backend_config=nested_backend_output["test-state-a"],
             aws_environ=pyfogies_test_aws_environ,
             backend_status_path=nested_backend_status_path,
             tfvars_path=tfvars_a,
@@ -196,7 +198,7 @@ def test_state_a_and_state_b(
             binary_cache_path=STAGING_BINARY_CACHE_PATH,
             command_params=command_params,
             module_path=state_b_module_path,
-            backend=nested_backend_output["test-state-b"],
+            backend_config=nested_backend_output["test-state-b"],
             aws_environ=pyfogies_test_aws_environ,
             backend_status_path=nested_backend_status_path,
             tfvars_path=tfvars_b,
@@ -236,7 +238,7 @@ def test_invalid_state_c(
         with (
             terraform_tfbackend(
                 path=tfbackend_c_path,
-                backend=nested_backend_output["invalid_state_c"],
+                backend_config=nested_backend_output["invalid_state_c"],
                 aws_environ=pyfogies_test_aws_environ,
             ) as tfbackend_c_path,
         ):

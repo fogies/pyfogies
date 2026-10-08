@@ -104,7 +104,7 @@ TfvarsFactory = Callable[[], TfvarsContextManager]
 def terraform_tfbackend(
     *,
     path: pathlib.Path,
-    backend: BackendConfig,
+    backend_config: BackendConfig,
     aws_environ: AwsEnviron,
     delete_on_exit: bool = True,
 ) -> Generator[TfbackendPath]:
@@ -121,13 +121,13 @@ def terraform_tfbackend(
         raise ValueError("Path '{}' must end with '.tfbackend'".format(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as f:
-        _ = f.write('region = "{}"\n'.format(backend.region))
+        _ = f.write('region = "{}"\n'.format(backend_config.region))
         _ = f.write(
             'bucket = "{}"\n'.format(
-                backend.bucket_name(account_id=aws_environ.account_id)
+                backend_config.bucket_name(account_id=aws_environ.account_id)
             )
         )
-        _ = f.write('key = "{}"\n'.format(backend.key))
+        _ = f.write('key = "{}"\n'.format(backend_config.key))
         _ = f.write("use_lockfile = true\n")
     try:
         yield TfbackendPath(path)
@@ -365,7 +365,7 @@ def terraform(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams | None = None,
     module_path: pathlib.Path | None = None,
-    backend: BackendConfig | None = None,
+    backend_config: BackendConfig | None = None,
     aws_environ: AwsEnviron | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
@@ -385,12 +385,12 @@ def terraform(
     *tfbackend_path* is optional for init and, when set, is passed as
     -backend-config=<path>.
 
-    *backend_status_path* and *backend*, when provided together, check
-    whether backend.state_name has any resources in the backend bucket after a
+    *backend_status_path* and *backend_config*, when provided together, check
+    whether backend_config.state_name has any resources in the backend bucket after a
     successful apply_on_entry, and again after a successful destroy_on_exit,
     recording the result in backend_status_path's backend status file. See
     fogies.terraform.backend. *aws_environ* is the AWS environment of the
-    backend bucket's account, and is required when *backend* is set.
+    backend bucket's account, and is required when *backend_config* is set.
 
     *tfvars_path* is optional for apply. If *destroy_on_exit* is true, run
     destroy when exiting the context; requires *command_params* and
@@ -418,10 +418,12 @@ def terraform(
         raise ValueError("apply_on_entry requires command_params and module_path")
     if destroy_on_exit and (command_params is None or module_path is None):
         raise ValueError("destroy_on_exit requires command_params and module_path")
-    if (backend_status_path is None) != (backend is None):
-        raise ValueError("backend_status_path and backend must be provided together")
-    if backend is not None and aws_environ is None:
-        raise ValueError("aws_environ is required when backend is set")
+    if (backend_status_path is None) != (backend_config is None):
+        raise ValueError(
+            "backend_status_path and backend_config must be provided together"
+        )
+    if backend_config is not None and aws_environ is None:
+        raise ValueError("aws_environ is required when backend_config is set")
 
     exe_name = "terraform_{}.exe".format(version.replace(".", "_"))
     exe_path = binary_cache_path / exe_name
@@ -469,13 +471,13 @@ def terraform(
                 apply_params=apply_params,
             )
             if backend_status_path is not None:
-                assert backend is not None
+                assert backend_config is not None
                 assert aws_environ is not None
                 backend_status = BackendStatus.load(path=backend_status_path)
-                backend_status.states[backend.state_name] = BackendStatusEntry(
+                backend_status.states[backend_config.state_name] = BackendStatusEntry(
                     applied=bool(
                         backend_state_resources(
-                            config=backend, account_id=aws_environ.account_id
+                            config=backend_config, account_id=aws_environ.account_id
                         )
                     )
                 )
@@ -493,13 +495,13 @@ def terraform(
                 destroy_params=destroy_params,
             )
             if backend_status_path is not None:
-                assert backend is not None
+                assert backend_config is not None
                 assert aws_environ is not None
                 backend_status = BackendStatus.load(path=backend_status_path)
-                backend_status.states[backend.state_name] = BackendStatusEntry(
+                backend_status.states[backend_config.state_name] = BackendStatusEntry(
                     applied=bool(
                         backend_state_resources(
-                            config=backend, account_id=aws_environ.account_id
+                            config=backend_config, account_id=aws_environ.account_id
                         )
                     )
                 )
@@ -514,7 +516,7 @@ def terraform_output(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams,
     module_path: pathlib.Path,
-    backend: BackendConfig | None = None,
+    backend_config: BackendConfig | None = None,
     aws_environ: AwsEnviron | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
@@ -537,7 +539,7 @@ def terraform_output(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams,
     module_path: pathlib.Path,
-    backend: BackendConfig | None = None,
+    backend_config: BackendConfig | None = None,
     aws_environ: AwsEnviron | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
@@ -559,7 +561,7 @@ def terraform_output(
     binary_cache_path: pathlib.Path,
     command_params: CommandParams,
     module_path: pathlib.Path,
-    backend: BackendConfig | None = None,
+    backend_config: BackendConfig | None = None,
     aws_environ: AwsEnviron | None = None,
     backend_status_path: pathlib.Path | None = None,
     tfbackend_path: pathlib.Path | None = None,
@@ -584,7 +586,7 @@ def terraform_output(
     None then, as the Literal[True] overload above tells callers; the assert
     below is what actually enforces that assumption at runtime.
 
-    *backend_status_path*, *backend* and *aws_environ* are passed through to terraform();
+    *backend_status_path*, *backend_config* and *aws_environ* are passed through to terraform();
     see its docstring.
     """
     with terraform(
@@ -592,7 +594,7 @@ def terraform_output(
         binary_cache_path=binary_cache_path,
         command_params=command_params,
         module_path=module_path,
-        backend=backend,
+        backend_config=backend_config,
         aws_environ=aws_environ,
         backend_status_path=backend_status_path,
         tfbackend_path=tfbackend_path,
