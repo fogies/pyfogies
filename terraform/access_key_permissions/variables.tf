@@ -10,11 +10,16 @@ variable "policies" {
 }
 
 variable "statements" {
-  description = "IAM policy statements to grant the user as an inline policy. May be empty if policies is set. Leaving both empty grants nothing."
+  description = "IAM policy statements to grant the user, in a managed policy created for the user. May be empty if policies is set. Each statement may have conditions, as in an aws_iam_policy_document. Leaving both empty grants nothing beyond the statements the module always adds: a deny of creating S3 buckets outside the account regional namespace."
   type = list(object({
     effect    = string
     actions   = list(string)
     resources = list(string)
+    conditions = optional(list(object({
+      test     = string
+      variable = string
+      values   = list(string)
+    })), [])
   }))
   default = []
 }
