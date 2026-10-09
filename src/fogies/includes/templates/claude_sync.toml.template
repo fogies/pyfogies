@@ -1,0 +1,15 @@
+# Settings for claude-sync tasks.
+# See https://github.com/tawanorg/claude-sync
+
+# S3 bucket and an IAM access key that can use it.
+bucket = "..."
+region = "..."
+access_key_id = "..."
+secret_access_key = "..."
+
+# What to sync: "sessions" or "full".
+scope = "sessions"
+
+# Encryption key.
+# claude-sync.configure will create, so that all machines have the same key.
+# age_key = "AGE-SECRET-KEY-1..."
