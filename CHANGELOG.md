@@ -35,6 +35,22 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0-dev.12] (2026-10-11)
+
+### Added
+- Added Terraform module and tasks for `claude_sync`. ([#12](https://github.com/fogies/pyfogies/pull/12))
+- Added `--init-migrate-state` to Terraform tasks. ([#12](https://github.com/fogies/pyfogies/pull/12))
+- Added `pyrage` dependency, for `age_key`. ([#12](https://github.com/fogies/pyfogies/pull/12))
+
+### Changed
+- Refactored for naming clarity of `backend_config`. ([#12](https://github.com/fogies/pyfogies/pull/12))
+
+### Removed
+- Removed automatic short flags from tasks. ([#12](https://github.com/fogies/pyfogies/pull/12))
+
+### Tests
+- Added `timeout` to `requests` in tests. ([#12](https://github.com/fogies/pyfogies/pull/12))
+
 ## [0.0.0-dev.11] (2026-10-08)
 
 ### Changed

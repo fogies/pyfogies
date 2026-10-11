@@ -9,6 +9,7 @@ from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
+from fogies.tasks.terraform import validate_init_params
 from fogies.terraform.backend import BackendOutput
 from fogies.tools.aws_environ import AwsEnvironFactory
 from fogies.tools.command import CommandParams
@@ -33,40 +34,34 @@ def get_task_backend_apply(
     output_model: type[TerraformOutputModel],
     output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
     default_init: bool = True,
-    default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
+    default_init_upgrade: bool = False,
     default_apply_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     @task(
         name="apply",
+        auto_shortflags=False,
         help={
             "init": "Include terraform init. Skip with --no-init.",
-            "init_upgrade": "During init, upgrade providers.",
             "init_reconfigure": "During init, reconfigure the backend.",
+            "init_upgrade": "During init, upgrade providers.",
             "apply_auto_approve": "Skip interactive confirmation.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
         context: Context,
         init: bool = default_init,
-        init_upgrade: bool = default_init_upgrade,
         init_reconfigure: bool = default_init_reconfigure,
+        init_upgrade: bool = default_init_upgrade,
         apply_auto_approve: bool = default_apply_auto_approve,
     ) -> None:
         """
         Apply a Terraform backend configuration, and record it as applied.
         """
-        if init_upgrade and not init:
-            raise ValueError("--init-upgrade requires --init")
-        if init_reconfigure and not init:
-            raise ValueError("--init-reconfigure requires --init")
+        init_params = InitParams(reconfigure=init_reconfigure, upgrade=init_upgrade)
+        validate_init_params(init=init, init_params=init_params)
 
         command_params = CommandParams(context=context)
-        init_params = (
-            InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure)
-            if init
-            else None
-        )
 
         with ExitStack() as stack:
             if aws_environ_factory is not None:
@@ -108,24 +103,25 @@ def get_task_backend_destroy(
     output_model: type[TerraformOutputModel],
     output_model_get_backend: Callable[[TerraformOutputModel], BackendOutput],
     default_init: bool = True,
-    default_init_upgrade: bool = False,
     default_init_reconfigure: bool = False,
+    default_init_upgrade: bool = False,
     default_destroy_auto_approve: bool = False,
 ) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
     @task(
         name="destroy",
+        auto_shortflags=False,
         help={
             "init": "Include terraform init. Skip with --no-init.",
-            "init_upgrade": "During init, upgrade providers.",
             "init_reconfigure": "During init, reconfigure the backend.",
+            "init_upgrade": "During init, upgrade providers.",
             "destroy_auto_approve": "Skip interactive confirmation.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(
         context: Context,
         init: bool = default_init,
-        init_upgrade: bool = default_init_upgrade,
         init_reconfigure: bool = default_init_reconfigure,
+        init_upgrade: bool = default_init_upgrade,
         destroy_auto_approve: bool = default_destroy_auto_approve,
     ) -> None:
         """
@@ -136,17 +132,10 @@ def get_task_backend_destroy(
         objects before destroying it. Refuses (raises) if any declared state
         still has resources, regardless of how this task is invoked.
         """
-        if init_upgrade and not init:
-            raise ValueError("--init-upgrade requires --init")
-        if init_reconfigure and not init:
-            raise ValueError("--init-reconfigure requires --init")
+        init_params = InitParams(reconfigure=init_reconfigure, upgrade=init_upgrade)
+        validate_init_params(init=init, init_params=init_params)
 
         command_params = CommandParams(context=context)
-        init_params = (
-            InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure)
-            if init
-            else None
-        )
 
         with ExitStack() as stack:
             if aws_environ_factory is not None:

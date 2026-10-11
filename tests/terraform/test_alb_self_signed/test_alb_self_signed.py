@@ -50,6 +50,7 @@ def test_alb_http_redirects_to_https(
     http_response = requests.get(
         "http://{}".format(pyfogies_test_alb_self_signed.alb.alb_dns_name),
         allow_redirects=False,
+        timeout=5,
     )
     assert http_response.status_code == 301, "Expected 301 redirect, got: {}".format(
         http_response.status_code
@@ -72,6 +73,7 @@ def test_alb_https_reachable(
     https_response = requests.get(
         "https://{}".format(pyfogies_test_alb_self_signed.alb.alb_dns_name),
         verify=str(pem_path),
+        timeout=5,
     )
     assert (
         https_response.status_code == 503

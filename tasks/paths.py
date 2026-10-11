@@ -8,6 +8,9 @@ SECRETS_PATH = Path("secrets")
 # Path to the AWS profile secrets configuration file.
 SECRETS_AWS_PATH = SECRETS_PATH / "aws.toml"
 
+# Path to the claude-sync secrets configuration file.
+SECRETS_CLAUDE_SYNC_PATH = SECRETS_PATH / "claude-sync.toml"
+
 # Path to the Poetry secrets configuration file.
 SECRETS_POETRY_PATH = SECRETS_PATH / "poetry.toml"
 

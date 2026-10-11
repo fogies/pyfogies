@@ -21,6 +21,24 @@ from fogies.tools.terraform import (
 )
 
 
+def validate_init_params(*, init: bool, init_params: InitParams) -> None:
+    """Raise ValueError for task flags that cannot be given together.
+
+    The init options only apply when init runs, and Terraform does not allow
+    migrating state while also reconfiguring the backend.
+    """
+    if init_params.migrate_state and not init:
+        raise ValueError("--init-migrate-state requires --init")
+    if init_params.reconfigure and not init:
+        raise ValueError("--init-reconfigure requires --init")
+    if init_params.upgrade and not init:
+        raise ValueError("--init-upgrade requires --init")
+    if init_params.migrate_state and init_params.reconfigure:
+        raise ValueError(
+            "--init-migrate-state and --init-reconfigure cannot be combined"
+        )
+
+
 def get_task_apply(
     *,
     binary_cache_path: pathlib.Path,
@@ -31,10 +49,11 @@ def get_task_apply(
     tfbackend_factory: TfbackendFactory | None = None,
     tfvars_factory: TfvarsFactory | None = None,
     default_init: bool = True,
-    default_init_upgrade: bool = False,
+    default_init_migrate_state: bool = False,
     default_init_reconfigure: bool = False,
+    default_init_upgrade: bool = False,
     default_apply_auto_approve: bool = False,
-) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
+) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
     if backend_config is not None and tfbackend_factory is None:
         raise ValueError("tfbackend_factory is required when backend_config is set")
     if (backend_config is not None or tfbackend_factory is not None) and (
@@ -50,34 +69,34 @@ def get_task_apply(
 
     @task(
         name="apply",
+        auto_shortflags=False,
         help={
             "init": "Include terraform init. Skip with --no-init.",
-            "init_upgrade": "During init, upgrade providers.",
+            "init_migrate_state": "During init, migrate state to a changed backend.",
             "init_reconfigure": "During init, reconfigure the backend.",
+            "init_upgrade": "During init, upgrade providers.",
             "apply_auto_approve": "Skip interactive confirmation.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_apply(
         context: Context,
         init: bool = default_init,
-        init_upgrade: bool = default_init_upgrade,
+        init_migrate_state: bool = default_init_migrate_state,
         init_reconfigure: bool = default_init_reconfigure,
+        init_upgrade: bool = default_init_upgrade,
         apply_auto_approve: bool = default_apply_auto_approve,
     ) -> None:
         """
         Apply a Terraform configuration.
         """
-        if init_upgrade and not init:
-            raise ValueError("--init-upgrade requires --init")
-        if init_reconfigure and not init:
-            raise ValueError("--init-reconfigure requires --init")
+        init_params = InitParams(
+            migrate_state=init_migrate_state,
+            reconfigure=init_reconfigure,
+            upgrade=init_upgrade,
+        )
+        validate_init_params(init=init, init_params=init_params)
 
         command_params = CommandParams(context=context)
-        init_params = (
-            InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure)
-            if init
-            else None
-        )
 
         with ExitStack() as stack:
             aws_environ = (
@@ -113,7 +132,9 @@ def get_task_apply(
                 )
             )
 
-    return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_apply)
+    return cast(
+        Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_apply
+    )
 
 
 def get_task_destroy(
@@ -126,10 +147,11 @@ def get_task_destroy(
     tfbackend_factory: TfbackendFactory | None = None,
     tfvars_factory: TfvarsFactory | None = None,
     default_init: bool = True,
-    default_init_upgrade: bool = False,
+    default_init_migrate_state: bool = False,
     default_init_reconfigure: bool = False,
+    default_init_upgrade: bool = False,
     default_destroy_auto_approve: bool = False,
-) -> Task[Callable[[Context, bool, bool, bool, bool], None]]:
+) -> Task[Callable[[Context, bool, bool, bool, bool, bool], None]]:
     if backend_config is not None and tfbackend_factory is None:
         raise ValueError("tfbackend_factory is required when backend_config is set")
     if (backend_config is not None or tfbackend_factory is not None) and (
@@ -145,34 +167,34 @@ def get_task_destroy(
 
     @task(
         name="destroy",
+        auto_shortflags=False,
         help={
             "init": "Include terraform init. Skip with --no-init.",
-            "init_upgrade": "During init, upgrade providers.",
+            "init_migrate_state": "During init, migrate state to a changed backend.",
             "init_reconfigure": "During init, reconfigure the backend.",
+            "init_upgrade": "During init, upgrade providers.",
             "destroy_auto_approve": "Skip interactive confirmation.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_destroy(
         context: Context,
         init: bool = default_init,
-        init_upgrade: bool = default_init_upgrade,
+        init_migrate_state: bool = default_init_migrate_state,
         init_reconfigure: bool = default_init_reconfigure,
+        init_upgrade: bool = default_init_upgrade,
         destroy_auto_approve: bool = default_destroy_auto_approve,
     ) -> None:
         """
         Destroy a Terraform configuration.
         """
-        if init_upgrade and not init:
-            raise ValueError("--init-upgrade requires --init")
-        if init_reconfigure and not init:
-            raise ValueError("--init-reconfigure requires --init")
+        init_params = InitParams(
+            migrate_state=init_migrate_state,
+            reconfigure=init_reconfigure,
+            upgrade=init_upgrade,
+        )
+        validate_init_params(init=init, init_params=init_params)
 
         command_params = CommandParams(context=context)
-        init_params = (
-            InitParams(upgrade=init_upgrade, reconfigure=init_reconfigure)
-            if init
-            else None
-        )
 
         with ExitStack() as stack:
             aws_environ = (
@@ -207,7 +229,9 @@ def get_task_destroy(
                 )
             )
 
-    return cast(Task[Callable[[Context, bool, bool, bool, bool], None]], task_destroy)
+    return cast(
+        Task[Callable[[Context, bool, bool, bool, bool, bool], None]], task_destroy
+    )
 
 
 def get_collection(

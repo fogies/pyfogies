@@ -56,5 +56,9 @@ def backend_status_toml_template_factory() -> str:
     return _read_template_from_resources("backend_status.toml.template")
 
 
+def claude_sync_toml_template_factory() -> str:
+    return _read_template_from_resources("claude_sync.toml.template")
+
+
 def poetry_toml_template_factory() -> str:
     return _read_template_from_resources("poetry.toml.template")

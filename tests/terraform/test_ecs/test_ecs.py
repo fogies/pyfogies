@@ -191,6 +191,7 @@ def test_ecs_https_serves_nginx(
     response = requests.get(
         "https://{}".format(pyfogies_test_alb_self_signed.alb.alb_dns_name),
         verify=verify,
+        timeout=5,
     )
     assert response.status_code == 200, "Expected 200 from nginx, got: {}".format(
         response.status_code
