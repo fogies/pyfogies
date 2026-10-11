@@ -126,52 +126,52 @@ def configure_claude_sync(
     """Apply the config in the secrets file at secrets_path to the claude-sync files.
 
     The config decides what claude-sync's encryption key and config.yaml
-    should be, in claude_sync_files_directory(). If it has no key yet, a new one is
-    generated and saved in it, so that other machines use it too.
+    should be, in claude_sync_files_directory(). If it has no key yet, a new one
+    is generated and saved in it, so that other machines use it too.
 
     A claude-sync file that is missing is written, and one that already
     matches is left alone. One that differs is an error, and nothing is
     written, unless force is set, which replaces it.
     """
-    # Expected paths for claude-sync configuration.
+    # Where the claude-sync files are.
     directory = claude_sync_files_directory()
     key_path = directory / _KEY_FILE_NAME
 
-    # Ensure we have a key.
+    # The key in the config, or a new one if it has none.
     config = load_claude_sync_config(path=secrets_path)
-    age_key_generated = config.age_key is None
+    generated_age_key = config.age_key is None
     age_key = generate_age_key() if config.age_key is None else config.age_key
 
-    # Check the expected content of configuration.
+    # What the claude-sync files should contain.
     expected_content = {
         key_path: age_key + "\n",
         directory / _CONFIG_FILE_NAME: render_claude_sync_yaml(config),
     }
-    # Which paths need to be written.
+    # Which of them are missing or differ.
     paths_to_write = [
         path
         for path, text in expected_content.items()
         if not path.exists() or path.read_text(encoding="utf-8") != text
     ]
-    # Which paths differ from the expected content.
+    # Which of those exist but differ.
     paths_that_differ = [path for path in paths_to_write if path.exists()]
 
-    # If any paths differ, require force flag before overwriting.
+    # Refuse to replace what differs, unless forced.
     if paths_that_differ and not force:
         raise ValueError("Configuration does not match existing claude-sync files.")
 
-    # If a key was generated, update our configuration file.
-    if age_key_generated:
+    # Save a generated key in the config, for other machines.
+    if generated_age_key:
         update_claude_sync_config(path=secrets_path, age_key=age_key)
 
-    # Write expected content to desired paths.
+    # Write the claude-sync files.
     directory.mkdir(parents=True, exist_ok=True)
     for path in paths_to_write:
         _ = path.write_text(expected_content[path], encoding="utf-8", newline="\n")
         path.chmod(0o600)
 
     return ClaudeSyncSetup(
-        generated_age_key=age_key_generated,
+        generated_age_key=generated_age_key,
         applied_to_claude_sync_files=bool(paths_to_write),
     )
 
