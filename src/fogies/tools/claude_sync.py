@@ -43,8 +43,8 @@ _DEFAULT_VERSION = _KNOWN_VERSIONS[0]
 _MODULE_TEMPLATE = "github.com/tawanorg/claude-sync/cmd/claude-sync@v{version}"
 
 
-def claude_sync_directory() -> pathlib.Path:
-    """Where claude-sync stores its configuration and encryption key."""
+def claude_sync_files_directory() -> pathlib.Path:
+    """Where the claude-sync files are: its config.yaml and encryption key."""
     return pathlib.Path.home() / ".claude-sync"
 
 
@@ -115,25 +115,20 @@ class ClaudeSyncSetup:
 
 
 def configure_claude_sync(
-    *,
-    secrets_path: pathlib.Path,
-    force: bool,
-    directory: pathlib.Path | None = None,
+    *, secrets_path: pathlib.Path, force: bool
 ) -> ClaudeSyncSetup:
     """Apply the config in the secrets file at secrets_path to the claude-sync files.
 
     The config decides what claude-sync's encryption key and config.yaml
-    should be, in *directory* (by default where claude-sync looks for them).
-    If it has no key yet, a new one is generated and saved in it, so that
-    other machines use it too.
+    should be, in claude_sync_files_directory(). If it has no key yet, a new one is
+    generated and saved in it, so that other machines use it too.
 
     A claude-sync file that is missing is written, and one that already
     matches is left alone. One that differs is an error, and nothing is
     written, unless force is set, which replaces it.
     """
     # Expected paths for claude-sync configuration.
-    if directory is None:
-        directory = claude_sync_directory()
+    directory = claude_sync_files_directory()
     key_path = directory / "age-key.txt"
 
     # Ensure we have a key.
