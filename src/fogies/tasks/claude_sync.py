@@ -8,10 +8,7 @@ from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
-from fogies.tools.claude_sync import (
-    claude_sync,
-    configure_claude_sync,
-)
+from fogies.tools.claude_sync import claude_sync, configure_claude_sync
 from fogies.tools.command import CommandParams
 
 
@@ -22,7 +19,7 @@ def get_task_configure(
         name="configure",
         auto_shortflags=False,
         help={
-            "force": "Force application of current configuration.",
+            "force": "Force overwrite based on current configuration.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_configure(context: Context, force: bool = False) -> None:
@@ -57,7 +54,7 @@ def get_task_pull(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None
         auto_shortflags=False,
         help={
             "dry_run": "Show what would be downloaded.",
-            "force": "Force overwrite of local changes.",
+            "force": "Force overwrite of local files.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_pull(context: Context, dry_run: bool = False, force: bool = False) -> None:
