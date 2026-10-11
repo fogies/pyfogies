@@ -46,16 +46,28 @@ def get_task_configure(
     return cast(Task[Callable[..., None]], task_configure)
 
 
-def get_task_pull(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
+def get_task_pull(
+    *,
+    binary_cache_path: pathlib.Path,
+    default_dry_run: bool = False,
+    default_force: bool = False,
+    default_rebuild_history: bool = True,
+) -> Task[Callable[..., None]]:
     @task(
         name="pull",
         auto_shortflags=False,
         help={
             "dry_run": "Show what would be downloaded.",
             "force": "Force overwrite of local files.",
+            "rebuild_history": "Rebuild history from session files.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
-    def task_pull(context: Context, dry_run: bool = False, force: bool = False) -> None:
+    def task_pull(
+        context: Context,
+        dry_run: bool = default_dry_run,
+        force: bool = default_force,
+        rebuild_history: bool = default_rebuild_history,
+    ) -> None:
         """
         Download remote changes.
         """
@@ -66,6 +78,7 @@ def get_task_pull(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None
                 command_params=CommandParams(context=context),
                 dry_run=dry_run,
                 force=force,
+                rebuild_history=rebuild_history,
             )
 
     return cast(Task[Callable[..., None]], task_pull)
