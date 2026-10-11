@@ -12,6 +12,7 @@ import pytest
 from fogies.templates import (
     aws_toml_template_factory,
     backend_status_toml_template_factory,
+    claude_sync_toml_template_factory,
     ensure_from_template,
     poetry_toml_template_factory,
 )
@@ -60,6 +61,7 @@ def test_ensure_from_template_raises_by_default_when_created(
     [
         aws_toml_template_factory,
         backend_status_toml_template_factory,
+        claude_sync_toml_template_factory,
         poetry_toml_template_factory,
     ],
 )
