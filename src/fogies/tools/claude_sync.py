@@ -112,14 +112,16 @@ def render_claude_sync_yaml(config: ClaudeSyncConfig) -> str:
 
 
 @dataclasses.dataclass(frozen=True)
-class ClaudeSyncSetup:
+class ClaudeSyncConfigureResult:
     """What configure_claude_sync() did."""
 
     generated_age_key: bool
     applied_to_claude_sync_files: bool
 
 
-def configure_claude_sync(*, config_path: pathlib.Path, force: bool) -> ClaudeSyncSetup:
+def configure_claude_sync(
+    *, config_path: pathlib.Path, force: bool
+) -> ClaudeSyncConfigureResult:
     """Apply the config at config_path to the claude-sync files.
 
     The config decides what claude-sync's encryption key and config.yaml
@@ -167,7 +169,7 @@ def configure_claude_sync(*, config_path: pathlib.Path, force: bool) -> ClaudeSy
         _ = path.write_text(expected_content[path], encoding="utf-8", newline="\n")
         path.chmod(0o600)
 
-    return ClaudeSyncSetup(
+    return ClaudeSyncConfigureResult(
         generated_age_key=generated_age_key,
         applied_to_claude_sync_files=bool(paths_to_write),
     )
