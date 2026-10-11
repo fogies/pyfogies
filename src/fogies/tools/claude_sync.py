@@ -2,18 +2,30 @@
 
 See <https://github.com/tawanorg/claude-sync>. claude-sync ships no Windows
 release binary, so it's built from source here rather than downloaded
-pre-built, unlike fogies.tools.terraform. Only push/pull/status are wrapped;
-claude-sync's own storage setup (S3/R2/etc. credentials, bucket, encryption
-passphrase) is configured through `claude-sync init`'s interactive wizard,
-which is out of scope here.
+pre-built, unlike fogies.tools.terraform. Only push/pull/status are wrapped.
+
+claude-sync's own setup wizard (`claude-sync init`) can't run unattended: for
+S3 it prompts for the credentials, region and bucket even when they are given
+as flags, and for the passphrase its encryption key can be derived from. So a
+machine is set up by writing the files claude-sync reads, from one
+gitignored file that is synced between machines like the other secrets. That
+file holds the encryption key itself, not a passphrase; see fogies.age_key.
 """
 
+import dataclasses
+import json
 import pathlib
+import tomllib
 from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Literal
 
+import tomlkit
 from invoke.runners import Result
+from pydantic import BaseModel, field_validator
 
+from fogies.age_key import generate_age_key, validate_age_key
+from fogies.templates import claude_sync_toml_template_factory, ensure_from_template
 from fogies.tools.command import CommandParams, command_run
 from fogies.tools.go import go
 
@@ -25,6 +37,143 @@ _KNOWN_VERSIONS = [
 _DEFAULT_VERSION = _KNOWN_VERSIONS[0]
 
 _MODULE_TEMPLATE = "github.com/tawanorg/claude-sync/cmd/claude-sync@v{version}"
+
+# The keys of claude-sync's config.yaml that render_claude_sync_yaml() writes.
+# The file has others (exclude, sync_paths, path_map, mcp_sync) that are meant
+# to be tuned per machine, which are not managed here.
+_MANAGED_YAML_KEYS = frozenset({"storage", "encryption_key_path", "scope"})
+
+
+def claude_sync_directory() -> pathlib.Path:
+    """Where claude-sync stores its configuration and encryption key."""
+    return pathlib.Path.home() / ".claude-sync"
+
+
+class ClaudeSyncConfig(BaseModel):
+    """Contents of the claude-sync secrets file."""
+
+    bucket: str
+    region: str
+    access_key_id: str
+    secret_access_key: str
+    scope: Literal["full", "sessions"]
+    # Absent until created by configure.
+    age_key: str | None = None
+
+    @field_validator("age_key")
+    @classmethod
+    def _age_key_is_an_age_key(cls, value: str | None) -> str | None:
+        return None if value is None else validate_age_key(value)
+
+
+def load_claude_sync_config(*, path: pathlib.Path) -> ClaudeSyncConfig:
+    """Return the configuration in path.
+
+    Created from a template if it doesn't exist yet -- callers should expect
+    a FileNotFoundError-style failure the first time, prompting them to fill
+    in the newly-created file and re-run.
+    """
+    ensure_from_template(path=path, template_factory=claude_sync_toml_template_factory)
+    with path.open("rb") as f:
+        return ClaudeSyncConfig.model_validate(tomllib.load(f))
+
+
+def update_claude_sync_config(*, path: pathlib.Path, age_key: str) -> None:
+    """Update the configuration file with age_key, keeping its comments and layout."""
+    with path.open("r", encoding="utf-8") as f:
+        doc = tomlkit.parse(f.read())
+    doc["age_key"] = age_key
+    with path.open("w", encoding="utf-8", newline="\n") as f:
+        _ = f.write(tomlkit.dumps(doc))
+
+
+def render_claude_sync_yaml(config: ClaudeSyncConfig) -> str:
+    """Return the contents of claude-sync's config.yaml for config.
+
+    As `claude-sync init` writes for S3, except that the scope is always
+    written, not left out when it's the default. Values are written as JSON
+    strings, which are also valid YAML strings, so that none needs escaping.
+    """
+    lines = [
+        "storage:",
+        "    provider: s3",
+        "    bucket: " + json.dumps(config.bucket),
+        "    access_key_id: " + json.dumps(config.access_key_id),
+        "    secret_access_key: " + json.dumps(config.secret_access_key),
+        "    region: " + json.dumps(config.region),
+        "encryption_key_path: " + json.dumps("~/.claude-sync/age-key.txt"),
+        "scope: " + config.scope,
+    ]
+    return "\n".join(lines) + "\n"
+
+
+@dataclasses.dataclass(frozen=True)
+class ClaudeSyncSetup:
+    """What configure_claude_sync() did."""
+
+    generated_age_key: bool
+    applied_to_claude_sync_files: bool
+
+
+def configure_claude_sync(
+    *,
+    secrets_path: pathlib.Path,
+    force: bool,
+    directory: pathlib.Path | None = None,
+) -> ClaudeSyncSetup:
+    """Apply the config in the secrets file at secrets_path to the claude-sync files.
+
+    The config decides what claude-sync's encryption key and config.yaml
+    should be, in *directory* (by default where claude-sync looks for them).
+    If it has no key yet, a new one is generated and saved in it, so that
+    other machines use it too.
+
+    A claude-sync file that is missing is written, and one that already
+    matches is left alone. One that differs is an error, and nothing is
+    written, unless force is set, which replaces it.
+    """
+    # Expected paths for claude-sync configuration.
+    if directory is None:
+        directory = claude_sync_directory()
+    key_path = directory / "age-key.txt"
+
+    # Ensure we have a key.
+    config = load_claude_sync_config(path=secrets_path)
+    age_key_generated = config.age_key is None
+    age_key = generate_age_key() if config.age_key is None else config.age_key
+
+    # Check the expected content of configuration.
+    expected_content = {
+        key_path: age_key + "\n",
+        directory / "config.yaml": render_claude_sync_yaml(config),
+    }
+    # Which paths need to be written.
+    paths_to_write = [
+        path
+        for path, text in expected_content.items()
+        if not path.exists() or path.read_text(encoding="utf-8") != text
+    ]
+    # Which paths differ from the expected content.
+    paths_that_differ = [path for path in paths_to_write if path.exists()]
+
+    # If any paths differ, require force flag before overwriting.
+    if paths_that_differ and not force:
+        raise ValueError("Configuration does not match existing claude-sync files.")
+
+    # If a key was generated, update our configuration file.
+    if age_key_generated:
+        update_claude_sync_config(path=secrets_path, age_key=age_key)
+
+    # Write expected content to desired paths.
+    directory.mkdir(parents=True, exist_ok=True)
+    for path in paths_to_write:
+        _ = path.write_text(expected_content[path], encoding="utf-8", newline="\n")
+        path.chmod(0o600)
+
+    return ClaudeSyncSetup(
+        generated_age_key=age_key_generated,
+        applied_to_claude_sync_files=bool(paths_to_write),
+    )
 
 
 class _ClaudeSync:
@@ -40,9 +189,17 @@ class _ClaudeSync:
         """The path to the claude-sync executable."""
         return self._path
 
-    def push(self, *, command_params: CommandParams, quiet: bool = False) -> Result:
+    def push(
+        self,
+        *,
+        command_params: CommandParams,
+        include_mcp: bool = False,
+        quiet: bool = False,
+    ) -> Result:
         """Run `claude-sync push`, uploading local changes to cloud storage."""
         push_args = ["push"]
+        if include_mcp:
+            push_args.append("--include-mcp")
         if quiet:
             push_args.append("-q")
         return command_run(
@@ -57,7 +214,9 @@ class _ClaudeSync:
         command_params: CommandParams,
         dry_run: bool = False,
         force: bool = False,
+        include_mcp: bool = False,
         quiet: bool = False,
+        rebuild_history: bool = False,
     ) -> Result:
         """Run `claude-sync pull`, downloading remote changes."""
         pull_args = ["pull"]
@@ -65,20 +224,27 @@ class _ClaudeSync:
             pull_args.append("--dry-run")
         if force:
             pull_args.append("--force")
+        if include_mcp:
+            pull_args.append("--include-mcp")
         if quiet:
             pull_args.append("-q")
+        if rebuild_history:
+            pull_args.append("--rebuild-history")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
             args=pull_args,
         )
 
-    def status(self, *, command_params: CommandParams) -> Result:
+    def status(self, *, command_params: CommandParams, quiet: bool = False) -> Result:
         """Run `claude-sync status`, showing pending local changes."""
+        status_args = ["status"]
+        if quiet:
+            status_args.append("-q")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
-            args=["status"],
+            args=status_args,
         )
 
 

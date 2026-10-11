@@ -18,6 +18,7 @@ include = [
     {path = "src/fogies/includes/templates/aws.toml.template", format = ["sdist", "wheel"]},
     {path = "src/fogies/includes/templates/poetry.toml.template", format = ["sdist", "wheel"]},
     {path = "src/fogies/includes/templates/backend_status.toml.template", format = ["sdist", "wheel"]},
+    {path = "src/fogies/includes/templates/claude_sync.toml.template", format = ["sdist", "wheel"]},
 ]
 
 [tool.poetry.dependencies]
@@ -33,6 +34,7 @@ pydantic = "^2.12.5"
 requests = "~2.33.0"
 tenacity = "^9.1.4"
 tomlkit = "^0.15.1"
+pyrage = "^1.4.0"
 
 [tool.poetry.group.dev.dependencies]
 # ^ allows all minor and patch releases.

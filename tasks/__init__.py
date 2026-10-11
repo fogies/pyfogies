@@ -6,6 +6,7 @@ import colorama
 from invoke.collection import Collection
 
 import fogies.tasks.access_key
+import fogies.tasks.claude_sync
 import fogies.tasks.format
 import fogies.tasks.lint
 import fogies.tasks.poetry
@@ -13,6 +14,7 @@ import fogies.tasks.test
 from fogies.tools.aws_environ import AwsEnvironContextManager, aws_environ_from_config
 from tasks.paths import (
     SECRETS_AWS_PATH,
+    SECRETS_CLAUDE_SYNC_PATH,
     SECRETS_POETRY_PATH,
     STAGING_BINARY_CACHE_PATH,
 )
@@ -57,6 +59,14 @@ namespace.add_collection(
 namespace.add_collection(
     fogies.tasks.access_key.get_collection(
         collection_name="access-key", aws_environ_factory=_aws_environ_factory
+    )
+)
+
+namespace.add_collection(
+    fogies.tasks.claude_sync.get_collection(
+        collection_name="claude-sync",
+        binary_cache_path=STAGING_BINARY_CACHE_PATH,
+        secrets_claude_sync_path=SECRETS_CLAUDE_SYNC_PATH,
     )
 )
 
