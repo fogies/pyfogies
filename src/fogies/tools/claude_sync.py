@@ -10,6 +10,10 @@ as flags, and for the passphrase its encryption key can be derived from. So a
 machine is set up by writing the files claude-sync reads, from one
 gitignored file that is synced between machines like the other secrets. That
 file holds the encryption key itself, not a passphrase; see fogies.age_key.
+
+The files claude-sync reads are managed only from that file, not with
+claude-sync's own commands. They are compared exactly, so changing them any
+other way makes them differ from it.
 """
 
 import dataclasses
@@ -37,11 +41,6 @@ _KNOWN_VERSIONS = [
 _DEFAULT_VERSION = _KNOWN_VERSIONS[0]
 
 _MODULE_TEMPLATE = "github.com/tawanorg/claude-sync/cmd/claude-sync@v{version}"
-
-# The keys of claude-sync's config.yaml that render_claude_sync_yaml() writes.
-# The file has others (exclude, sync_paths, path_map, mcp_sync) that are meant
-# to be tuned per machine, which are not managed here.
-_MANAGED_YAML_KEYS = frozenset({"storage", "encryption_key_path", "scope"})
 
 
 def claude_sync_directory() -> pathlib.Path:
