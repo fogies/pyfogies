@@ -1,4 +1,4 @@
-# Settings for claude-sync tasks.
+# Config for claude-sync tasks.
 # See https://github.com/tawanorg/claude-sync
 
 # S3 bucket and an IAM access key that can use it.

@@ -7,10 +7,10 @@ import pytest
 
 from fogies.age_key import generate_age_key
 from fogies.tools.claude_sync import (
-    _CONFIG_FILE_NAME,  # pyright: ignore[reportPrivateUsage]
+    _KEY_FILE_NAME,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
-    _KEY_FILE_NAME,  # pyright: ignore[reportPrivateUsage]
+    _YAML_FILE_NAME,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
     claude_sync,
@@ -43,9 +43,7 @@ def claude_sync_files_dir(temp_home: pathlib.Path) -> pathlib.Path:
     return claude_sync_files_directory()
 
 
-def _secrets_file(
-    tmp_path: pathlib.Path, *, age_key: str | None = None
-) -> pathlib.Path:
+def _config_file(tmp_path: pathlib.Path, *, age_key: str | None = None) -> pathlib.Path:
     """Write a config, with symbols in the secret that must survive being written."""
     path = tmp_path / "claude-sync.toml"
     text = """
@@ -97,7 +95,7 @@ def test_claude_sync_accepts_the_files_that_configure_writes(
     in the home directory, which temp_home has replaced.
     """
     _ = temp_home
-    _ = configure_claude_sync(secrets_path=_secrets_file(tmp_path), force=False)
+    _ = configure_claude_sync(config_path=_config_file(tmp_path), force=False)
 
     with claude_sync(
         binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
@@ -116,17 +114,17 @@ def test_claude_sync_accepts_the_files_that_configure_writes(
 def test_configure_claude_sync_generates_a_key_when_the_config_has_none(
     tmp_path: pathlib.Path, claude_sync_files_dir: pathlib.Path
 ) -> None:
-    secrets_path = _secrets_file(tmp_path)
+    config_path = _config_file(tmp_path)
     key_path = claude_sync_files_dir / _KEY_FILE_NAME
-    config_path = claude_sync_files_dir / _CONFIG_FILE_NAME
+    yaml_path = claude_sync_files_dir / _YAML_FILE_NAME
 
-    setup = configure_claude_sync(secrets_path=secrets_path, force=False)
+    setup = configure_claude_sync(config_path=config_path, force=False)
 
     # The key is saved in the config, for other machines, and is the one used.
-    config = load_claude_sync_config(path=secrets_path)
+    config = load_claude_sync_config(path=config_path)
     assert config.age_key is not None
     assert key_path.read_text(encoding="utf-8") == config.age_key + "\n"
-    assert config_path.read_text(encoding="utf-8") == render_claude_sync_yaml(config)
+    assert yaml_path.read_text(encoding="utf-8") == render_claude_sync_yaml(config)
     assert setup.generated_age_key
     assert setup.applied_to_claude_sync_files
 
@@ -134,16 +132,16 @@ def test_configure_claude_sync_generates_a_key_when_the_config_has_none(
 def test_configure_claude_sync_writes_the_files_when_the_key_is_already_in_the_config(
     tmp_path: pathlib.Path, claude_sync_files_dir: pathlib.Path
 ) -> None:
-    secrets_path = _secrets_file(tmp_path, age_key=_KEY)
+    config_path = _config_file(tmp_path, age_key=_KEY)
     key_path = claude_sync_files_dir / _KEY_FILE_NAME
-    config_path = claude_sync_files_dir / _CONFIG_FILE_NAME
+    yaml_path = claude_sync_files_dir / _YAML_FILE_NAME
 
-    setup = configure_claude_sync(secrets_path=secrets_path, force=False)
+    setup = configure_claude_sync(config_path=config_path, force=False)
 
     # The config's key is used, not replaced.
-    assert load_claude_sync_config(path=secrets_path).age_key == _KEY
+    assert load_claude_sync_config(path=config_path).age_key == _KEY
     assert key_path.read_text(encoding="utf-8") == _KEY + "\n"
-    assert config_path.exists()
+    assert yaml_path.exists()
     assert not setup.generated_age_key
     assert setup.applied_to_claude_sync_files
 
@@ -152,10 +150,10 @@ def test_configure_claude_sync_needs_nothing_when_the_files_match(
     tmp_path: pathlib.Path, temp_home: pathlib.Path
 ) -> None:
     _ = temp_home
-    secrets_path = _secrets_file(tmp_path, age_key=_KEY)
-    _ = configure_claude_sync(secrets_path=secrets_path, force=False)
+    config_path = _config_file(tmp_path, age_key=_KEY)
+    _ = configure_claude_sync(config_path=config_path, force=False)
 
-    setup = configure_claude_sync(secrets_path=secrets_path, force=False)
+    setup = configure_claude_sync(config_path=config_path, force=False)
 
     assert not setup.generated_age_key
     assert not setup.applied_to_claude_sync_files
@@ -172,33 +170,33 @@ def test_configure_claude_sync_refuses_a_different_key_and_changes_nothing(
     config_age_key: str | None,
 ) -> None:
     """With no key in the config, the one that would be generated cannot match."""
-    secrets_path = _secrets_file(tmp_path, age_key=config_age_key)
+    config_path = _config_file(tmp_path, age_key=config_age_key)
     key_path = claude_sync_files_dir / _KEY_FILE_NAME
-    config_path = claude_sync_files_dir / _CONFIG_FILE_NAME
+    yaml_path = claude_sync_files_dir / _YAML_FILE_NAME
     claude_sync_files_dir.mkdir()
     _ = key_path.write_text(_OTHER_KEY + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="does not match"):
-        _ = configure_claude_sync(secrets_path=secrets_path, force=False)
+        _ = configure_claude_sync(config_path=config_path, force=False)
 
     assert key_path.read_text(encoding="utf-8") == _OTHER_KEY + "\n"
-    assert not config_path.exists()
-    assert load_claude_sync_config(path=secrets_path).age_key == config_age_key
+    assert not yaml_path.exists()
+    assert load_claude_sync_config(path=config_path).age_key == config_age_key
 
 
 def test_configure_claude_sync_replaces_what_differs_when_forced(
     tmp_path: pathlib.Path, claude_sync_files_dir: pathlib.Path
 ) -> None:
-    secrets_path = _secrets_file(tmp_path, age_key=_KEY)
+    config_path = _config_file(tmp_path, age_key=_KEY)
     key_path = claude_sync_files_dir / _KEY_FILE_NAME
-    config_path = claude_sync_files_dir / _CONFIG_FILE_NAME
+    yaml_path = claude_sync_files_dir / _YAML_FILE_NAME
     claude_sync_files_dir.mkdir()
     _ = key_path.write_text(_OTHER_KEY + "\n", encoding="utf-8")
-    _ = config_path.write_text("something: else\n", encoding="utf-8")
+    _ = yaml_path.write_text("something: else\n", encoding="utf-8")
 
-    _ = configure_claude_sync(secrets_path=secrets_path, force=True)
+    _ = configure_claude_sync(config_path=config_path, force=True)
 
     assert key_path.read_text(encoding="utf-8") == _KEY + "\n"
-    assert config_path.read_text(encoding="utf-8") == render_claude_sync_yaml(
-        load_claude_sync_config(path=secrets_path)
+    assert yaml_path.read_text(encoding="utf-8") == render_claude_sync_yaml(
+        load_claude_sync_config(path=config_path)
     )

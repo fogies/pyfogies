@@ -8,10 +8,10 @@ claude-sync's own setup wizard (`claude-sync init`) can't run unattended: for
 S3 it prompts for the credentials, region and bucket even when they are given
 as flags, and for the passphrase its encryption key can be derived from. So a
 machine is set up by writing the files claude-sync reads, from one
-gitignored file that is synced between machines like the other secrets. That
-file holds the encryption key itself, not a passphrase; see fogies.age_key.
+gitignored config that is synced between machines like the other secrets. That
+config holds the encryption key itself, not a passphrase; see fogies.age_key.
 
-The files claude-sync reads are managed only from that file, not with
+The files claude-sync reads are managed only from that config, not with
 claude-sync's own commands. They are compared exactly, so changing them any
 other way makes them differ from it.
 """
@@ -44,7 +44,7 @@ _MODULE_TEMPLATE = "github.com/tawanorg/claude-sync/cmd/claude-sync@v{version}"
 
 # The claude-sync files, in the home directory.
 _DIRECTORY_NAME = ".claude-sync"
-_CONFIG_FILE_NAME = "config.yaml"
+_YAML_FILE_NAME = "config.yaml"
 _KEY_FILE_NAME = "age-key.txt"
 
 
@@ -54,7 +54,7 @@ def claude_sync_files_directory() -> pathlib.Path:
 
 
 class ClaudeSyncConfig(BaseModel):
-    """Contents of the claude-sync secrets file."""
+    """Contents of the claude-sync config."""
 
     bucket: str
     region: str
@@ -71,11 +71,10 @@ class ClaudeSyncConfig(BaseModel):
 
 
 def load_claude_sync_config(*, path: pathlib.Path) -> ClaudeSyncConfig:
-    """Return the configuration in path.
+    """Return the config in path.
 
-    Created from a template if it doesn't exist yet -- callers should expect
-    a FileNotFoundError-style failure the first time, prompting them to fill
-    in the newly-created file and re-run.
+    If it doesn't exist yet, it is created from a template and FileNotFoundError
+    is raised, so that it is filled in before it is used.
     """
     ensure_from_template(path=path, template_factory=claude_sync_toml_template_factory)
     with path.open("rb") as f:
@@ -83,7 +82,7 @@ def load_claude_sync_config(*, path: pathlib.Path) -> ClaudeSyncConfig:
 
 
 def update_claude_sync_config(*, path: pathlib.Path, age_key: str) -> None:
-    """Update the configuration file with age_key, keeping its comments and layout."""
+    """Update the config with age_key, keeping its comments and layout."""
     with path.open("r", encoding="utf-8") as f:
         doc = tomlkit.parse(f.read())
     doc["age_key"] = age_key
@@ -120,10 +119,8 @@ class ClaudeSyncSetup:
     applied_to_claude_sync_files: bool
 
 
-def configure_claude_sync(
-    *, secrets_path: pathlib.Path, force: bool
-) -> ClaudeSyncSetup:
-    """Apply the config in the secrets file at secrets_path to the claude-sync files.
+def configure_claude_sync(*, config_path: pathlib.Path, force: bool) -> ClaudeSyncSetup:
+    """Apply the config at config_path to the claude-sync files.
 
     The config decides what claude-sync's encryption key and config.yaml
     should be, in claude_sync_files_directory(). If it has no key yet, a new one
@@ -138,14 +135,14 @@ def configure_claude_sync(
     key_path = directory / _KEY_FILE_NAME
 
     # The key in the config, or a new one if it has none.
-    config = load_claude_sync_config(path=secrets_path)
+    config = load_claude_sync_config(path=config_path)
     generated_age_key = config.age_key is None
     age_key = generate_age_key() if config.age_key is None else config.age_key
 
     # What the claude-sync files should contain.
     expected_content = {
         key_path: age_key + "\n",
-        directory / _CONFIG_FILE_NAME: render_claude_sync_yaml(config),
+        directory / _YAML_FILE_NAME: render_claude_sync_yaml(config),
     }
     # Which of them are missing or differ.
     paths_to_write = [
@@ -158,11 +155,11 @@ def configure_claude_sync(
 
     # Refuse to replace what differs, unless forced.
     if paths_that_differ and not force:
-        raise ValueError("Configuration does not match existing claude-sync files.")
+        raise ValueError("Config does not match existing claude-sync files.")
 
     # Save a generated key in the config, for other machines.
     if generated_age_key:
-        update_claude_sync_config(path=secrets_path, age_key=age_key)
+        update_claude_sync_config(path=config_path, age_key=age_key)
 
     # Write the claude-sync files.
     directory.mkdir(parents=True, exist_ok=True)
