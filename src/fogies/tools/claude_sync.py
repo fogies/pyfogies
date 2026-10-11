@@ -175,7 +175,6 @@ def configure_claude_sync(
     directory.mkdir(parents=True, exist_ok=True)
     for path in paths_to_write:
         _ = path.write_text(expected_content[path], encoding="utf-8", newline="\n")
-        path.chmod(0o600)
 
     return ClaudeSyncConfigureResult(
         generated_age_key=generated_age_key,
