@@ -42,10 +42,15 @@ _DEFAULT_VERSION = _KNOWN_VERSIONS[0]
 
 _MODULE_TEMPLATE = "github.com/tawanorg/claude-sync/cmd/claude-sync@v{version}"
 
+# The claude-sync files, in the home directory.
+_DIRECTORY_NAME = ".claude-sync"
+_CONFIG_FILE_NAME = "config.yaml"
+_KEY_FILE_NAME = "age-key.txt"
+
 
 def claude_sync_files_directory() -> pathlib.Path:
     """Where the claude-sync files are: its config.yaml and encryption key."""
-    return pathlib.Path.home() / ".claude-sync"
+    return pathlib.Path.home() / _DIRECTORY_NAME
 
 
 class ClaudeSyncConfig(BaseModel):
@@ -100,7 +105,8 @@ def render_claude_sync_yaml(config: ClaudeSyncConfig) -> str:
         "    access_key_id: " + json.dumps(config.access_key_id),
         "    secret_access_key: " + json.dumps(config.secret_access_key),
         "    region: " + json.dumps(config.region),
-        "encryption_key_path: " + json.dumps("~/.claude-sync/age-key.txt"),
+        "encryption_key_path: "
+        + json.dumps("~/{}/{}".format(_DIRECTORY_NAME, _KEY_FILE_NAME)),
         "scope: " + config.scope,
     ]
     return "\n".join(lines) + "\n"
@@ -129,7 +135,7 @@ def configure_claude_sync(
     """
     # Expected paths for claude-sync configuration.
     directory = claude_sync_files_directory()
-    key_path = directory / "age-key.txt"
+    key_path = directory / _KEY_FILE_NAME
 
     # Ensure we have a key.
     config = load_claude_sync_config(path=secrets_path)
@@ -139,7 +145,7 @@ def configure_claude_sync(
     # Check the expected content of configuration.
     expected_content = {
         key_path: age_key + "\n",
-        directory / "config.yaml": render_claude_sync_yaml(config),
+        directory / _CONFIG_FILE_NAME: render_claude_sync_yaml(config),
     }
     # Which paths need to be written.
     paths_to_write = [
