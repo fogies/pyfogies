@@ -10,6 +10,7 @@ as flags, and for the passphrase its encryption key can be derived from. So a
 machine is set up by writing the files claude-sync reads, from one
 gitignored config that is synced between machines like the other secrets. That
 config holds the encryption key itself, not a passphrase; see fogies.age_key.
+The credentials are not in it, but in a profile of the AWS config.
 
 The files claude-sync reads are managed only from that config, not with
 claude-sync's own commands. They are compared exactly, so changing them any
@@ -30,6 +31,7 @@ from pydantic import BaseModel, field_validator
 
 from fogies.age_key import generate_age_key, validate_age_key
 from fogies.templates import claude_sync_toml_template_factory, ensure_from_template
+from fogies.tools.aws_environ import AwsProfile, load_aws_profile_from_config
 from fogies.tools.command import CommandParams, command_run
 from fogies.tools.go import go
 
@@ -56,10 +58,10 @@ def claude_sync_files_directory() -> pathlib.Path:
 class ClaudeSyncConfig(BaseModel):
     """Contents of the claude-sync config."""
 
+    # A profile in the AWS config, with the credentials claude-sync signs in with.
+    aws_profile: str
     bucket: str
     region: str
-    access_key_id: str
-    secret_access_key: str
     scope: Literal["full", "sessions"]
     # Absent until created by configure.
     age_key: str | None = None
@@ -90,8 +92,8 @@ def update_claude_sync_config(*, path: pathlib.Path, age_key: str) -> None:
         _ = f.write(tomlkit.dumps(doc))
 
 
-def render_claude_sync_yaml(config: ClaudeSyncConfig) -> str:
-    """Return the contents of claude-sync's config.yaml for config.
+def render_claude_sync_yaml(config: ClaudeSyncConfig, aws_profile: AwsProfile) -> str:
+    """Return the contents of claude-sync's config.yaml for config and aws_profile.
 
     As `claude-sync init` writes for S3, except that the scope is always
     written, not left out when it's the default. Values are written as JSON
@@ -101,8 +103,8 @@ def render_claude_sync_yaml(config: ClaudeSyncConfig) -> str:
         "storage:",
         "    provider: s3",
         "    bucket: " + json.dumps(config.bucket),
-        "    access_key_id: " + json.dumps(config.access_key_id),
-        "    secret_access_key: " + json.dumps(config.secret_access_key),
+        "    access_key_id: " + json.dumps(aws_profile.aws_access_key_id),
+        "    secret_access_key: " + json.dumps(aws_profile.aws_secret_access_key),
         "    region: " + json.dumps(config.region),
         "encryption_key_path: "
         + json.dumps("~/{}/{}".format(_DIRECTORY_NAME, _KEY_FILE_NAME)),
@@ -120,9 +122,12 @@ class ClaudeSyncConfigureResult:
 
 
 def configure_claude_sync(
-    *, config_path: pathlib.Path, force: bool
+    *, claude_sync_config_path: pathlib.Path, aws_config_path: pathlib.Path, force: bool
 ) -> ClaudeSyncConfigureResult:
-    """Apply the config at config_path to the claude-sync files.
+    """Apply the config at claude_sync_config_path to the claude-sync files.
+
+    The credentials are those of the config's profile in the AWS config at
+    aws_config_path.
 
     The config decides what claude-sync's encryption key and config.yaml
     should be, in claude_sync_files_directory(). If it has no key yet, a new one
@@ -137,14 +142,17 @@ def configure_claude_sync(
     key_path = directory / _KEY_FILE_NAME
 
     # The key in the config, or a new one if it has none.
-    config = load_claude_sync_config(path=config_path)
+    config = load_claude_sync_config(path=claude_sync_config_path)
+    aws_profile = load_aws_profile_from_config(
+        config_path=aws_config_path, profile_name=config.aws_profile
+    )
     generated_age_key = config.age_key is None
     age_key = generate_age_key() if config.age_key is None else config.age_key
 
     # What the claude-sync files should contain.
     expected_content = {
         key_path: age_key + "\n",
-        directory / _YAML_FILE_NAME: render_claude_sync_yaml(config),
+        directory / _YAML_FILE_NAME: render_claude_sync_yaml(config, aws_profile),
     }
     # Which of them are missing or differ.
     paths_to_write = [
@@ -161,7 +169,7 @@ def configure_claude_sync(
 
     # Save a generated key in the config, for other machines.
     if generated_age_key:
-        update_claude_sync_config(path=config_path, age_key=age_key)
+        update_claude_sync_config(path=claude_sync_config_path, age_key=age_key)
 
     # Write the claude-sync files.
     directory.mkdir(parents=True, exist_ok=True)

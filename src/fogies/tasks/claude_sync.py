@@ -13,7 +13,10 @@ from fogies.tools.command import CommandParams
 
 
 def get_task_configure(
-    *, binary_cache_path: pathlib.Path, config_path: pathlib.Path
+    *,
+    binary_cache_path: pathlib.Path,
+    claude_sync_config_path: pathlib.Path,
+    aws_config_path: pathlib.Path,
 ) -> Task[Callable[..., None]]:
     @task(
         name="configure",
@@ -26,7 +29,11 @@ def get_task_configure(
         """
         Configure claude-sync on this machine.
         """
-        setup = configure_claude_sync(config_path=config_path, force=force)
+        setup = configure_claude_sync(
+            claude_sync_config_path=claude_sync_config_path,
+            aws_config_path=aws_config_path,
+            force=force,
+        )
 
         if setup.generated_age_key:
             print("Generated encryption key.")
@@ -120,14 +127,16 @@ def get_collection(
     *,
     collection_name: str,
     binary_cache_path: pathlib.Path,
-    config_path: pathlib.Path,
+    claude_sync_config_path: pathlib.Path,
+    aws_config_path: pathlib.Path,
 ) -> Collection:
     """Get a collection of tasks for setting up and running claude-sync."""
     collection = Collection(collection_name)
     collection.add_task(
         get_task_configure(
             binary_cache_path=binary_cache_path,
-            config_path=config_path,
+            claude_sync_config_path=claude_sync_config_path,
+            aws_config_path=aws_config_path,
         )
     )
     collection.add_task(get_task_pull(binary_cache_path=binary_cache_path))

@@ -66,7 +66,8 @@ namespace.add_collection(
     fogies.tasks.claude_sync.get_collection(
         collection_name="claude-sync",
         binary_cache_path=STAGING_BINARY_CACHE_PATH,
-        config_path=SECRETS_CLAUDE_SYNC_PATH,
+        claude_sync_config_path=SECRETS_CLAUDE_SYNC_PATH,
+        aws_config_path=SECRETS_AWS_PATH,
     )
 )
 

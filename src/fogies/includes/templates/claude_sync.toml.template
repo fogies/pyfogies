@@ -1,11 +1,12 @@
 # Config for claude-sync tasks.
 # See https://github.com/tawanorg/claude-sync
 
-# S3 bucket and an IAM access key that can use it.
+# Profile in the AWS config, for an IAM user that can use the bucket.
+aws_profile = "..."
+
+# S3 bucket.
 bucket = "..."
 region = "..."
-access_key_id = "..."
-secret_access_key = "..."
 
 # What to sync: "sessions" or "full".
 scope = "sessions"
