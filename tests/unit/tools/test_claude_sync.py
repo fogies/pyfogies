@@ -19,6 +19,7 @@ from fogies.tools.claude_sync import (
     configure_claude_sync,
     load_claude_sync_config,
     render_claude_sync_yaml,
+    update_claude_sync_config,
 )
 from tasks.paths import STAGING_BINARY_CACHE_PATH
 
@@ -265,3 +266,19 @@ def test_configure_claude_sync_replaces_what_differs_when_forced(
     assert yaml_path.read_text(encoding="utf-8") == render_claude_sync_yaml(
         load_claude_sync_config(path=claude_sync_config_path), _AWS_PROFILE
     )
+
+
+def test_update_claude_sync_config_updates_what_a_redirect_points_to(
+    tmp_path: pathlib.Path,
+) -> None:
+    (tmp_path / "shared").mkdir()
+    shared_path = _config_file(tmp_path / "shared")
+    redirect_path = tmp_path / "project" / "claude-sync.toml"
+    redirect_path.parent.mkdir()
+    redirect_text = 'redirect = "../shared/claude-sync.toml"\n'
+    _ = redirect_path.write_text(redirect_text, encoding="utf-8")
+
+    update_claude_sync_config(path=redirect_path, age_key=_KEY)
+
+    assert load_claude_sync_config(path=shared_path).age_key == _KEY
+    assert redirect_path.read_text(encoding="utf-8") == redirect_text

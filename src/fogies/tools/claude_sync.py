@@ -20,7 +20,6 @@ other way makes them differ from it.
 import dataclasses
 import json
 import pathlib
-import tomllib
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Literal
@@ -30,7 +29,8 @@ from invoke.runners import Result
 from pydantic import BaseModel, field_validator
 
 from fogies.age_key import generate_age_key, validate_age_key
-from fogies.templates import claude_sync_toml_template_factory, ensure_from_template
+from fogies.config import load_config, resolve_config_path
+from fogies.templates import claude_sync_toml_template_factory
 from fogies.tools.aws_environ import AwsProfile, load_aws_profile_from_config
 from fogies.tools.command import CommandParams, command_run
 from fogies.tools.go import go
@@ -78,13 +78,19 @@ def load_claude_sync_config(*, path: pathlib.Path) -> ClaudeSyncConfig:
     If it doesn't exist yet, it is created from a template and FileNotFoundError
     is raised, so that it is filled in before it is used.
     """
-    ensure_from_template(path=path, template_factory=claude_sync_toml_template_factory)
-    with path.open("rb") as f:
-        return ClaudeSyncConfig.model_validate(tomllib.load(f))
+    return load_config(
+        path=path,
+        model=ClaudeSyncConfig,
+        template_factory=claude_sync_toml_template_factory,
+    )
 
 
 def update_claude_sync_config(*, path: pathlib.Path, age_key: str) -> None:
-    """Update the config with age_key, keeping its comments and layout."""
+    """Update the config with age_key, keeping its comments and layout.
+
+    If the config redirects, the shared config it redirects to is updated.
+    """
+    path = resolve_config_path(path=path)
     with path.open("r", encoding="utf-8") as f:
         doc = tomlkit.parse(f.read())
     doc["age_key"] = age_key
