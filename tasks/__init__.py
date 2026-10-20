@@ -5,6 +5,7 @@ import pathlib
 import colorama
 from invoke.collection import Collection
 
+import fogies.tasks.claude_code
 import fogies.tasks.claude_sync
 import fogies.tasks.format
 import fogies.tasks.lint
@@ -35,6 +36,12 @@ namespace.add_task(
 namespace.add_task(fogies.tasks.lint.get_task_lint())
 namespace.add_collection(
     fogies.tasks.poetry.get_collection(secrets_poetry_path=SECRETS_POETRY_PATH)
+)
+namespace.add_collection(
+    fogies.tasks.claude_code.get_collection(
+        collection_name="claude-code",
+        binary_cache_path=STAGING_BINARY_CACHE_PATH,
+    )
 )
 namespace.add_collection(
     fogies.tasks.claude_sync.get_collection(
