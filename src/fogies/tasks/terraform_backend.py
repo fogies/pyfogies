@@ -56,7 +56,7 @@ def get_task_backend_apply(
         apply_auto_approve: bool = default_apply_auto_approve,
     ) -> None:
         """
-        Apply a Terraform backend configuration, and record it as applied.
+        Apply a Terraform backend configuration.
         """
         init_params = InitParams(reconfigure=init_reconfigure, upgrade=init_upgrade)
         validate_init_params(init=init, init_params=init_params)
@@ -125,7 +125,7 @@ def get_task_backend_destroy(
         destroy_auto_approve: bool = default_destroy_auto_approve,
     ) -> None:
         """
-        Destroy a Terraform backend configuration, and record it as destroyed.
+        Destroy a Terraform backend configuration.
 
         Reads the backend module's own output, verifies every state it
         declares is empty of resources, then clears the bucket's state
