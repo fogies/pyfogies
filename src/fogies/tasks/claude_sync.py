@@ -53,6 +53,38 @@ def get_task_configure(
     return cast(Task[Callable[..., None]], task_configure)
 
 
+def get_task_conflicts(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
+    @task(
+        name="conflicts",
+        auto_shortflags=False,
+        help={
+            "keep": "Resolve all conflicts, keeping 'local' or 'remote'.",
+            "list": "Only list the conflicts.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
+    def task_conflicts(
+        context: Context, keep: str | None = None, list_: bool = False
+    ) -> None:
+        """
+        Resolve conflicts from a sync, by default interactively.
+        """
+        if keep not in (None, "local", "remote"):
+            raise ValueError("--keep must be 'local' or 'remote'")
+        if keep is not None and list_:
+            raise ValueError("--keep and --list cannot be combined")
+
+        with claude_sync(
+            binary_cache_path=binary_cache_path, raise_if_env_exists=False
+        ) as cs:
+            command_params = CommandParams(context=context)
+            if list_:
+                _ = cs.list_conflicts(command_params=command_params)
+            else:
+                _ = cs.resolve_conflicts(command_params=command_params, keep=keep)
+
+    return cast(Task[Callable[..., None]], task_conflicts)
+
+
 def get_task_pull(
     *,
     binary_cache_path: pathlib.Path,
@@ -139,6 +171,7 @@ def get_collection(
             aws_config_path=aws_config_path,
         )
     )
+    collection.add_task(get_task_conflicts(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_pull(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_push(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_status(binary_cache_path=binary_cache_path))

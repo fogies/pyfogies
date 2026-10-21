@@ -2,7 +2,8 @@
 
 See <https://github.com/tawanorg/claude-sync>. claude-sync ships no Windows
 release binary, so it's built from source here rather than downloaded
-pre-built, unlike fogies.tools.terraform. Only push/pull/status are wrapped.
+pre-built, unlike fogies.tools.terraform. Only push/pull/status/conflicts are
+wrapped.
 
 claude-sync's own setup wizard (`claude-sync init`) can't run unattended: for
 S3 it prompts for the credentials, region and bucket even when they are given
@@ -201,19 +202,49 @@ class _ClaudeSync:
         """The path to the claude-sync executable."""
         return self._path
 
+    def list_conflicts(self, *, command_params: CommandParams) -> Result:
+        """Run `claude-sync conflicts --list`, listing conflicts from a sync.
+
+        When both the local and remote file change, the remote version is saved
+        as a .conflict file.
+        """
+        return command_run(
+            command=self.binary_path,
+            command_params=command_params,
+            args=["conflicts", "--list"],
+        )
+
+    def resolve_conflicts(
+        self,
+        *,
+        command_params: CommandParams,
+        keep: Literal["local", "remote"] | None = None,
+    ) -> Result:
+        """Run `claude-sync conflicts`, resolving conflicts from a sync.
+
+        By default they are resolved interactively, where showing differences
+        runs a `diff` command, so one has to be on PATH. *keep* resolves all of
+        them, keeping the local or the remote version.
+        """
+        resolve_args = ["conflicts"]
+        if keep is not None:
+            resolve_args.extend(["--keep", keep])
+        return command_run(
+            command=self.binary_path,
+            command_params=command_params,
+            args=resolve_args,
+        )
+
     def push(
         self,
         *,
         command_params: CommandParams,
         include_mcp: bool = False,
-        quiet: bool = False,
     ) -> Result:
         """Run `claude-sync push`, uploading local changes to cloud storage."""
         push_args = ["push"]
         if include_mcp:
             push_args.append("--include-mcp")
-        if quiet:
-            push_args.append("-q")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
@@ -227,7 +258,6 @@ class _ClaudeSync:
         dry_run: bool = False,
         force: bool = False,
         include_mcp: bool = False,
-        quiet: bool = False,
         rebuild_history: bool = False,
     ) -> Result:
         """Run `claude-sync pull`, downloading remote changes."""
@@ -238,8 +268,6 @@ class _ClaudeSync:
             pull_args.append("--force")
         if include_mcp:
             pull_args.append("--include-mcp")
-        if quiet:
-            pull_args.append("-q")
         if rebuild_history:
             pull_args.append("--rebuild-history")
         return command_run(
@@ -248,15 +276,12 @@ class _ClaudeSync:
             args=pull_args,
         )
 
-    def status(self, *, command_params: CommandParams, quiet: bool = False) -> Result:
+    def status(self, *, command_params: CommandParams) -> Result:
         """Run `claude-sync status`, showing pending local changes."""
-        status_args = ["status"]
-        if quiet:
-            status_args.append("-q")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
-            args=status_args,
+            args=["status"],
         )
 
 

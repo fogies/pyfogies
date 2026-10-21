@@ -21,6 +21,7 @@ from fogies.tools.claude_sync import (
     render_claude_sync_yaml,
     update_claude_sync_config,
 )
+from fogies.tools.command import CommandParams
 from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 # Any two different age secret keys will do.
@@ -282,3 +283,45 @@ def test_update_claude_sync_config_updates_what_a_redirect_points_to(
 
     assert load_claude_sync_config(path=shared_path).age_key == _KEY
     assert redirect_path.read_text(encoding="utf-8") == redirect_text
+
+
+def test_claude_sync_conflicts_keeps_the_chosen_version(
+    temp_home: pathlib.Path,
+) -> None:
+    """A conflict is resolved by keeping the remote version, which is saved beside it."""
+    project_path = temp_home / ".claude" / "projects" / "demo"
+    project_path.mkdir(parents=True)
+    local_path = project_path / "a.jsonl"
+    conflict_path = project_path / "a.jsonl.conflict.20260208-095132"
+    _ = local_path.write_text("local", encoding="utf-8")
+    _ = conflict_path.write_text("remote", encoding="utf-8")
+
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        _ = cs.resolve_conflicts(
+            command_params=CommandParams(in_stream=False, hide=True), keep="remote"
+        )
+
+    assert local_path.read_text(encoding="utf-8") == "remote"
+    assert not conflict_path.exists()
+
+
+def test_claude_sync_list_conflicts_changes_nothing(temp_home: pathlib.Path) -> None:
+    project_path = temp_home / ".claude" / "projects" / "demo"
+    project_path.mkdir(parents=True)
+    local_path = project_path / "a.jsonl"
+    conflict_path = project_path / "a.jsonl.conflict.20260208-095132"
+    _ = local_path.write_text("local", encoding="utf-8")
+    _ = conflict_path.write_text("remote", encoding="utf-8")
+
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        result = cs.list_conflicts(
+            command_params=CommandParams(in_stream=False, hide=True)
+        )
+
+    assert "a.jsonl" in result.stdout
+    assert local_path.read_text(encoding="utf-8") == "local"
+    assert conflict_path.read_text(encoding="utf-8") == "remote"
