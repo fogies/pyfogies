@@ -66,7 +66,7 @@ def get_task_conflicts(*, binary_cache_path: pathlib.Path) -> Task[Callable[...,
         context: Context, keep: str | None = None, list_: bool = False
     ) -> None:
         """
-        Resolve conflicts from a sync, by default interactively.
+        Resolve conflicts from a sync.
         """
         if keep not in (None, "local", "remote"):
             raise ValueError("--keep must be 'local' or 'remote'")
