@@ -16,8 +16,9 @@ from fogies.tools.claude_sync import (
 from fogies.tools.claude_sync import (
     _conflicts_remain,  # pyright: ignore[reportPrivateUsage]
 )
+from fogies.tools.claude_sync import _had_errors  # pyright: ignore[reportPrivateUsage]
 from fogies.tools.claude_sync import (
-    _pull_had_errors,  # pyright: ignore[reportPrivateUsage]
+    _pull_finished,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
     claude_sync,
@@ -333,9 +334,28 @@ def test_claude_sync_list_conflicts_changes_nothing(temp_home: pathlib.Path) -> 
     assert conflict_path.read_text(encoding="utf-8") == "remote"
 
 
-def test_pull_had_errors() -> None:
-    assert not _pull_had_errors("Pull complete: 2 downloaded")
-    assert _pull_had_errors("Pull complete\n\nErrors:\n  a.jsonl: timeout")
+def test_had_errors() -> None:
+    """Both a pull and a push print what failed, and still exit successfully."""
+    assert not _had_errors("Pull complete: 2 downloaded")
+    assert _had_errors("Pull complete: 1 failed\n\nErrors:\n  a.jsonl: timeout")
+    assert _had_errors("Push complete: 1 failed\n\nErrors:\n  b.jsonl: timeout")
+
+
+def test_pull_finished() -> None:
+    # Every pull that runs to its end rebuilds the history, with nothing else
+    # printed when there was nothing to download.
+    assert _pull_finished(
+        "\n".join(
+            [
+                "Fetching remote file list...",
+                "  Rebuilt history.jsonl: 5 entries (5 existing + 0 recovered)",
+            ]
+        )
+    )
+    # A pull that was stopped, or did nothing, printed none of it.
+    assert not _pull_finished("  Aborted.")
+    assert not _pull_finished("Pull complete: 2 downloaded")
+    assert not _pull_finished("")
 
 
 def test_conflicts_remain() -> None:

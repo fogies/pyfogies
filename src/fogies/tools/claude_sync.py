@@ -51,12 +51,24 @@ _YAML_FILE_NAME = "config.yaml"
 _KEY_FILE_NAME = "age-key.txt"
 
 
-def _pull_had_errors(output: str) -> bool:
-    """Return whether the output of a pull says that some files failed.
+def _had_errors(output: str) -> bool:
+    """Return whether the output of a pull or a push says that some files failed.
 
-    claude-sync's pull exits successfully even then, and only prints them.
+    claude-sync exits successfully even then, and only prints them.
     """
     return "Errors:" in output
+
+
+def _pull_finished(output: str) -> bool:
+    """Return whether the output of a pull says that it ran to its end.
+
+    A pull that does nothing, or is stopped (e.g., a first pull that is
+    aborted), exits successfully too. What every pull that runs to its end
+    prints, as it is always asked to rebuild the history, is that it did. The
+    messages for a pull with nothing to download, or one that is up to date,
+    are not printed in every case, so are not relied on.
+    """
+    return "Rebuilt history.jsonl" in output
 
 
 def _conflicts_remain(output: str) -> bool:
@@ -315,8 +327,10 @@ class _ClaudeSync:
         errors or conflicts are left unresolved (e.g., skipped).
         """
         pull_result = self.pull(command_params=command_params)
-        if _pull_had_errors(pull_result.stdout):
+        if _had_errors(pull_result.stdout):
             raise ValueError("Not pushing, because the pull had errors.")
+        if not _pull_finished(pull_result.stdout):
+            raise ValueError("Not pushing, because the pull did not finish.")
 
         if _conflicts_remain(self.list_conflicts(command_params=command_params).stdout):
             _ = self.resolve_conflicts(command_params=command_params)
@@ -325,7 +339,9 @@ class _ClaudeSync:
             if _conflicts_remain(self.list_conflicts(command_params=hidden).stdout):
                 raise ValueError("Not pushing, because conflicts are unresolved.")
 
-        _ = self.push(command_params=command_params)
+        push_result = self.push(command_params=command_params)
+        if _had_errors(push_result.stdout):
+            raise ValueError("The push had errors, so some files were not uploaded.")
 
 
 @contextmanager
