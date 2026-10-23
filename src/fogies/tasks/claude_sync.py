@@ -90,7 +90,6 @@ def get_task_pull(
     binary_cache_path: pathlib.Path,
     default_dry_run: bool = False,
     default_force: bool = False,
-    default_rebuild_history: bool = True,
 ) -> Task[Callable[..., None]]:
     @task(
         name="pull",
@@ -98,14 +97,12 @@ def get_task_pull(
         help={
             "dry_run": "Show what would be downloaded.",
             "force": "Force overwrite of local files.",
-            "rebuild_history": "Rebuild history from session files.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_pull(
         context: Context,
         dry_run: bool = default_dry_run,
         force: bool = default_force,
-        rebuild_history: bool = default_rebuild_history,
     ) -> None:
         """
         Download remote changes.
@@ -117,7 +114,6 @@ def get_task_pull(
                 command_params=CommandParams(context=context),
                 dry_run=dry_run,
                 force=force,
-                rebuild_history=rebuild_history,
             )
 
     return cast(Task[Callable[..., None]], task_pull)
@@ -155,6 +151,25 @@ def get_task_status(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., No
     return cast(Task[Callable[..., None]], task_status)
 
 
+def get_task_sync(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
+    @task(
+        name="sync", auto_shortflags=False
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
+    def task_sync(context: Context) -> None:
+        """
+        Pull, resolve any conflicts, then push.
+        """
+        with claude_sync(
+            binary_cache_path=binary_cache_path, raise_if_env_exists=False
+        ) as cs:
+            try:
+                cs.sync(command_params=CommandParams(context=context))
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+
+    return cast(Task[Callable[..., None]], task_sync)
+
+
 def get_collection(
     *,
     collection_name: str,
@@ -175,4 +190,5 @@ def get_collection(
     collection.add_task(get_task_pull(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_push(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_status(binary_cache_path=binary_cache_path))
+    collection.add_task(get_task_sync(binary_cache_path=binary_cache_path))
     return collection

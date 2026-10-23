@@ -14,6 +14,12 @@ from fogies.tools.claude_sync import (
     _YAML_FILE_NAME,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
+    _conflicts_remain,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync import (
+    _pull_had_errors,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync import (
     claude_sync,
     claude_sync_files_directory,
     configure_claude_sync,
@@ -325,3 +331,15 @@ def test_claude_sync_list_conflicts_changes_nothing(temp_home: pathlib.Path) -> 
     assert "a.jsonl" in result.stdout
     assert local_path.read_text(encoding="utf-8") == "local"
     assert conflict_path.read_text(encoding="utf-8") == "remote"
+
+
+def test_pull_had_errors() -> None:
+    assert not _pull_had_errors("Pull complete: 2 downloaded")
+    assert _pull_had_errors("Pull complete\n\nErrors:\n  a.jsonl: timeout")
+
+
+def test_conflicts_remain() -> None:
+    assert not _conflicts_remain("No conflicts found")
+    assert _conflicts_remain("Found 1 conflict(s):")
+    # What is not recognized is not taken to be none.
+    assert _conflicts_remain("something else")

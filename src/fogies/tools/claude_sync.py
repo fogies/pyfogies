@@ -51,6 +51,24 @@ _YAML_FILE_NAME = "config.yaml"
 _KEY_FILE_NAME = "age-key.txt"
 
 
+def _pull_had_errors(output: str) -> bool:
+    """Return whether the output of a pull says that some files failed.
+
+    claude-sync's pull exits successfully even then, and only prints them.
+    """
+    return "Errors:" in output
+
+
+def _conflicts_remain(output: str) -> bool:
+    """Return whether the output of listing conflicts is not that there are none.
+
+    Anything else, including wording that is not recognized, counts as there
+    being some, so that a change in what claude-sync prints stops a push rather
+    than allowing one.
+    """
+    return "No conflicts found" not in output
+
+
 def claude_sync_files_directory() -> pathlib.Path:
     """Where the claude-sync files are: its config.yaml and encryption key."""
     return pathlib.Path.home() / _DIRECTORY_NAME
@@ -258,18 +276,20 @@ class _ClaudeSync:
         dry_run: bool = False,
         force: bool = False,
         include_mcp: bool = False,
-        rebuild_history: bool = False,
     ) -> Result:
-        """Run `claude-sync pull`, downloading remote changes."""
-        pull_args = ["pull"]
+        """Run `claude-sync pull`, downloading remote changes.
+
+        The history is always rebuilt afterward, from the session files, because
+        otherwise history.jsonl, which is a single file that machines replace
+        each other's copies of, loses entries. (Nothing is rebuilt for a dry run.)
+        """
+        pull_args = ["pull", "--rebuild-history"]
         if dry_run:
             pull_args.append("--dry-run")
         if force:
             pull_args.append("--force")
         if include_mcp:
             pull_args.append("--include-mcp")
-        if rebuild_history:
-            pull_args.append("--rebuild-history")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
@@ -283,6 +303,29 @@ class _ClaudeSync:
             command_params=command_params,
             args=["status"],
         )
+
+    def sync(self, *, command_params: CommandParams) -> None:
+        """Pull, resolve any conflicts, and then push.
+
+        A push does not look at what is in the bucket, so pushing without
+        pulling replaces other machines' changes, and pushing with conflicts
+        unresolved replaces the bucket's version with this machine's. So the
+        history is rebuilt after the pull, and conflicts are resolved
+        interactively. Raises ValueError, without pushing, if the pull had
+        errors or conflicts are left unresolved (e.g., skipped).
+        """
+        pull_result = self.pull(command_params=command_params)
+        if _pull_had_errors(pull_result.stdout):
+            raise ValueError("Not pushing, because the pull had errors.")
+
+        if _conflicts_remain(self.list_conflicts(command_params=command_params).stdout):
+            _ = self.resolve_conflicts(command_params=command_params)
+            # What was resolved was already shown, so only what is left is.
+            hidden = dataclasses.replace(command_params, hide=True)
+            if _conflicts_remain(self.list_conflicts(command_params=hidden).stdout):
+                raise ValueError("Not pushing, because conflicts are unresolved.")
+
+        _ = self.push(command_params=command_params)
 
 
 @contextmanager
