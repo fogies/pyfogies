@@ -51,16 +51,6 @@ _AWS_PROFILE = AwsProfile(
 
 
 @pytest.fixture
-def temp_home(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathlib.Path:
-    """Replace the home directory, where claude-sync looks for its files."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
-    return home
-
-
-@pytest.fixture
 def claude_sync_files_dir(temp_home: pathlib.Path) -> pathlib.Path:
     """Where claude-sync looks for its files, in the temporary home directory."""
     _ = temp_home

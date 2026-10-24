@@ -10,7 +10,7 @@ from invoke.tasks import Task, task
 
 from fogies.tasks.terminal import spawn_new_terminal
 from fogies.tools.claude_sync import claude_sync, configure_claude_sync, is_first_pull
-from fogies.tools.claude_sync_watch import watch_and_sync
+from fogies.tools.claude_sync_watch import is_watching, watch_and_sync
 from fogies.tools.command import CommandParams
 
 
@@ -187,6 +187,11 @@ def get_task_sync(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None
                 "This machine has not synced before. Run the sync task without --watch first."
             )
 
+        if watch and is_watching():
+            raise SystemExit(
+                "claude-sync is already being watched, in another terminal."
+            )
+
         if watch and not spawn_new_terminal(context):
             return
 
@@ -205,6 +210,8 @@ def get_task_sync(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None
                     watch_and_sync(sync=sync_once)
                 except KeyboardInterrupt:
                     print("Stopped.")
+                except ValueError as exc:
+                    raise SystemExit(str(exc)) from exc
             else:
                 try:
                     sync_once()

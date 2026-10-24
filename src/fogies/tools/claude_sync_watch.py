@@ -10,11 +10,13 @@ machines have pushed.
 import datetime
 import pathlib
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 
+from filelock import FileLock, Timeout
 from invoke.exceptions import Failure
 
-from fogies.tools.claude_sync import claude_directory
+from fogies.tools.claude_sync import claude_directory, claude_sync_files_directory
 
 # What is polled for local changes, in the directory claude-sync syncs. It is
 # the sessions scope; whatever else a full scope syncs is picked up on the
@@ -64,6 +66,39 @@ def sync_due(
     )
 
 
+@contextmanager
+def _watch_lock() -> Generator[None]:
+    """Hold this machine's lock on watching, which only one watch can have.
+
+    The operating system releases it when the process ends, however it ends, so
+    one that is left behind is not a watch that is running. On Windows that is
+    a moment after, so a watch started at once after another is killed may be
+    refused, and can be started again. Raises ValueError if another watch has it.
+    """
+    directory = claude_sync_files_directory()
+    directory.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(directory / "watch.lock", timeout=0)
+    try:
+        _ = lock.acquire()
+    except Timeout as exc:
+        raise ValueError(
+            "claude-sync is already being watched, in another terminal."
+        ) from exc
+    try:
+        yield
+    finally:
+        lock.release()
+
+
+def is_watching() -> bool:
+    """Return whether a watch is running on this machine."""
+    try:
+        with _watch_lock():
+            return False
+    except ValueError:
+        return True
+
+
 def _say(message: str) -> None:
     print("{}  {}".format(datetime.datetime.now().strftime("%H:%M:%S"), message))
 
@@ -80,29 +115,32 @@ def watch_and_sync(
 
     A sync that stops because of a ValueError (e.g., conflicts) or a failed
     command (e.g., no network) is reported, and tried again when next due.
+    Raises ValueError, without syncing, if another watch is running, as two
+    would sync over each other.
     """
     if directory is None:
         directory = claude_directory()
 
-    last_sync = 0.0
-    synced_change: float | None = None
-    _say("Watching and syncing. Stop with Ctrl+C.")
-    while True:
-        if sync_due(
-            now=time.time(),
-            newest_change=newest_change(directory=directory),
-            synced_change=synced_change,
-            last_sync=last_sync,
-            quiet_seconds=quiet_seconds,
-            interval_seconds=interval_seconds,
-        ):
-            last_sync = time.time()
-            try:
-                sync()
-                _say("Synced.")
-            except (ValueError, Failure) as exc:
-                _say(str(exc))
-            # What the sync wrote is not a change to sync again. A change made
-            # while it ran is not either, which the interval brings in.
-            synced_change = newest_change(directory=directory)
-        time.sleep(poll_seconds)
+    with _watch_lock():
+        last_sync = 0.0
+        synced_change: float | None = None
+        _say("Watching and syncing. Stop with Ctrl+C.")
+        while True:
+            if sync_due(
+                now=time.time(),
+                newest_change=newest_change(directory=directory),
+                synced_change=synced_change,
+                last_sync=last_sync,
+                quiet_seconds=quiet_seconds,
+                interval_seconds=interval_seconds,
+            ):
+                last_sync = time.time()
+                try:
+                    sync()
+                    _say("Synced.")
+                except (ValueError, Failure) as exc:
+                    _say(str(exc))
+                # What the sync wrote is not a change to sync again. A change
+                # made while it ran is not either, which the interval brings in.
+                synced_change = newest_change(directory=directory)
+            time.sleep(poll_seconds)
