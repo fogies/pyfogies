@@ -8,7 +8,9 @@ from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
+from fogies.tasks.terminal import spawn_new_terminal
 from fogies.tools.claude_sync import claude_sync, configure_claude_sync, is_first_pull
+from fogies.tools.claude_sync_watch import watch_and_sync
 from fogies.tools.command import CommandParams
 
 
@@ -169,19 +171,45 @@ def get_task_status(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., No
 
 def get_task_sync(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
     @task(
-        name="sync", auto_shortflags=False
+        name="sync",
+        auto_shortflags=False,
+        help={
+            "watch": "Keep syncing, in a new terminal, until stopped. Never asks about conflicts, and waits for them to be resolved. The first sync on a machine has to be run without it.",
+        },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
-    def task_sync(context: Context) -> None:
+    def task_sync(context: Context, watch: bool = False) -> None:
         """
         Pull, resolve any conflicts, then push.
         """
+        # Before a new terminal, so that this one says it.
+        if watch and is_first_pull():
+            raise SystemExit(
+                "This machine has not synced before. Run the sync task without --watch first."
+            )
+
+        if watch and not spawn_new_terminal(context):
+            return
+
         with claude_sync(
             binary_cache_path=binary_cache_path, raise_if_env_exists=False
         ) as cs:
-            try:
-                cs.sync(command_params=CommandParams(context=context))
-            except ValueError as exc:
-                raise SystemExit(str(exc)) from exc
+
+            def sync_once() -> None:
+                cs.sync(
+                    command_params=CommandParams(context=context),
+                    unattended=watch,
+                )
+
+            if watch:
+                try:
+                    watch_and_sync(sync=sync_once)
+                except KeyboardInterrupt:
+                    print("Stopped.")
+            else:
+                try:
+                    sync_once()
+                except ValueError as exc:
+                    raise SystemExit(str(exc)) from exc
 
     return cast(Task[Callable[..., None]], task_sync)
 

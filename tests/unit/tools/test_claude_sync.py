@@ -465,3 +465,18 @@ def test_backup_claude_directory_nothing_to_back_up(temp_home: pathlib.Path) -> 
     _ = (claude / ".credentials.json").write_text("secret", encoding="utf-8")
 
     assert backup_claude_directory(names=["projects", "history.jsonl"]) is None
+
+
+def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(
+    temp_home: pathlib.Path,
+) -> None:
+    """Nothing is run, or changed, for an unattended first sync."""
+    _ = temp_home
+
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        with pytest.raises(ValueError, match="first sync"):
+            cs.sync(command_params=CommandParams(in_stream=False), unattended=True)
+
+    assert not claude_directory().exists()

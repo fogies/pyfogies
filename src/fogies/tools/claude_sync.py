@@ -428,27 +428,50 @@ class _ClaudeSync:
             args=["status"],
         )
 
-    def sync(self, *, command_params: CommandParams) -> None:
+    def _conflicts_remain(self, *, command_params: CommandParams) -> bool:
+        """Return whether conflicts are left, according to listing them."""
+        return _conflicts_remain(
+            self.list_conflicts(command_params=command_params).stdout
+        )
+
+    def sync(self, *, command_params: CommandParams, unattended: bool = False) -> None:
         """Pull, resolve any conflicts, and then push.
 
         A push does not look at what is in the bucket, so pushing without
         pulling replaces other machines' changes, and pushing with conflicts
         unresolved replaces the bucket's version with this machine's. So the
         history is rebuilt after the pull, and conflicts are resolved
-        interactively. Raises ValueError, without pushing, if the pull had
-        errors or conflicts are left unresolved (e.g., skipped).
+        interactively.
+
+        *unattended* when true never asks, so what would need resolving stops
+        it. Conflicts left from before also stop it before it pulls, which would
+        otherwise add to them. The first sync on a machine merges what is here
+        with the bucket, so it is not unattended.
+
+        Raises ValueError, without pushing, if the pull had errors or did not
+        finish, or conflicts are unresolved (e.g., skipped). Raises it after
+        pushing, which is not undone, if the push had errors.
         """
+        if unattended and is_first_pull():
+            raise ValueError("The first sync on this machine has to be attended.")
+
+        hidden = dataclasses.replace(command_params, hide=True)
+        if unattended and self._conflicts_remain(command_params=hidden):
+            raise ValueError("Not syncing, because conflicts are unresolved.")
+
         pull_result = self.pull(command_params=command_params)
         if _had_errors(pull_result.stdout):
             raise ValueError("Not pushing, because the pull had errors.")
         if not _pull_finished(pull_result.stdout):
             raise ValueError("Not pushing, because the pull did not finish.")
 
-        if _conflicts_remain(self.list_conflicts(command_params=command_params).stdout):
+        if unattended:
+            if self._conflicts_remain(command_params=hidden):
+                raise ValueError("Not pushing, because the pull had conflicts.")
+        elif self._conflicts_remain(command_params=command_params):
             _ = self.resolve_conflicts(command_params=command_params)
             # What was resolved was already shown, so only what is left is.
-            hidden = dataclasses.replace(command_params, hide=True)
-            if _conflicts_remain(self.list_conflicts(command_params=hidden).stdout):
+            if self._conflicts_remain(command_params=hidden):
                 raise ValueError("Not pushing, because conflicts are unresolved.")
 
         push_result = self.push(command_params=command_params)
