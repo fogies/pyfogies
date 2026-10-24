@@ -8,7 +8,7 @@ from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
-from fogies.tools.claude_sync import claude_sync, configure_claude_sync
+from fogies.tools.claude_sync import claude_sync, configure_claude_sync, is_first_pull
 from fogies.tools.command import CommandParams
 
 
@@ -48,7 +48,23 @@ def get_task_configure(
         with claude_sync(
             binary_cache_path=binary_cache_path, raise_if_env_exists=False
         ) as cs:
-            _ = cs.pull(command_params=CommandParams(context=context), dry_run=True)
+            command_params = CommandParams(context=context)
+            _ = cs.pull(command_params=command_params, dry_run=True)
+
+            # What was just shown is what the first pull does, which merges with
+            # what is here, and it is followed by a push of what is only here.
+            if is_first_pull():
+                try:
+                    answer = input("Run the first sync now? [y/N] ")
+                except EOFError:
+                    answer = ""
+                if answer.strip().lower() == "y":
+                    try:
+                        cs.sync(command_params=command_params)
+                    except ValueError as exc:
+                        raise SystemExit(str(exc)) from exc
+                else:
+                    print("Run the sync task when ready.")
 
     return cast(Task[Callable[..., None]], task_configure)
 
