@@ -1,23 +1,23 @@
-"""Tasks for signing in to Claude Code and resuming its sessions in the desktop app.
+"""Tasks for signing in to Claude Code, and for its sessions.
 
-Sessions are listed and found with the Claude Agent SDK. See
+Sessions are listed and deleted with the Claude Agent SDK. See
 <https://code.claude.com/docs/en/agent-sdk/python>.
 """
 
-import datetime
 import pathlib
 from collections.abc import Callable
 from typing import cast
 
-from claude_agent_sdk import list_sessions
+from claude_agent_sdk import delete_session, list_sessions
 from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
-from fogies.tools.claude_code import claude_code
-
-# Longest title shown in a list of sessions.
-_TITLE_LENGTH = 60
+from fogies.tools.claude_code import (
+    claude_code,
+    describe_session,
+    find_session_id,
+)
 
 
 def get_task_login(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
@@ -76,49 +76,37 @@ def get_task_sessions() -> Task[Callable[..., None]]:
         """
         _ = context
         for session in list_sessions():
-            # The transcript's modified time. For a session synced from another
-            # machine (e.g., by claude-sync), that is when it was synced.
-            modified = (
-                datetime.datetime.fromtimestamp(session.last_modified / 1000)
-                .astimezone()
-                .strftime("%Y-%m-%d %H:%M")
-            )
-            project = pathlib.Path(session.cwd).name if session.cwd is not None else "?"
-            title = " ".join((session.summary or "").split())
-            if len(title) > _TITLE_LENGTH:
-                title = title[: _TITLE_LENGTH - 3] + "..."
-            print(
-                "{}  {}  {:<24}  {}".format(
-                    session.session_id,
-                    modified,
-                    project,
-                    title,
-                )
-            )
+            print(describe_session(session))
 
     return cast(Task[Callable[..., None]], task_sessions)
 
 
-def _match_session_id(session_ids: list[str], value: str) -> str:
-    """Return the session ID that value identifies, from any part of it.
+def get_task_delete() -> Task[Callable[..., None]]:
+    @task(
+        name="delete",
+        auto_shortflags=False,
+        help={
+            "session_id": "Session to delete, from any part of its ID that is only in that one.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
+    def task_delete(context: Context, session_id: str) -> None:
+        """
+        Delete a session from this machine, permanently.
+        """
+        _ = context
+        sessions = {session.session_id: session for session in list_sessions()}
+        delete_id = find_session_id(list(sessions), session_id)
 
-    That includes the start of it, as with git, and all of it. Raises
-    ValueError if no ID has the part, or if more than one does.
-    """
-    wanted = value.strip().lower()
-    if not wanted:
-        raise ValueError("Give at least part of a session's ID.")
+        print(describe_session(sessions[delete_id]))
+        print("Its transcript is deleted from this machine, and cannot be recovered.")
+        if input("Delete it? [y/N] ").strip().lower() != "y":
+            print("Not deleted.")
+            return
 
-    matches = [i for i in session_ids if wanted in i.lower()]
-    if len(matches) == 1:
-        return matches[0]
-    if matches:
-        raise ValueError(
-            "'{}' matches {} sessions: {}. Give more of it.".format(
-                value, len(matches), ", ".join(matches)
-            )
-        )
-    raise ValueError("No session '{}'".format(value))
+        delete_session(delete_id)
+        print("Deleted {}.".format(delete_id))
+
+    return cast(Task[Callable[..., None]], task_delete)
 
 
 def get_task_resume(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
@@ -145,7 +133,7 @@ def get_task_resume(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., No
             session_ids = list(sessions)
         else:
             assert session_id is not None
-            session_ids = [_match_session_id(list(sessions), session_id)]
+            session_ids = [find_session_id(list(sessions), session_id)]
 
         resumed = 0
         with claude_code(binary_cache_path=binary_cache_path) as cc:
@@ -181,9 +169,18 @@ def get_collection(
     *,
     collection_name: str,
     binary_cache_path: pathlib.Path,
+    include_delete: bool = False,
 ) -> Collection:
-    """Get a collection of tasks for signing in to Claude Code and resuming its sessions."""
+    """Get a collection of tasks for signing in to Claude Code, and for its sessions.
+
+    *include_delete* adds a task that deletes a session from this machine. It
+    is not for where sessions are synced (e.g., by claude-sync), as a session
+    deleted on one machine comes back from the others. Delete them in a way
+    that syncing knows about.
+    """
     collection = Collection(collection_name)
+    if include_delete:
+        collection.add_task(get_task_delete())
     collection.add_task(get_task_login(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_logout(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_resume(binary_cache_path=binary_cache_path))
