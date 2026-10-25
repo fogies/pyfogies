@@ -6,6 +6,7 @@ import colorama
 from invoke.collection import Collection
 
 import fogies.tasks.claude_code
+import fogies.tasks.claude_desktop
 import fogies.tasks.claude_sync
 import fogies.tasks.format
 import fogies.tasks.lint
@@ -40,6 +41,13 @@ namespace.add_collection(
 namespace.add_collection(
     fogies.tasks.claude_code.get_collection(
         collection_name="claude-code",
+        binary_cache_path=STAGING_BINARY_CACHE_PATH,
+        include_delete=False,
+    )
+)
+namespace.add_collection(
+    fogies.tasks.claude_desktop.get_collection(
+        collection_name="claude-desktop",
         binary_cache_path=STAGING_BINARY_CACHE_PATH,
     )
 )
