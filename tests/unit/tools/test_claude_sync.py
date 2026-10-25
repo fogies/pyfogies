@@ -21,10 +21,6 @@ from fogies.tools.claude_sync import (
     _pull_finished,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
-    _sync_paths_from,  # pyright: ignore[reportPrivateUsage]
-)
-from fogies.tools.claude_sync import (
-    backup_claude_directory,
     claude_directory,
     claude_sync,
     claude_sync_files_directory,
@@ -375,86 +371,6 @@ def test_is_first_pull(claude_sync_files_dir: pathlib.Path) -> None:
 
     _ = state_path.write_text('{"files": {"a.jsonl": {"hash": "x"}}}', encoding="utf-8")
     assert not is_first_pull()
-
-
-def test_sync_paths_from() -> None:
-    """Only the paths that sync are read, whatever else `paths list` prints."""
-    output = "\n".join(
-        [
-            "",
-            "\x1b[1mSync Paths\x1b[0m (config.yaml, scope: full):",
-            "  \x1b[32m+\x1b[0m projects",
-            "  \x1b[32m+\x1b[0m history.jsonl",
-            "  \x1b[36m+\x1b[0m (custom) notes/shared",
-            "",
-            '\x1b[1mNot synced\x1b[0m (outside the "sessions" scope):',
-            "  \x1b[33m-\x1b[0m plugins",
-            "",
-            "\x1b[1mExclude Filters\x1b[0m:",
-            "  \x1b[33m-\x1b[0m plugins/**/node_modules",
-            "",
-        ]
-    )
-
-    assert _sync_paths_from(output) == ["projects", "history.jsonl", "notes/shared"]
-    assert _sync_paths_from("something else") == []
-
-
-def test_claude_sync_sync_paths_from_the_real_claude_sync(
-    tmp_path: pathlib.Path, temp_home: pathlib.Path, aws_config_path: pathlib.Path
-) -> None:
-    """What claude-sync prints for `paths list` is read, for the scope that is set."""
-    _ = temp_home
-    _ = configure_claude_sync(
-        claude_sync_config_path=_config_file(tmp_path),
-        aws_config_path=aws_config_path,
-        force=False,
-    )
-
-    with claude_sync(
-        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
-    ) as cs:
-        paths = cs.sync_paths(command_params=CommandParams(in_stream=False))
-
-    # The sessions scope that the config has, and not, for example, plugins.
-    assert set(paths) == {"projects", "history.jsonl", "tasks", "plans"}
-
-
-def test_backup_claude_directory(temp_home: pathlib.Path) -> None:
-    """What is named is copied, and what is not is not."""
-    _ = temp_home
-    claude = claude_directory()
-    session = claude / "projects" / "demo" / "a.jsonl"
-    session.parent.mkdir(parents=True)
-    _ = session.write_text("session", encoding="utf-8")
-    _ = (claude / "history.jsonl").write_text("history", encoding="utf-8")
-    _ = (claude / ".credentials.json").write_text("secret", encoding="utf-8")
-    plugin = claude / "plugins" / "p.txt"
-    plugin.parent.mkdir()
-    _ = plugin.write_text("plugin", encoding="utf-8")
-
-    backup = backup_claude_directory(names=["projects", "history.jsonl", "agents"])
-
-    assert backup is not None
-    assert (backup / "projects" / "demo" / "a.jsonl").read_text(encoding="utf-8") == (
-        "session"
-    )
-    assert (backup / "history.jsonl").read_text(encoding="utf-8") == "history"
-    # Not named, so not copied, and a name that does not exist is not an error.
-    assert not (backup / ".credentials.json").exists()
-    assert not (backup / "plugins").exists()
-    # Beside the Claude directory, and the original is untouched.
-    assert backup.parent == claude.parent
-    assert session.read_text(encoding="utf-8") == "session"
-
-
-def test_backup_claude_directory_nothing_to_back_up(temp_home: pathlib.Path) -> None:
-    _ = temp_home
-    claude = claude_directory()
-    claude.mkdir()
-    _ = (claude / ".credentials.json").write_text("secret", encoding="utf-8")
-
-    assert backup_claude_directory(names=["projects", "history.jsonl"]) is None
 
 
 def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(

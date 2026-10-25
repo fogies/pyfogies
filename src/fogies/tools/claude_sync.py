@@ -19,11 +19,8 @@ other way makes them differ from it.
 """
 
 import dataclasses
-import datetime
 import json
 import pathlib
-import re
-import shutil
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Literal
@@ -74,31 +71,6 @@ def _pull_finished(output: str) -> bool:
     return "Rebuilt history.jsonl" in output
 
 
-def _sync_paths_from(output: str) -> list[str]:
-    """Return the paths listed as synced in the output of `claude-sync paths list`.
-
-    The output has a section for the paths that sync, each as a line starting
-    with a +, followed by others (e.g., those outside the scope) that start
-    with a -. A path added by the user is marked as custom.
-    """
-    text = re.sub(r"\x1b\[[0-9;]*m", "", output)
-    paths: list[str] = []
-    in_section = False
-    for line in text.splitlines():
-        if "Sync Paths" in line:
-            in_section = True
-        elif in_section:
-            if not line.strip():
-                if paths:
-                    break
-                continue
-            match = re.match(r"\s*\+\s+(?:\(custom\)\s+)?(\S.*?)\s*$", line)
-            if match is None:
-                break
-            paths.append(match.group(1))
-    return paths
-
-
 def _conflicts_remain(output: str) -> bool:
     """Return whether the output of listing conflicts is not that there are none.
 
@@ -128,9 +100,9 @@ class _SyncState(BaseModel):
 def is_first_pull() -> bool:
     """Return whether claude-sync has recorded nothing of syncing on this machine.
 
-    If it is not sure, it is taken to be, because what follows is a backup. If
-    it is wrong the other way, claude-sync asks about overwriting files before
-    its first pull, which does not work from a task.
+    If it is not sure, it is taken to be, because what follows is forcing the
+    pull. If it is wrong the other way, claude-sync asks about overwriting files
+    before its first pull, which does not work from a task.
     """
     try:
         state = _SyncState.model_validate_json(
@@ -139,32 +111,6 @@ def is_first_pull() -> bool:
     except OSError, ValidationError:
         return True
     return not state.files
-
-
-def backup_claude_directory(*, names: list[str]) -> pathlib.Path | None:
-    """Copy names, in the Claude directory, to a backup beside it.
-
-    That is what claude-sync does before a first pull, for what it syncs, which
-    could replace these files. Returns where the backup is, or None if there
-    is nothing to back up.
-    """
-    claude = claude_directory()
-    sources = [claude / name for name in names if (claude / name).exists()]
-    if not sources:
-        return None
-
-    backup = claude.with_name(
-        "{}.backup.{}".format(
-            claude.name, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        )
-    )
-    for source in sources:
-        if source.is_dir():
-            _ = shutil.copytree(source, backup / source.name)
-        else:
-            backup.mkdir(parents=True, exist_ok=True)
-            _ = shutil.copy2(source, backup / source.name)
-    return backup
 
 
 class ClaudeSyncConfig(BaseModel):
@@ -362,24 +308,6 @@ class _ClaudeSync:
             args=push_args,
         )
 
-    def sync_paths(self, *, command_params: CommandParams) -> list[str]:
-        """Run `claude-sync paths list`, and return the paths under ~/.claude it syncs.
-
-        These depend on the scope, and on any paths added or removed. Raises
-        ValueError if none can be told from what it prints, rather than going
-        on without knowing what is synced.
-        """
-        hidden = dataclasses.replace(command_params, hide=True)
-        result = command_run(
-            command=self.binary_path,
-            command_params=hidden,
-            args=["paths", "list"],
-        )
-        paths = _sync_paths_from(result.stdout)
-        if not paths:
-            raise ValueError("Could not tell what claude-sync syncs.")
-        return paths
-
     def pull(
         self,
         *,
@@ -396,19 +324,14 @@ class _ClaudeSync:
 
         The first pull on a machine merges what is in the bucket with what is
         here, the newer of a file on both sides winning, and claude-sync asks
-        whether to back up first. The prompt does not work from a task, so what
-        claude-sync syncs is backed up from here, and the prompt is skipped with
-        --force. A dry run shows what that would do, without either.
+        whether to back up first. The prompt does not work from a task, and the
+        bucket keeps earlier versions of what was pushed, so it is skipped with
+        --force. A dry run shows what that would do, without it.
         """
         pull_args = ["pull", "--rebuild-history"]
         if dry_run:
             pull_args.append("--dry-run")
         elif is_first_pull():
-            backup = backup_claude_directory(
-                names=self.sync_paths(command_params=command_params)
-            )
-            if backup is not None:
-                print("First pull on this machine. Backed up to {}.".format(backup))
             force = True
         if force:
             pull_args.append("--force")
