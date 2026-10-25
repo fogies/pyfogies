@@ -21,7 +21,7 @@ other way makes them differ from it.
 import dataclasses
 import json
 import pathlib
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Literal
 
@@ -357,7 +357,13 @@ class _ClaudeSync:
             self.list_conflicts(command_params=command_params).stdout
         )
 
-    def sync(self, *, command_params: CommandParams, unattended: bool = False) -> None:
+    def sync(
+        self,
+        *,
+        command_params: CommandParams,
+        unattended: bool = False,
+        after_pull: Callable[[], None] | None = None,
+    ) -> None:
         """Pull, resolve any conflicts, and then push.
 
         A push does not look at what is in the bucket, so pushing without
@@ -365,6 +371,11 @@ class _ClaudeSync:
         unresolved replaces the bucket's version with this machine's. So the
         history is rebuilt after the pull, and conflicts are resolved
         interactively.
+
+        *after_pull* is called once the pull, and any conflicts, are done, and
+        before the push, so that what it changes (e.g., files it deletes because
+        another machine did) is what is pushed. It is not called if the sync
+        stops before then, and if it raises, nothing is pushed.
 
         *unattended* when true never asks, so what would need resolving stops
         it. Conflicts left from before also stop it before it pulls, which would
@@ -396,6 +407,9 @@ class _ClaudeSync:
             # What was resolved was already shown, so only what is left is.
             if self._conflicts_remain(command_params=hidden):
                 raise ValueError("Not pushing, because conflicts are unresolved.")
+
+        if after_pull is not None:
+            after_pull()
 
         push_result = self.push(command_params=command_params)
         if _had_errors(push_result.stdout):

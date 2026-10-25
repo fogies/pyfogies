@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 
 import pytest
+from invoke.runners import Result
 
 from fogies.age_key import generate_age_key
 from fogies.tools.aws_environ import AwsProfile
@@ -386,3 +387,57 @@ def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(
             cs.sync(command_params=CommandParams(in_stream=False), unattended=True)
 
     assert not claude_directory().exists()
+
+
+@pytest.mark.parametrize(
+    ("pull_output", "calls"),
+    [
+        ("Rebuilt history.jsonl: 3 entries", ["pull", "after_pull", "push"]),
+        ("Errors:\n  a.jsonl: failed", ["pull"]),
+        ("Pull stopped", ["pull"]),
+    ],
+    ids=["finished", "errors", "not finished"],
+)
+def test_claude_sync_sync_calls_after_pull_before_the_push(
+    temp_home: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pull_output: str,
+    calls: list[str],
+) -> None:
+    """What it changes is pushed, and it is not run for a pull that failed."""
+    _ = temp_home
+    made: list[str] = []
+
+    def fake_pull(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("pull")
+        return Result(stdout=pull_output)
+
+    def fake_push(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("push")
+        return Result(stdout="Pushed")
+
+    def fake_conflicts_remain(**kwargs: object) -> bool:
+        _ = kwargs
+        return False
+
+    monkeypatch.setattr("fogies.tools.claude_sync.is_first_pull", lambda: False)
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        monkeypatch.setattr(cs, "pull", fake_pull)
+        monkeypatch.setattr(cs, "push", fake_push)
+        monkeypatch.setattr(cs, "_conflicts_remain", fake_conflicts_remain)
+
+        try:
+            cs.sync(
+                command_params=CommandParams(in_stream=False),
+                unattended=True,
+                after_pull=lambda: made.append("after_pull"),
+            )
+        except ValueError:
+            # A pull that failed stops the sync, which is what is tested.
+            pass
+
+    assert made == calls
