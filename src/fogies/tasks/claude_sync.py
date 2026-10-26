@@ -1,15 +1,24 @@
-"""Tasks for setting up and running claude-sync."""
+"""Tasks for setting up and running claude-sync, and deleting sessions it syncs."""
 
 import pathlib
 from collections.abc import Callable
 from typing import cast
 
+from claude_agent_sdk import list_sessions
 from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
 from fogies.tasks.terminal import spawn_new_terminal
-from fogies.tools.claude_sync import claude_sync, configure_claude_sync, is_first_pull
+from fogies.tools.aws_environ import aws_environ_from_config
+from fogies.tools.claude_code import describe_session, find_session_id
+from fogies.tools.claude_sync import (
+    claude_sync,
+    configure_claude_sync,
+    is_first_pull,
+    load_claude_sync_config,
+)
+from fogies.tools.claude_sync_deletions import apply_deletions, delete_everywhere
 from fogies.tools.claude_sync_watch import is_watching, watch_and_sync
 from fogies.tools.command import CommandParams
 
@@ -103,6 +112,45 @@ def get_task_conflicts(*, binary_cache_path: pathlib.Path) -> Task[Callable[...,
     return cast(Task[Callable[..., None]], task_conflicts)
 
 
+def get_task_delete(
+    *, claude_sync_config_path: pathlib.Path, aws_config_path: pathlib.Path
+) -> Task[Callable[..., None]]:
+    @task(
+        name="delete",
+        auto_shortflags=False,
+        help={
+            "session_id": "Session to delete, from any part of its ID that is only in that one.",
+        },
+    )  # pyright: ignore[reportUntypedFunctionDecorator]
+    def task_delete(context: Context, session_id: str) -> None:
+        """
+        Delete a session from this machine, and from every other that syncs.
+        """
+        _ = context
+        sessions = {session.session_id: session for session in list_sessions()}
+        delete_id = find_session_id(list(sessions), session_id)
+
+        print(describe_session(sessions[delete_id]))
+        print("Its transcript is deleted from this machine now, and from each other")
+        print("machine when it next syncs. These tasks cannot get it back.")
+        if input("Delete it everywhere? [y/N] ").strip().lower() != "y":
+            print("Not deleted.")
+            return
+
+        config = load_claude_sync_config(path=claude_sync_config_path)
+        with aws_environ_from_config(
+            config_path=aws_config_path,
+            profile_name=config.aws_profile,
+            raise_if_env_exists=False,
+        ):
+            delete_everywhere(
+                bucket_name=config.bucket, region=config.region, session_id=delete_id
+            )
+        print("Deleted {}.".format(delete_id))
+
+    return cast(Task[Callable[..., None]], task_delete)
+
+
 def get_task_pull(
     *,
     binary_cache_path: pathlib.Path,
@@ -169,7 +217,12 @@ def get_task_status(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., No
     return cast(Task[Callable[..., None]], task_status)
 
 
-def get_task_sync(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
+def get_task_sync(
+    *,
+    binary_cache_path: pathlib.Path,
+    claude_sync_config_path: pathlib.Path,
+    aws_config_path: pathlib.Path,
+) -> Task[Callable[..., None]]:
     @task(
         name="sync",
         auto_shortflags=False,
@@ -179,7 +232,7 @@ def get_task_sync(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None
     )  # pyright: ignore[reportUntypedFunctionDecorator]
     def task_sync(context: Context, watch: bool = False) -> None:
         """
-        Pull, resolve any conflicts, then push.
+        Pull, resolve any conflicts, delete what other machines deleted, then push.
         """
         # Before a new terminal, so that this one says it.
         if watch and is_first_pull():
@@ -199,10 +252,28 @@ def get_task_sync(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None
             binary_cache_path=binary_cache_path, raise_if_env_exists=False
         ) as cs:
 
+            def delete_what_others_deleted() -> None:
+                config = load_claude_sync_config(path=claude_sync_config_path)
+                with aws_environ_from_config(
+                    config_path=aws_config_path,
+                    profile_name=config.aws_profile,
+                    raise_if_env_exists=False,
+                ):
+                    deleted = apply_deletions(
+                        bucket_name=config.bucket, region=config.region
+                    )
+                if deleted:
+                    print(
+                        "Deleted {} session(s) that other machines deleted: {}".format(
+                            len(deleted), ", ".join(deleted)
+                        )
+                    )
+
             def sync_once() -> None:
                 cs.sync(
                     command_params=CommandParams(context=context),
                     unattended=watch,
+                    after_pull=delete_what_others_deleted,
                 )
 
             if watch:
@@ -228,7 +299,7 @@ def get_collection(
     claude_sync_config_path: pathlib.Path,
     aws_config_path: pathlib.Path,
 ) -> Collection:
-    """Get a collection of tasks for setting up and running claude-sync."""
+    """Get a collection of tasks for setting up and running claude-sync, and deleting sessions it syncs."""
     collection = Collection(collection_name)
     collection.add_task(
         get_task_configure(
@@ -238,8 +309,20 @@ def get_collection(
         )
     )
     collection.add_task(get_task_conflicts(binary_cache_path=binary_cache_path))
+    collection.add_task(
+        get_task_delete(
+            claude_sync_config_path=claude_sync_config_path,
+            aws_config_path=aws_config_path,
+        )
+    )
     collection.add_task(get_task_pull(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_push(binary_cache_path=binary_cache_path))
     collection.add_task(get_task_status(binary_cache_path=binary_cache_path))
-    collection.add_task(get_task_sync(binary_cache_path=binary_cache_path))
+    collection.add_task(
+        get_task_sync(
+            binary_cache_path=binary_cache_path,
+            claude_sync_config_path=claude_sync_config_path,
+            aws_config_path=aws_config_path,
+        )
+    )
     return collection
