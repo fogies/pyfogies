@@ -11,8 +11,8 @@ from fogies.tools.boto import S3Object, S3PreconditionFailed
 from fogies.tools.claude_sync import claude_directory
 from fogies.tools.claude_sync_deletions import (
     KEY,
-    apply_deletions,
-    delete_everywhere,
+    apply_deletion_locally,
+    apply_deletions_locally,
     deleted_session_ids,
     record_deletion,
 )
@@ -174,9 +174,9 @@ def test_a_record_that_is_not_understood_is_not_used_or_changed(
     with pytest.raises(ValueError, match="not a record of deleted sessions"):
         _ = deleted_session_ids(**_BUCKET)
     with pytest.raises(ValueError, match="not a record of deleted sessions"):
-        _ = apply_deletions(**_BUCKET)
+        _ = apply_deletions_locally(**_BUCKET)
     with pytest.raises(ValueError, match="not a record of deleted sessions"):
-        delete_everywhere(**_BUCKET, session_id=_OTHER_ID)
+        record_deletion(**_BUCKET, session_id=_OTHER_ID)
 
     assert bucket.body == before
     assert _exists("project-a", _ID)
@@ -196,65 +196,51 @@ def test_record_deletion_of_what_is_not_a_session_id(bucket: _FakeBucket) -> Non
     assert bucket.body is None
 
 
-def test_apply_deletions_deletes_what_was_recorded(
+def test_apply_deletions_locally_deletes_what_was_recorded(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
-    """The session, in any project, and its subagents, go, and others stay."""
+    """The session and its subagents go, from whichever project, and others stay."""
     _ = temp_home
-    _write_session("project-a", _ID, subagents=True)
-    _write_session("project-b", _ID)
+    _write_session("project-b", _ID, subagents=True)
     _write_session("project-a", _OTHER_ID)
     # Recorded, but never here.
     bucket.set(_record(_ID, _THIRD_ID))
 
-    assert apply_deletions(**_BUCKET) == [_ID]
+    assert apply_deletions_locally(**_BUCKET) == [_ID]
 
-    assert not _exists("project-a", _ID)
     assert not _exists("project-b", _ID)
-    assert not (claude_directory() / "projects" / "project-a" / _ID).exists()
+    assert not (claude_directory() / "projects" / "project-b" / _ID).exists()
     assert _exists("project-a", _OTHER_ID)
     # Still recorded, for machines that have not yet synced.
     assert set(bucket.deleted()) == {_ID, _THIRD_ID}
 
 
 @pytest.mark.usefixtures("bucket")
-def test_apply_deletions_with_nothing_recorded(temp_home: pathlib.Path) -> None:
+def test_apply_deletions_locally_with_nothing_recorded(temp_home: pathlib.Path) -> None:
     _ = temp_home
     _write_session("project-a", _ID)
 
-    assert apply_deletions(**_BUCKET) == []
+    assert apply_deletions_locally(**_BUCKET) == []
 
     assert _exists("project-a", _ID)
 
 
-def test_delete_everywhere_records_it_and_deletes_only_that_session_here(
-    bucket: _FakeBucket, temp_home: pathlib.Path
+def test_apply_deletion_locally_deletes_only_that_session(
+    temp_home: pathlib.Path,
 ) -> None:
-    """Others that were recorded are left to be applied by a sync."""
+    """It is found from an ID in any case, and a second time it is not here."""
     _ = temp_home
     _write_session("project-a", _ID, subagents=True)
     _write_session("project-a", _OTHER_ID)
-    _write_session("project-a", _THIRD_ID)
-    bucket.set(_record(_THIRD_ID))
 
-    delete_everywhere(**_BUCKET, session_id=_ID)
+    assert apply_deletion_locally(_ID.upper())
+    assert not apply_deletion_locally(_ID)
 
     assert not _exists("project-a", _ID)
     assert not (claude_directory() / "projects" / "project-a" / _ID).exists()
     assert _exists("project-a", _OTHER_ID)
-    assert _exists("project-a", _THIRD_ID)
-    assert set(bucket.deleted()) == {_ID, _THIRD_ID}
 
 
-def test_delete_everywhere_deletes_nothing_if_it_cannot_record(
-    bucket: _FakeBucket, temp_home: pathlib.Path
-) -> None:
-    _ = temp_home
-    _write_session("project-a", _ID)
-    bucket.set(_record())
-    bucket.interference.extend(lambda: bucket.set(_record()) for _ in range(10))
-
-    with pytest.raises(RuntimeError):
-        delete_everywhere(**_BUCKET, session_id=_ID)
-
-    assert _exists("project-a", _ID)
+def test_apply_deletion_locally_of_what_is_not_a_session_id() -> None:
+    with pytest.raises(ValueError, match="not a session ID"):
+        _ = apply_deletion_locally("../outside")

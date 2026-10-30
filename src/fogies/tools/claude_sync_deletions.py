@@ -3,7 +3,10 @@
 A session deleted on one machine comes back from the others: the next push from
 a machine that still has it uploads it again, and a pull downloads it to the
 machine that deleted it. So a deletion is recorded in the bucket claude-sync
-syncs to, and each machine, after a pull, deletes what has been recorded.
+syncs to, and each machine, after a pull, deletes what has been recorded. A
+session is deleted as the Claude Agent SDK deletes one, which is its transcript
+and its subagents' transcripts. To delete a session everywhere, record it, and
+then delete it from this machine, so that if recording fails nothing is deleted.
 
 The record is one object in the bucket, KEY, which claude-sync ignores, as it
 only reads objects with an `.age` suffix. It is changed only by a write that
@@ -16,15 +19,14 @@ These use the AWS credentials of the environment, which the caller applies
 """
 
 import datetime
-import shutil
 import socket
 import uuid
 from typing import Literal
 
+from claude_agent_sdk import delete_session
 from pydantic import BaseModel, ValidationError
 
 from fogies.tools.boto import S3PreconditionFailed, s3_get_object, s3_put_object
-from fogies.tools.claude_sync import claude_directory
 
 # Where the record is, in the bucket. Under a name that says what wrote it.
 KEY = "pyfogies/claude-sync/deleted-sessions.json"
@@ -63,6 +65,14 @@ def _session_id(value: str) -> str | None:
         return None
 
 
+def _require_session_id(value: str) -> str:
+    """Return value as a session ID, or raise ValueError if it is not one."""
+    session_id = _session_id(value)
+    if session_id is None:
+        raise ValueError("'{}' is not a session ID.".format(value))
+    return session_id
+
+
 def _load(*, bucket_name: str, region: str) -> tuple[_DeletedSessions, str | None]:
     """Return the record, and its ETag, which is None if there is no record yet.
 
@@ -97,9 +107,7 @@ def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
     bucket is not understood. Raises RuntimeError if others kept changing the
     record, so that this could not.
     """
-    valid_id = _session_id(session_id)
-    if valid_id is None:
-        raise ValueError("'{}' is not a session ID.".format(session_id))
+    valid_id = _require_session_id(session_id)
 
     for _ in range(_ATTEMPTS):
         record, etag = _load(bucket_name=bucket_name, region=region)
@@ -126,60 +134,28 @@ def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
     )
 
 
-def _session_names(session_id: str) -> list[str]:
-    """Return what is in the Claude directory for a session, as paths relative to it.
+def apply_deletion_locally(session_id: str) -> bool:
+    """Delete a session from this machine, and return whether it was here.
 
-    That is its transcript, and the directory of its subagents' transcripts,
-    in whichever projects have them.
+    Raises ValueError if session_id is not a session ID.
     """
-    projects = claude_directory() / "projects"
-    names: list[str] = []
-    if not projects.is_dir():
-        return names
-    for project in projects.iterdir():
-        if not project.is_dir():
-            continue
-        for name in (session_id + ".jsonl", session_id):
-            if (project / name).exists():
-                names.append("projects/{}/{}".format(project.name, name))
-    return names
+    try:
+        delete_session(_require_session_id(session_id))
+    except FileNotFoundError:
+        return False
+    return True
 
 
-def _remove(names: list[str]) -> None:
-    """Delete paths relative to the Claude directory."""
-    claude = claude_directory()
-    for name in names:
-        path = claude / name
-        if path.is_dir():
-            shutil.rmtree(path)
-        else:
-            path.unlink(missing_ok=True)
-
-
-def apply_deletions(*, bucket_name: str, region: str) -> list[str]:
-    """Delete the sessions that have been recorded as deleted.
+def apply_deletions_locally(*, bucket_name: str, region: str) -> list[str]:
+    """Delete from this machine the sessions that have been recorded as deleted.
 
     Those that are already gone from here are skipped. Returns the IDs of the
     sessions that were deleted.
     """
-    deleted: list[str] = []
-    for session_id in sorted(
-        deleted_session_ids(bucket_name=bucket_name, region=region)
-    ):
-        names = _session_names(session_id)
-        if names:
-            _remove(names)
-            deleted.append(session_id)
-    return deleted
-
-
-def delete_everywhere(*, bucket_name: str, region: str, session_id: str) -> None:
-    """Record a session as deleted, then delete it from this machine.
-
-    The other machines delete it when they next sync. It is recorded first,
-    so that if that fails nothing is deleted. Raises what record_deletion() does.
-    """
-    record_deletion(bucket_name=bucket_name, region=region, session_id=session_id)
-    valid_id = _session_id(session_id)
-    assert valid_id is not None
-    _remove(_session_names(valid_id))
+    return [
+        session_id
+        for session_id in sorted(
+            deleted_session_ids(bucket_name=bucket_name, region=region)
+        )
+        if apply_deletion_locally(session_id)
+    ]

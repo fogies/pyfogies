@@ -25,17 +25,21 @@ def _answering(answer: str) -> Callable[[str], str]:
 
 
 @pytest.fixture
-def deleted(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, str]]:
-    """Replace what reaches the bucket, and record what is deleted everywhere."""
-    calls: list[dict[str, str]] = []
+def calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, dict[str, str]]]:
+    """Replace what reaches the bucket and deletes, and record what is called."""
+    calls: list[tuple[str, dict[str, str]]] = []
 
     @contextlib.contextmanager
     def fake_aws_environ(**kwargs: object) -> Generator[None]:
         assert kwargs["profile_name"] == "profile"
         yield
 
-    def fake_delete_everywhere(**kwargs: str) -> None:
-        calls.append(kwargs)
+    def fake_record_deletion(**kwargs: str) -> None:
+        calls.append(("record_deletion", kwargs))
+
+    def fake_apply_deletion_locally(session_id: str) -> bool:
+        calls.append(("apply_deletion_locally", {"session_id": session_id}))
+        return True
 
     def fake_load_claude_sync_config(**kwargs: object) -> ClaudeSyncConfig:
         _ = kwargs
@@ -49,7 +53,10 @@ def deleted(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, str]]:
         "fogies.tasks.claude_sync.aws_environ_from_config", fake_aws_environ
     )
     monkeypatch.setattr(
-        "fogies.tasks.claude_sync.delete_everywhere", fake_delete_everywhere
+        "fogies.tasks.claude_sync.record_deletion", fake_record_deletion
+    )
+    monkeypatch.setattr(
+        "fogies.tasks.claude_sync.apply_deletion_locally", fake_apply_deletion_locally
     )
     return calls
 
@@ -61,10 +68,10 @@ def _delete(session_id: str) -> None:
     )(Context(), session_id=session_id)
 
 
-def test_delete_deletes_everywhere_after_confirming(
+def test_delete_records_it_then_deletes_it_here_after_confirming(
     write_session: WriteSession,
     tmp_path: pathlib.Path,
-    deleted: list[dict[str, str]],
+    calls: list[tuple[str, dict[str, str]]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A session is found from part of its ID, and the bucket is the config's."""
@@ -73,15 +80,19 @@ def test_delete_deletes_everywhere_after_confirming(
 
     _delete("60c0de")
 
-    assert deleted == [
-        {"bucket_name": "bucket", "region": "us-west-2", "session_id": _SESSION_ID}
+    assert calls == [
+        (
+            "record_deletion",
+            {"bucket_name": "bucket", "region": "us-west-2", "session_id": _SESSION_ID},
+        ),
+        ("apply_deletion_locally", {"session_id": _SESSION_ID}),
     ]
 
 
 def test_delete_deletes_nothing_unless_confirmed(
     write_session: WriteSession,
     tmp_path: pathlib.Path,
-    deleted: list[dict[str, str]],
+    calls: list[tuple[str, dict[str, str]]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _ = write_session(_SESSION_ID, tmp_path)
@@ -89,12 +100,37 @@ def test_delete_deletes_nothing_unless_confirmed(
 
     _delete(_SESSION_ID)
 
-    assert deleted == []
+    assert calls == []
 
 
 @pytest.mark.usefixtures("write_session")
-def test_delete_a_session_that_is_not_here(deleted: list[dict[str, str]]) -> None:
+def test_delete_a_session_that_is_not_here(
+    calls: list[tuple[str, dict[str, str]]],
+) -> None:
     with pytest.raises(ValueError, match="No session"):
         _delete("ffffffff")
 
-    assert deleted == []
+    assert calls == []
+
+
+def test_delete_deletes_nothing_here_if_it_cannot_record(
+    write_session: WriteSession,
+    tmp_path: pathlib.Path,
+    calls: list[tuple[str, dict[str, str]]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _ = write_session(_SESSION_ID, tmp_path)
+    monkeypatch.setattr("builtins.input", _answering("y"))
+
+    def failing_record_deletion(**kwargs: str) -> None:
+        _ = kwargs
+        raise RuntimeError("kept changing")
+
+    monkeypatch.setattr(
+        "fogies.tasks.claude_sync.record_deletion", failing_record_deletion
+    )
+
+    with pytest.raises(RuntimeError, match="kept changing"):
+        _delete(_SESSION_ID)
+
+    assert calls == []
