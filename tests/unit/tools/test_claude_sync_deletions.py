@@ -15,6 +15,7 @@ from fogies.tools.claude_sync_deletions import (
     apply_deletions_locally,
     deleted_session_ids,
     record_deletion,
+    record_desktop_deletions,
 )
 
 _ID = "60c0de8b-271f-4239-830d-bbe9838a631c"
@@ -120,6 +121,20 @@ def _exists(project: str, session_id: str) -> bool:
     return (directory / (session_id + ".jsonl")).exists()
 
 
+def _marker(released_at: str, *, reason: str = "delete") -> str:
+    """The marker that the Claude desktop app leaves for a deleted session."""
+    return json.dumps({"v": 1, "releasedAt": released_at, "reason": reason})
+
+
+def _write_marker(project: str, name: str, text: str) -> None:
+    """Write a marker, which is named for the session it is for."""
+    directory = claude_directory() / "projects" / project
+    directory.mkdir(parents=True, exist_ok=True)
+    _ = (directory / (name + ".desktop-released.json")).write_text(
+        text, encoding="utf-8"
+    )
+
+
 def test_record_deletion_adds_to_what_is_recorded(bucket: _FakeBucket) -> None:
     """The first creates the record, saying what wrote it, and later ones add."""
     record_deletion(**_BUCKET, session_id=_ID)
@@ -170,6 +185,7 @@ def test_a_record_that_is_not_understood_is_not_used_or_changed(
     bucket.set(record)
     before = bucket.body
     _write_session("project-a", _ID)
+    _write_marker("project-a", _OTHER_ID, _marker("2026-10-27T20:45:00.000Z"))
 
     with pytest.raises(ValueError, match="not a record of deleted sessions"):
         _ = deleted_session_ids(**_BUCKET)
@@ -177,6 +193,8 @@ def test_a_record_that_is_not_understood_is_not_used_or_changed(
         _ = apply_deletions_locally(**_BUCKET)
     with pytest.raises(ValueError, match="not a record of deleted sessions"):
         record_deletion(**_BUCKET, session_id=_OTHER_ID)
+    with pytest.raises(ValueError, match="not a record of deleted sessions"):
+        _ = record_desktop_deletions(**_BUCKET)
 
     assert bucket.body == before
     assert _exists("project-a", _ID)
@@ -244,3 +262,85 @@ def test_apply_deletion_locally_deletes_only_that_session(
 def test_apply_deletion_locally_of_what_is_not_a_session_id() -> None:
     with pytest.raises(ValueError, match="not a session ID"):
         _ = apply_deletion_locally("../outside")
+
+
+def test_record_desktop_deletions_records_what_the_app_deleted(
+    bucket: _FakeBucket, temp_home: pathlib.Path
+) -> None:
+    """Each is recorded as of when the app deleted it, whichever project it was in."""
+    _ = temp_home
+    _write_marker("project-b", _OTHER_ID, _marker("2026-10-27T21:00:00.000Z"))
+    _write_marker("project-a", _ID, _marker("2026-10-27T20:45:00.000Z"))
+
+    assert record_desktop_deletions(**_BUCKET) == [_ID, _OTHER_ID]
+
+    assert bucket.deleted()[_ID]["at"] == "2026-10-27T20:45:00.000Z"
+    assert bucket.deleted()[_OTHER_ID]["at"] == "2026-10-27T21:00:00.000Z"
+    assert bucket.deleted()[_ID]["machine"]
+    assert bucket.metadata == {"written-by": "fogies.tools.claude_sync_deletions"}
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    [
+        (_ID, _marker("2026-10-27T20:45:00.000Z", reason="archive")),
+        (_ID, json.dumps({"v": 1, "reason": "delete"})),
+        (_ID, "["),
+        (_ID, "[]"),
+        ("notes", _marker("2026-10-27T20:45:00.000Z")),
+    ],
+    ids=["other reason", "no time", "not JSON", "not an object", "not for a session"],
+)
+def test_record_desktop_deletions_skips_what_is_not_a_deletion(
+    bucket: _FakeBucket, temp_home: pathlib.Path, name: str, text: str
+) -> None:
+    _ = temp_home
+    _write_marker("project-a", name, text)
+
+    assert record_desktop_deletions(**_BUCKET) == []
+
+    assert bucket.body is None
+
+
+def test_record_desktop_deletions_leaves_what_is_already_recorded(
+    bucket: _FakeBucket, temp_home: pathlib.Path
+) -> None:
+    """Nothing is written if there is nothing to add."""
+    _ = temp_home
+    bucket.set(_record(_ID))
+    _write_marker("project-a", _ID, _marker("2026-10-27T20:45:00.000Z"))
+    _write_marker("project-a", _OTHER_ID, _marker("2026-10-27T21:00:00.000Z"))
+
+    assert record_desktop_deletions(**_BUCKET) == [_OTHER_ID]
+    assert bucket.deleted()[_ID]["at"] == "2026-10-25T00:00:00+00:00"
+    version = bucket.version
+
+    assert record_desktop_deletions(**_BUCKET) == []
+    assert bucket.version == version
+
+
+@pytest.mark.usefixtures("bucket")
+def test_record_desktop_deletions_without_any_markers(temp_home: pathlib.Path) -> None:
+    """Without a projects directory, or with no markers in it, nothing is read."""
+    _ = temp_home
+    assert record_desktop_deletions(**_BUCKET) == []
+
+    _write_session("project-a", _ID)
+    assert record_desktop_deletions(**_BUCKET) == []
+
+
+def test_record_desktop_deletions_keeps_what_another_machine_recorded_meanwhile(
+    bucket: _FakeBucket, temp_home: pathlib.Path
+) -> None:
+    """Only what this recorded is returned, even if another recorded it first."""
+    _ = temp_home
+    bucket.set(_record(_THIRD_ID))
+    _write_marker("project-a", _ID, _marker("2026-10-27T20:45:00.000Z"))
+    _write_marker("project-a", _OTHER_ID, _marker("2026-10-27T21:00:00.000Z"))
+    # Another machine records one of these, between this one reading and writing.
+    bucket.interference.append(lambda: bucket.set(_record(_THIRD_ID, _OTHER_ID)))
+
+    assert record_desktop_deletions(**_BUCKET) == [_ID]
+
+    assert set(bucket.deleted()) == {_ID, _OTHER_ID, _THIRD_ID}
+    assert bucket.deleted()[_OTHER_ID]["at"] == "2026-10-25T00:00:00+00:00"

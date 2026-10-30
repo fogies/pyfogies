@@ -22,6 +22,7 @@ from fogies.tools.claude_sync_deletions import (
     apply_deletion_locally,
     apply_deletions_locally,
     record_deletion,
+    record_desktop_deletions,
 )
 from fogies.tools.claude_sync_watch import is_watching, watch_and_sync
 from fogies.tools.command import CommandParams
@@ -265,8 +266,17 @@ def get_task_sync(
                     profile_name=config.aws_profile,
                     raise_if_env_exists=False,
                 ):
+                    recorded = record_desktop_deletions(
+                        bucket_name=config.bucket, region=config.region
+                    )
                     deleted = apply_deletions_locally(
                         bucket_name=config.bucket, region=config.region
+                    )
+                if recorded:
+                    print(
+                        "Recorded {} session(s) deleted in the desktop app: {}".format(
+                            len(recorded), ", ".join(recorded)
+                        )
                     )
                 if deleted:
                     print(

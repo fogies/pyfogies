@@ -14,6 +14,11 @@ is conditional on the object being as it was read, so that machines that delete
 at the same time do not replace each other's deletions. The bucket is
 versioned, so earlier versions of it can be recovered.
 
+A session deleted in the Claude desktop app is recorded from the marker that the
+app leaves, `<session ID>.desktop-released.json` in the project, which claude-sync
+syncs. A marker is only a signal to record it, as the app removes it from a
+session it brings back, so the record is what a deletion is kept in.
+
 These use the AWS credentials of the environment, which the caller applies
 (e.g., with fogies.tools.aws_environ.aws_environ_from_config).
 """
@@ -21,18 +26,23 @@ These use the AWS credentials of the environment, which the caller applies
 import datetime
 import socket
 import uuid
+from collections.abc import Callable
 from typing import Literal
 
 from claude_agent_sdk import delete_session
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from fogies.tools.boto import S3PreconditionFailed, s3_get_object, s3_put_object
+from fogies.tools.claude_sync import claude_directory
 
 # Where the record is, in the bucket. Under a name that says what wrote it.
 KEY = "pyfogies/claude-sync/deleted-sessions.json"
 
 _FORMAT = "pyfogies-deleted-sessions"
 _WRITTEN_BY = "fogies.tools.claude_sync_deletions"
+
+# What the end of the name of a marker is, for the Claude desktop app.
+_MARKER_SUFFIX = ".desktop-released.json"
 
 # How many times a change is tried, if others are changing the record too.
 _ATTEMPTS = 5
@@ -43,6 +53,16 @@ class _Deletion(BaseModel):
 
     at: str
     machine: str
+
+
+class _DesktopMarker(BaseModel):
+    """What the Claude desktop app leaves when a session is deleted in it.
+
+    Only a deletion is of use here, and the rest of what is in it is ignored.
+    """
+
+    reason: Literal["delete"]
+    released_at: str = Field(alias="releasedAt")
 
 
 class _DeletedSessions(BaseModel):
@@ -100,21 +120,26 @@ def deleted_session_ids(*, bucket_name: str, region: str) -> set[str]:
     return {i for i in map(_session_id, record.deleted) if i is not None}
 
 
-def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
-    """Record a session as deleted, for the machines that sync it.
+def _update(
+    *,
+    bucket_name: str,
+    region: str,
+    change: Callable[[_DeletedSessions], None],
+) -> None:
+    """Change the record, which is not written if the change leaves it as it was.
 
-    Raises ValueError if session_id is not a session ID, or if what is in the
-    bucket is not understood. Raises RuntimeError if others kept changing the
-    record, so that this could not.
+    The change is made to the record as it is, and made again to the record as
+    it then is if others changed it meanwhile, so it must not depend on being
+    called once. Raises ValueError if what is in the bucket is not understood.
+    Raises RuntimeError if others kept changing the record, so that this could
+    not.
     """
-    valid_id = _require_session_id(session_id)
-
     for _ in range(_ATTEMPTS):
         record, etag = _load(bucket_name=bucket_name, region=region)
-        record.deleted[valid_id] = _Deletion(
-            at=datetime.datetime.now().astimezone().isoformat(),
-            machine=socket.gethostname(),
-        )
+        before = record.model_copy(deep=True)
+        change(record)
+        if record == before:
+            return
         try:
             _ = s3_put_object(
                 bucket_name=bucket_name,
@@ -129,9 +154,71 @@ def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
             # Changed since it was read, so read it again.
             continue
         return
-    raise RuntimeError(
-        "Could not record the deletion, as '{}' kept changing.".format(KEY)
-    )
+    raise RuntimeError("Could not change '{}', as it kept changing.".format(KEY))
+
+
+def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
+    """Record a session as deleted, for the machines that sync it.
+
+    Raises ValueError if session_id is not a session ID, or if what is in the
+    bucket is not understood. Raises RuntimeError if others kept changing the
+    record, so that this could not.
+    """
+    valid_id = _require_session_id(session_id)
+
+    def add(record: _DeletedSessions) -> None:
+        record.deleted[valid_id] = _Deletion(
+            at=datetime.datetime.now().astimezone().isoformat(),
+            machine=socket.gethostname(),
+        )
+
+    _update(bucket_name=bucket_name, region=region, change=add)
+
+
+def _desktop_deletions() -> dict[str, _Deletion]:
+    """Return the sessions that were deleted in the Claude desktop app.
+
+    The app leaves a marker for each, in the project that had the session.
+    Anything else in that place, or that is not as expected, is skipped.
+    """
+    deletions: dict[str, _Deletion] = {}
+    for path in (claude_directory() / "projects").glob("*/*" + _MARKER_SUFFIX):
+        session_id = _session_id(path.name.removesuffix(_MARKER_SUFFIX))
+        if session_id is None:
+            continue
+        try:
+            marker = _DesktopMarker.model_validate_json(path.read_bytes())
+        except OSError, ValidationError:
+            continue
+        deletions[session_id] = _Deletion(
+            at=marker.released_at, machine=socket.gethostname()
+        )
+    return deletions
+
+
+def record_desktop_deletions(*, bucket_name: str, region: str) -> list[str]:
+    """Record the sessions that were deleted in the Claude desktop app.
+
+    Those that are already recorded are left as they are. Returns the IDs of
+    the sessions that were recorded, and writes nothing if there are none.
+    Raises ValueError if what is in the bucket is not understood. Raises
+    RuntimeError if others kept changing the record, so that this could not.
+    """
+    deletions = _desktop_deletions()
+    if not deletions:
+        return []
+
+    recorded: list[str] = []
+
+    def add(record: _DeletedSessions) -> None:
+        recorded.clear()
+        for session_id, deletion in deletions.items():
+            if session_id not in record.deleted:
+                record.deleted[session_id] = deletion
+                recorded.append(session_id)
+
+    _update(bucket_name=bucket_name, region=region, change=add)
+    return sorted(recorded)
 
 
 def apply_deletion_locally(session_id: str) -> bool:
