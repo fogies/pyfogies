@@ -30,6 +30,11 @@ def _read_toml(*, path: pathlib.Path) -> dict[str, object]:
         return tomllib.load(f)
 
 
+def _require_toml(*, path: pathlib.Path) -> None:
+    if path.suffix != ".toml":
+        raise ValueError("Config file '{}' must have a .toml extension.".format(path))
+
+
 def _redirect_target(
     *, path: pathlib.Path, data: dict[str, object]
 ) -> pathlib.Path | None:
@@ -51,7 +56,10 @@ def resolve_config_path(*, path: pathlib.Path) -> pathlib.Path:
 
     That is path itself, or the file that it redirects to. Use this to write to
     a config, so that the write goes to the shared file and not the redirect.
+
+    Raises ValueError if path, or the file it redirects to, is not a .toml file.
     """
+    _require_toml(path=path)
     if not path.exists():
         return path
 
@@ -59,6 +67,7 @@ def resolve_config_path(*, path: pathlib.Path) -> pathlib.Path:
     if target is None:
         return path
 
+    _require_toml(path=target)
     if not target.exists():
         raise FileNotFoundError(
             "'{}' redirects to '{}', which was not found.".format(path, target)
@@ -81,8 +90,11 @@ def load_config(
     If path doesn't exist, it is created from template_factory and
     FileNotFoundError is raised, so that it is filled in before it is used; see
     ensure_from_template(). If path redirects, the config is the file it
-    redirects to. Raises a pydantic ValidationError if the config does not match
+    redirects to. Raises ValueError if path, or the file it redirects to, is not
+    a .toml file, and a pydantic ValidationError if the config does not match
     model.
     """
+    # Before the template, so that a file with the wrong name is never created.
+    _require_toml(path=path)
     ensure_from_template(path=path, template_factory=template_factory)
     return model.model_validate(_read_toml(path=resolve_config_path(path=path)))

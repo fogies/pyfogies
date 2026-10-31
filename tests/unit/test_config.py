@@ -68,3 +68,25 @@ def test_load_config_rejects_a_bad_redirect(
 
     with pytest.raises(error, match=match):
         _ = load_config(path=path, model=_Config, template_factory=lambda: "")
+
+
+def test_load_config_rejects_a_path_that_is_not_toml(tmp_path: pathlib.Path) -> None:
+    """It is rejected before the template would create a file with that name."""
+    path = tmp_path / "config.json"
+
+    with pytest.raises(ValueError, match=r"config\.json.*\.toml extension"):
+        _ = load_config(path=path, model=_Config, template_factory=lambda: "")
+
+    assert not path.exists()
+
+
+def test_a_redirect_to_a_file_that_is_not_toml_is_rejected(
+    tmp_path: pathlib.Path,
+) -> None:
+    _ = _write(tmp_path / "shared.json", 'name = "shared"\n')
+    path = _write(tmp_path / "config.toml", 'redirect = "shared.json"\n')
+
+    with pytest.raises(ValueError, match=r"shared\.json.*\.toml extension"):
+        _ = load_config(path=path, model=_Config, template_factory=lambda: "")
+    with pytest.raises(ValueError, match=r"shared\.json.*\.toml extension"):
+        _ = resolve_config_path(path=path)

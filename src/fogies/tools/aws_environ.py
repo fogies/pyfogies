@@ -64,10 +64,6 @@ def load_aws_profile_from_config(config_path: Path, profile_name: str) -> AwsPro
     FileNotFoundError is raised, so that it is filled in with real credentials
     before it is used.
     """
-    if config_path.suffix != ".toml":
-        raise ValueError(
-            "AWS config file must have .toml extension, got '{}'".format(config_path)
-        )
     aws_config = load_config(
         path=config_path,
         model=_AwsConfig,
@@ -175,11 +171,11 @@ def aws_environ_from_config(
 ) -> Generator[AwsEnviron]:
     """Context manager that applies AWS variables read from an AWS config file.
 
-    The *config_path* parameter specifies the AWS config file to read; it
-    must have a ``.toml`` extension. The *profile_name* parameter specifies
-    the AWS profile name, which is mapped to a ``[<name>]`` table in the
-    config file. See aws_environ_from_profile() for credential validation
-    and for raise_if_env_exists/raise_if_env_changed defaults.
+    The *config_path* parameter specifies the AWS config file to read. The
+    *profile_name* parameter specifies the AWS profile name, which is mapped
+    to a ``[<name>]`` table in the config file. See aws_environ_from_profile()
+    for credential validation and for raise_if_env_exists/raise_if_env_changed
+    defaults.
 
     Yields an :class:`AwsEnviron` describing which profile, account ID, IAM
     username, and key ID are active.
