@@ -36,17 +36,41 @@ class DesktopSession(BaseModel):
 
 
 def desktop_sessions_directory() -> pathlib.Path | None:
-    """Return where the app records its sessions on this machine, or None if it can't be."""
+    """Return where the app records its sessions on this machine, or None if it can't be.
+
+    If the app has no records here, this is where a regular install would keep them.
+    """
+    candidates: list[pathlib.Path] = []
     if sys.platform == "win32":
         app_data = os.environ.get("APPDATA")
-        if not app_data:
-            return None
-        base = pathlib.Path(app_data)
+        if app_data:
+            candidates.append(
+                pathlib.Path(app_data) / "Claude" / "claude-code-sessions"
+            )
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            # The Microsoft Store install keeps its data in a directory named for
+            # its package, rather than in the roaming profile.
+            candidates.extend(
+                sorted(
+                    (pathlib.Path(local_app_data) / "Claude-Data").glob(
+                        "*/claude-code-sessions"
+                    )
+                )
+            )
     elif sys.platform == "darwin":
-        base = pathlib.Path.home() / "Library" / "Application Support"
-    else:
-        return None
-    return base / "Claude" / "claude-code-sessions"
+        candidates.append(
+            pathlib.Path.home()
+            / "Library"
+            / "Application Support"
+            / "Claude"
+            / "claude-code-sessions"
+        )
+
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return candidates[0] if candidates else None
 
 
 def desktop_sessions(
