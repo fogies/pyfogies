@@ -1,4 +1,4 @@
-"""Fixtures shared by the tests of tasks."""
+"""Fixtures shared by the tests of the Claude tasks."""
 
 import json
 import pathlib

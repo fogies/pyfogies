@@ -1,4 +1,4 @@
-"""Fixtures shared by the tests of tools."""
+"""Fixtures shared by the tests of the Claude tools."""
 
 import pathlib
 
