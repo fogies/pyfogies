@@ -1,4 +1,4 @@
-"""Tool wrapping the Claude Code CLI, and its sessions.
+"""Tool wrapping the Claude Code CLI.
 
 See <https://code.claude.com/docs>. The CLI is downloaded as the official
 installer downloads it, rather than borrowing the copy bundled with the Claude
@@ -13,20 +13,13 @@ neither. `claude --desktop --resume` opens any of them.
 
 The CLI signs in separately from the desktop app, so it needs signing in once
 on each machine, with a Claude account rather than an API key.
-
-Sessions are listed with the Claude Agent SDK, which tasks call directly. See <https://code.claude.com/docs/en/agent-sdk/python>. This is what
-is wanted on top of it: finding a session from part of its ID, and describing
-one in a line.
 """
 
-import datetime
 import pathlib
 import subprocess
 import sys
 from collections.abc import Generator
 from contextlib import contextmanager
-
-from claude_agent_sdk import SDKSessionInfo
 
 from fogies.download_verified import download_verified
 
@@ -42,9 +35,6 @@ _DEFAULT_VERSION = next(iter(_KNOWN_VERSIONS))
 _DOWNLOAD_BASE_URL = "https://downloads.claude.ai/claude-code-releases"
 
 _CLAUDE_CODE_URL_TEMPLATE = _DOWNLOAD_BASE_URL + "/{version}/win32-x64/claude.exe"
-
-# Longest title shown in a line describing a session.
-_TITLE_LENGTH = 60
 
 
 class _ClaudeCode:
@@ -160,41 +150,3 @@ def claude_code(
             raise
 
     yield _ClaudeCode(version=version, path=exe_path)
-
-
-def find_session_id(session_ids: list[str], value: str) -> str:
-    """Return the session ID that value identifies, from any part of it.
-
-    That includes the start of it, as with git, and all of it. Raises
-    ValueError if no ID has the part, or if more than one does.
-    """
-    wanted = value.strip().lower()
-    if not wanted:
-        raise ValueError("Give at least part of a session's ID.")
-
-    matches = [i for i in session_ids if wanted in i.lower()]
-    if len(matches) == 1:
-        return matches[0]
-    if matches:
-        raise ValueError(
-            "'{}' matches {} sessions: {}. Give more of it.".format(
-                value, len(matches), ", ".join(matches)
-            )
-        )
-    raise ValueError("No session '{}'".format(value))
-
-
-def describe_session(session: SDKSessionInfo) -> str:
-    """Return a line describing a session: its ID, when it was modified, where it ran, and its title."""
-    # The transcript's modified time. For a session synced from another
-    # machine (e.g., by claude-sync), that is when it was synced.
-    modified = (
-        datetime.datetime.fromtimestamp(session.last_modified / 1000)
-        .astimezone()
-        .strftime("%Y-%m-%d %H:%M")
-    )
-    project = pathlib.Path(session.cwd).name if session.cwd is not None else "?"
-    title = " ".join((session.summary or "").split())
-    if len(title) > _TITLE_LENGTH:
-        title = title[: _TITLE_LENGTH - 3] + "..."
-    return "{}  {}  {:<24}  {}".format(session.session_id, modified, project, title)

@@ -15,11 +15,12 @@ from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
 
-from fogies.tools.claude_code import claude_code, describe_session, find_session_id
+from fogies.tools.claude_code import claude_code
 from fogies.tools.claude_desktop import (
     desktop_sessions,
     desktop_sessions_directory,
 )
+from fogies.tools.claude_sessions import describe_session, find_session_id
 
 _NOT_FOUND = "The Claude desktop app's sessions were not found here ({}).".format
 

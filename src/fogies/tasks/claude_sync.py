@@ -11,7 +11,7 @@ from invoke.tasks import Task, task
 
 from fogies.tasks.terminal import spawn_new_terminal
 from fogies.tools.aws_environ import aws_environ_from_config
-from fogies.tools.claude_code import describe_session, find_session_id
+from fogies.tools.claude_sessions import describe_session, find_session_id
 from fogies.tools.claude_sync import (
     claude_sync,
     configure_claude_sync,
