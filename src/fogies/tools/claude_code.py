@@ -14,8 +14,7 @@ neither. `claude --desktop --resume` opens any of them.
 The CLI signs in separately from the desktop app, so it needs signing in once
 on each machine, with a Claude account rather than an API key.
 
-Sessions are listed and deleted with the Claude Agent SDK, which tasks call
-directly. See <https://code.claude.com/docs/en/agent-sdk/python>. This is what
+Sessions are listed with the Claude Agent SDK, which tasks call directly. See <https://code.claude.com/docs/en/agent-sdk/python>. This is what
 is wanted on top of it: finding a session from part of its ID, and describing
 one in a line.
 """

@@ -42,7 +42,6 @@ namespace.add_collection(
     fogies.tasks.claude_code.get_collection(
         collection_name="claude-code",
         binary_cache_path=STAGING_BINARY_CACHE_PATH,
-        include_delete=False,
     )
 )
 namespace.add_collection(
