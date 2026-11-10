@@ -2,17 +2,18 @@
 
 A session deleted on one machine comes back from the others: the next push from
 a machine that still has it uploads it again, and a pull downloads it to the
-machine that deleted it. So a deletion is recorded in the bucket claude-sync
-syncs to, and each machine, after a pull, deletes what has been recorded. A
-session is deleted as the Claude Agent SDK deletes one, which is its transcript
-and its subagents' transcripts. To delete a session everywhere, record it, and
-then delete it from this machine, so that if recording fails nothing is deleted.
+machine that deleted it. So a deletion is recorded in a bucket, and each machine,
+after a pull, deletes what has been recorded. A session is deleted as the Claude
+Agent SDK deletes one, which is its transcript and its subagents' transcripts.
+To delete a session everywhere, record it, and then delete it from this machine,
+so that if recording fails nothing is deleted.
 
-The record is one object in the bucket, KEY, which claude-sync ignores, as it
-only reads objects with an `.age` suffix. It is changed only by a write that
-is conditional on the object being as it was read, so that machines that delete
-at the same time do not replace each other's deletions. The bucket is
-versioned, so earlier versions of it can be recovered.
+The bucket is not the one claude-sync syncs to (see the claude_sync Terraform
+module), because claude-sync owns the root of that bucket and deletes everything
+in it when reset. The record is one object in it, KEY. It is changed only by a
+write that is conditional on the object being as it was read, so that machines
+that delete at the same time do not replace each other's deletions. The bucket
+is versioned, so earlier versions of it can be recovered.
 
 A session deleted in the Claude desktop app is recorded from the marker that the
 app leaves, `<session ID>.desktop-released.json` in the project, which claude-sync
@@ -35,8 +36,8 @@ from pydantic import BaseModel, Field, ValidationError
 from fogies.tools.boto import S3PreconditionFailed, s3_get_object, s3_put_object
 from fogies.tools.claude_sync import claude_directory
 
-# Where the record is, in the bucket. Under a name that says what wrote it.
-KEY = "pyfogies/claude-sync/deleted-sessions.json"
+# Where the record is, in the bucket.
+KEY = "deleted-sessions.json"
 
 _FORMAT = "pyfogies-deleted-sessions"
 _WRITTEN_BY = "fogies.tools.claude_sync_deletions"

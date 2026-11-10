@@ -78,6 +78,7 @@ def _config_file(tmp_path: pathlib.Path, *, age_key: str | None = None) -> pathl
     text = """
 aws_profile = "{}"
 bucket = "my-bucket"
+deletions_bucket = "my-deletions-bucket"
 region = "us-west-2"
 scope = "sessions"
 """.format(_AWS_PROFILE.name)

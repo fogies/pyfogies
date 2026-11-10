@@ -15,7 +15,11 @@ from .conftest import WriteSession
 _SESSION_ID = "60c0de8b-271f-4239-830d-bbe9838a631c"
 
 _CONFIG = ClaudeSyncConfig(
-    aws_profile="profile", bucket="bucket", region="us-west-2", scope="sessions"
+    aws_profile="profile",
+    bucket="bucket",
+    deletions_bucket="deletions-bucket",
+    region="us-west-2",
+    scope="sessions",
 )
 
 
@@ -74,7 +78,7 @@ def test_delete_records_it_then_deletes_it_here_after_confirming(
     calls: list[tuple[str, dict[str, str]]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A session is found from part of its ID, and the bucket is the config's."""
+    """A session is found from part of its ID, and recorded in the config's deletions bucket."""
     _ = write_session(_SESSION_ID, tmp_path)
     monkeypatch.setattr("builtins.input", _answering("y"))
 
@@ -83,7 +87,11 @@ def test_delete_records_it_then_deletes_it_here_after_confirming(
     assert calls == [
         (
             "record_deletion",
-            {"bucket_name": "bucket", "region": "us-west-2", "session_id": _SESSION_ID},
+            {
+                "bucket_name": "deletions-bucket",
+                "region": "us-west-2",
+                "session_id": _SESSION_ID,
+            },
         ),
         ("apply_deletion_locally", {"session_id": _SESSION_ID}),
     ]

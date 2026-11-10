@@ -46,6 +46,11 @@ output "bucket" {
   value       = module.claude_sync.bucket
 }
 
+output "deletions_bucket" {
+  description = "Name of the S3 bucket for the record of deleted sessions."
+  value       = module.claude_sync.deletions_bucket
+}
+
 output "region" {
   description = "Region of the S3 bucket."
   value       = module.claude_sync.region

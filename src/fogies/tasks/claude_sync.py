@@ -149,7 +149,9 @@ def get_task_delete(
             raise_if_env_exists=False,
         ):
             record_deletion(
-                bucket_name=config.bucket, region=config.region, session_id=delete_id
+                bucket_name=config.deletions_bucket,
+                region=config.region,
+                session_id=delete_id,
             )
         # Recorded first, so that if that fails nothing is deleted.
         _ = apply_deletion_locally(delete_id)
@@ -267,10 +269,10 @@ def get_task_sync(
                     raise_if_env_exists=False,
                 ):
                     recorded = record_desktop_deletions(
-                        bucket_name=config.bucket, region=config.region
+                        bucket_name=config.deletions_bucket, region=config.region
                     )
                     deleted = apply_deletions_locally(
-                        bucket_name=config.bucket, region=config.region
+                        bucket_name=config.deletions_bucket, region=config.region
                     )
                 if recorded:
                     print(

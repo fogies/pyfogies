@@ -119,6 +119,9 @@ class ClaudeSyncConfig(BaseModel):
     # A profile in the AWS config, with the credentials claude-sync signs in with.
     aws_profile: str
     bucket: str
+    # A bucket of its own for the record of deleted sessions, which claude-sync
+    # does not use. In the same region.
+    deletions_bucket: str
     region: str
     scope: Literal["full", "sessions"]
     # Absent until created by configure.

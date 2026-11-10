@@ -1,6 +1,6 @@
 """Test Terraform claude-sync module.
 
-Applies the module for real and checks what it created: the bucket, in the
+Applies the module for real and checks what it created: the buckets, in the
 account regional namespace and with versioning, and the IAM user. Does not
 exercise claude-sync itself, or the permissions granted to the user; those are
 the access-key-permissions module's tests.
@@ -38,17 +38,18 @@ class _TestClaudeSyncVars(BaseModel):
 
 class _TestClaudeSyncOutput(BaseModel):
     bucket: str
+    deletions_bucket: str
     region: str
     user_name: str
 
 
-def test_claude_sync_creates_bucket_and_user(
+def test_claude_sync_creates_buckets_and_user(
     pyfogies_test_config: PyfogiesTestsConfig,
     pyfogies_test_aws_environ: AwsEnviron,
     pyfogies_test_backend: BackendOutput,
     tmp_path: pathlib.Path,
 ) -> None:
-    """The module creates a versioned account regional bucket and an IAM user."""
+    """The module creates versioned account regional buckets and an IAM user."""
     command_params = CommandParams(in_stream=False)
     module_path = pathlib.Path(__file__).parent
     tfbackend_path = tmp_path / "test-claude-sync.tfbackend"
@@ -96,10 +97,15 @@ def test_claude_sync_creates_bucket_and_user(
             _TEST_CLAUDE_SYNC_NAME, pyfogies_test_aws_environ.account_id, region
         )
 
-        versioning = boto_client_s3(region=region).get_bucket_versioning(
-            Bucket=output.bucket
+        # The record of deleted sessions is in a bucket claude-sync does not use.
+        assert output.deletions_bucket == "{}-deletions-{}-{}-an".format(
+            _TEST_CLAUDE_SYNC_NAME, pyfogies_test_aws_environ.account_id, region
         )
-        assert versioning.get("Status") == "Enabled"
+
+        s3 = boto_client_s3(region=region)
+        for bucket in (output.bucket, output.deletions_bucket):
+            versioning = s3.get_bucket_versioning(Bucket=bucket)
+            assert versioning.get("Status") == "Enabled"
 
         user = boto_client_iam().get_user(UserName=output.user_name)
         assert user["User"]["UserName"] == _TEST_CLAUDE_SYNC_NAME
