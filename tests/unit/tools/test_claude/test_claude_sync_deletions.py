@@ -10,6 +10,9 @@ import pytest
 from fogies.tools.boto import S3Object, S3PreconditionFailed
 from fogies.tools.claude_sync import claude_directory
 from fogies.tools.claude_sync_deletions import (
+    _load,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync_deletions import (
     KEY,
     apply_deletion_locally,
     apply_deletions_locally,
@@ -172,6 +175,13 @@ def test_record_deletion_gives_up_if_the_record_keeps_changing(
 
     with pytest.raises(RuntimeError, match="kept changing"):
         record_deletion(**_BUCKET, session_id=_ID)
+
+
+def test_load_raises_for_a_record_that_is_not_understood(bucket: _FakeBucket) -> None:
+    bucket.set({"format": "something-else"})
+
+    with pytest.raises(ValueError, match="not a record of deleted sessions"):
+        _ = _load(**_BUCKET)
 
 
 def test_ids_that_are_not_session_ids_are_not_used(bucket: _FakeBucket) -> None:
