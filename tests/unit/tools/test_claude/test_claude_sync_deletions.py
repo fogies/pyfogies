@@ -38,14 +38,12 @@ class _FakeBucket:
 
     body: bytes | None
     version: int
-    metadata: dict[str, str]
     # What runs just before each write, to be another machine's change.
     interference: list[Callable[[], None]]
 
     def __init__(self) -> None:
         self.body = None
         self.version = 0
-        self.metadata = {}
         self.interference = []
 
     @property
@@ -72,7 +70,6 @@ class _FakeBucket:
         body: bytes,
         if_match: str | None = None,
         if_absent: bool = False,
-        metadata: dict[str, str] | None = None,
     ) -> str:
         assert (bucket_name, region, key) == ("bucket", "us-west-2", KEY)
         if self.interference:
@@ -83,7 +80,6 @@ class _FakeBucket:
             raise S3PreconditionFailed("changed")
         self.body = body
         self.version += 1
-        self.metadata = metadata or {}
         assert self.etag is not None
         return self.etag
 
@@ -150,7 +146,6 @@ def test_record_deletion_adds_to_what_is_recorded(bucket: _FakeBucket) -> None:
 
     assert list(bucket.deleted()) == [_ID, _OTHER_ID]
     assert bucket.deleted()[_ID]["machine"]
-    assert bucket.metadata == {"written-by": "fogies.tools.claude_sync_deletions"}
     assert deleted_session_ids(**_BUCKET) == {_ID, _OTHER_ID}
 
 
@@ -268,7 +263,6 @@ def test_record_desktop_deletions_records_what_the_app_deleted(
     assert bucket.deleted()[_ID]["at"] == "2026-10-27T20:45:00.000Z"
     assert bucket.deleted()[_OTHER_ID]["at"] == "2026-10-27T21:00:00.000Z"
     assert bucket.deleted()[_ID]["machine"]
-    assert bucket.metadata == {"written-by": "fogies.tools.claude_sync_deletions"}
 
 
 @pytest.mark.parametrize(

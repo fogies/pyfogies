@@ -40,7 +40,6 @@ from fogies.tools.claude_sync import claude_directory
 KEY = "deleted-sessions.json"
 
 _FORMAT = "pyfogies-deleted-sessions"
-_WRITTEN_BY = "fogies.tools.claude_sync_deletions"
 
 # What the end of the name of a marker is, for the Claude desktop app.
 _MARKER_SUFFIX = ".desktop-released.json"
@@ -155,7 +154,6 @@ def _update(
                 body=record.model_dump_json(indent=2).encode("utf-8"),
                 if_match=etag,
                 if_absent=etag is None,
-                metadata={"written-by": _WRITTEN_BY},
             )
         except S3PreconditionFailed:
             # Changed since it was read, so read it again.

@@ -108,7 +108,6 @@ def s3_put_object(
     body: bytes,
     if_match: str | None = None,
     if_absent: bool = False,
-    metadata: dict[str, str] | None = None,
 ) -> str:
     """Write body to key in bucket_name, and return the new ETag.
 
@@ -130,8 +129,6 @@ def s3_put_object(
         request["IfMatch"] = if_match
     if if_absent:
         request["IfNoneMatch"] = "*"
-    if metadata is not None:
-        request["Metadata"] = metadata
 
     client = boto_client_s3(region=region)
     try:
