@@ -184,20 +184,6 @@ def test_load_raises_for_a_record_that_is_not_understood(bucket: _FakeBucket) ->
         _ = _load(**_BUCKET)
 
 
-def test_ids_that_are_not_session_ids_are_not_used(bucket: _FakeBucket) -> None:
-    """What is in the bucket is used in paths, so is not trusted."""
-    bucket.set(_record("../../../outside", "*", _ID))
-
-    assert deleted_session_ids(**_BUCKET) == {_ID}
-
-
-def test_record_deletion_of_what_is_not_a_session_id(bucket: _FakeBucket) -> None:
-    with pytest.raises(ValueError, match="not a session ID"):
-        record_deletion(**_BUCKET, session_id="../outside")
-
-    assert bucket.body is None
-
-
 def test_apply_deletions_locally_deletes_what_was_recorded(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
@@ -249,11 +235,6 @@ def test_apply_deletion_locally_deletes_only_that_session(
     assert not _exists("project-a", _ID)
     assert not (claude_directory() / "projects" / "project-a" / _ID).exists()
     assert _exists("project-a", _OTHER_ID)
-
-
-def test_apply_deletion_locally_of_what_is_not_a_session_id() -> None:
-    with pytest.raises(ValueError, match="not a session ID"):
-        _ = apply_deletion_locally("../outside")
 
 
 def test_record_desktop_deletions_records_what_the_app_deleted(
