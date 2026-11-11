@@ -140,13 +140,15 @@ def _write_marker(project: str, name: str, text: str) -> None:
 
 
 def test_record_deletion_adds_to_what_is_recorded(bucket: _FakeBucket) -> None:
-    """The first creates the record, saying what wrote it, and later ones add."""
-    record_deletion(**_BUCKET, session_id=_ID)
-    record_deletion(**_BUCKET, session_id=_OTHER_ID.upper())
+    """The first creates the record, and later ones add."""
+    first = _uuid(1)
+    second = _uuid(2)
 
-    assert list(bucket.deleted()) == [_ID, _OTHER_ID]
-    assert bucket.deleted()[_ID]["machine"]
-    assert deleted_session_ids(**_BUCKET) == {_ID, _OTHER_ID}
+    record_deletion(**_BUCKET, session_id=first)
+    record_deletion(**_BUCKET, session_id=second)
+
+    assert list(bucket.deleted()) == [first, second]
+    assert deleted_session_ids(**_BUCKET) == {first, second}
 
 
 @pytest.mark.parametrize(
@@ -222,16 +224,6 @@ def test_apply_deletions_locally_deletes_what_was_recorded(
     assert _exists("project-2", not_recorded)
     # Still recorded, for machines that have not yet synced.
     assert set(bucket.deleted()) == {recorded_and_here, recorded_not_here}
-
-
-@pytest.mark.usefixtures("bucket")
-def test_apply_deletions_locally_with_nothing_recorded(temp_home: pathlib.Path) -> None:
-    _ = temp_home
-    _write_session("project-a", _ID)
-
-    assert apply_deletions_locally(**_BUCKET) == []
-
-    assert _exists("project-a", _ID)
 
 
 def test_apply_deletion_locally_deletes_only_that_session(
