@@ -274,35 +274,16 @@ def test_record_desktop_deletions_skips_a_marker_not_named_for_a_session(
     assert bucket.body is None
 
 
-def test_record_desktop_deletions_leaves_what_is_already_recorded(
+def test_record_desktop_deletions_writes_nothing_if_all_are_recorded(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
-    """Nothing is written if there is nothing to add."""
+    """A marker for a recorded session leaves the record as it was, not rewritten."""
     _ = temp_home
-    bucket.set(_record(_ID))
-    _write_marker("project-a", _ID, _marker("2026-10-27T20:45:00.000Z"))
-    _write_marker("project-a", _OTHER_ID, _marker("2026-10-27T21:00:00.000Z"))
-
-    assert record_desktop_deletions(**_BUCKET) == [_OTHER_ID]
-    assert bucket.deleted()[_ID]["at"] == "2026-10-25T00:00:00+00:00"
+    recorded = _uuid(1)
+    bucket.set(_record(recorded))
     version = bucket.version
+    _write_marker("project-1", recorded, _marker("2026-10-27T20:45:00.000Z"))
 
     assert record_desktop_deletions(**_BUCKET) == []
+
     assert bucket.version == version
-
-
-def test_record_desktop_deletions_keeps_what_another_machine_recorded_meanwhile(
-    bucket: _FakeBucket, temp_home: pathlib.Path
-) -> None:
-    """Only what this recorded is returned, even if another recorded it first."""
-    _ = temp_home
-    bucket.set(_record(_THIRD_ID))
-    _write_marker("project-a", _ID, _marker("2026-10-27T20:45:00.000Z"))
-    _write_marker("project-a", _OTHER_ID, _marker("2026-10-27T21:00:00.000Z"))
-    # Another machine records one of these, between this one reading and writing.
-    bucket.interference.append(lambda: bucket.set(_record(_THIRD_ID, _OTHER_ID)))
-
-    assert record_desktop_deletions(**_BUCKET) == [_ID]
-
-    assert set(bucket.deleted()) == {_ID, _OTHER_ID, _THIRD_ID}
-    assert bucket.deleted()[_OTHER_ID]["at"] == "2026-10-25T00:00:00+00:00"
