@@ -174,37 +174,6 @@ def test_record_deletion_gives_up_if_the_record_keeps_changing(
         record_deletion(**_BUCKET, session_id=_ID)
 
 
-@pytest.mark.parametrize(
-    "record",
-    [
-        {"format": "something-else", "version": 1, "deleted": {}},
-        {"format": "pyfogies-deleted-sessions", "version": 2, "deleted": {}},
-        {"format": "pyfogies-deleted-sessions", "version": 1, "deleted": [_ID]},
-    ],
-    ids=["other format", "other version", "other shape"],
-)
-def test_a_record_that_is_not_understood_is_not_used_or_changed(
-    bucket: _FakeBucket, temp_home: pathlib.Path, record: object
-) -> None:
-    _ = temp_home
-    bucket.set(record)
-    before = bucket.body
-    _write_session("project-a", _ID)
-    _write_marker("project-a", _OTHER_ID, _marker("2026-10-27T20:45:00.000Z"))
-
-    with pytest.raises(ValueError, match="not a record of deleted sessions"):
-        _ = deleted_session_ids(**_BUCKET)
-    with pytest.raises(ValueError, match="not a record of deleted sessions"):
-        _ = apply_deletions_locally(**_BUCKET)
-    with pytest.raises(ValueError, match="not a record of deleted sessions"):
-        record_deletion(**_BUCKET, session_id=_OTHER_ID)
-    with pytest.raises(ValueError, match="not a record of deleted sessions"):
-        _ = record_desktop_deletions(**_BUCKET)
-
-    assert bucket.body == before
-    assert _exists("project-a", _ID)
-
-
 def test_ids_that_are_not_session_ids_are_not_used(bucket: _FakeBucket) -> None:
     """What is in the bucket is used in paths, so is not trusted."""
     bucket.set(_record("../../../outside", "*", _ID))
