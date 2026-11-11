@@ -24,10 +24,6 @@ from fogies.tools.claude_sync_deletions import (
     record_desktop_deletions,
 )
 
-_ID = "60c0de8b-271f-4239-830d-bbe9838a631c"
-_OTHER_ID = "f542028f-01b1-4734-ad54-e30e6b957005"
-_THIRD_ID = "11111111-0000-4000-8000-000000000001"
-
 _BUCKET = {"bucket_name": "bucket", "region": "us-west-2"}
 
 
