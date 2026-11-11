@@ -295,20 +295,12 @@ class _ClaudeSync:
             args=resolve_args,
         )
 
-    def push(
-        self,
-        *,
-        command_params: CommandParams,
-        include_mcp: bool = False,
-    ) -> Result:
+    def push(self, *, command_params: CommandParams) -> Result:
         """Run `claude-sync push`, uploading local changes to cloud storage."""
-        push_args = ["push"]
-        if include_mcp:
-            push_args.append("--include-mcp")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
-            args=push_args,
+            args=["push"],
         )
 
     def pull(
@@ -317,7 +309,6 @@ class _ClaudeSync:
         command_params: CommandParams,
         dry_run: bool = False,
         force: bool = False,
-        include_mcp: bool = False,
     ) -> Result:
         """Run `claude-sync pull`, downloading remote changes.
 
@@ -338,8 +329,6 @@ class _ClaudeSync:
             force = True
         if force:
             pull_args.append("--force")
-        if include_mcp:
-            pull_args.append("--include-mcp")
         return command_run(
             command=self.binary_path,
             command_params=command_params,

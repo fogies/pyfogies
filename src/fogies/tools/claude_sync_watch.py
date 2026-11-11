@@ -23,6 +23,15 @@ from fogies.tools.claude_sync import claude_directory, claude_sync_files_directo
 # interval, instead of being polled for.
 _POLLED_NAMES = ["projects", "tasks", "plans", "history.jsonl"]
 
+# How often to look for changes, in seconds.
+_POLL_SECONDS = 30
+
+# How long local changes have to have stopped for before a sync, in seconds.
+_QUIET_SECONDS = 120
+
+# How long between syncs, however quiet it is, in seconds.
+_INTERVAL_SECONDS = 300
+
 
 def newest_change(*, directory: pathlib.Path) -> float | None:
     """Return when a polled file in directory last changed, or None if none exist."""
@@ -103,14 +112,7 @@ def _say(message: str) -> None:
     print("{}  {}".format(datetime.datetime.now().strftime("%H:%M:%S"), message))
 
 
-def watch_and_sync(
-    *,
-    sync: Callable[[], None],
-    directory: pathlib.Path | None = None,
-    poll_seconds: float = 30,
-    quiet_seconds: float = 120,
-    interval_seconds: float = 300,
-) -> None:
+def watch_and_sync(*, sync: Callable[[], None]) -> None:
     """Call sync whenever it is time to, until interrupted.
 
     A sync that stops because of a ValueError (e.g., conflicts) or a failed
@@ -118,8 +120,7 @@ def watch_and_sync(
     Raises ValueError, without syncing, if another watch is running, as two
     would sync over each other.
     """
-    if directory is None:
-        directory = claude_directory()
+    directory = claude_directory()
 
     with _watch_lock():
         last_sync = 0.0
@@ -131,8 +132,8 @@ def watch_and_sync(
                 newest_change=newest_change(directory=directory),
                 synced_change=synced_change,
                 last_sync=last_sync,
-                quiet_seconds=quiet_seconds,
-                interval_seconds=interval_seconds,
+                quiet_seconds=_QUIET_SECONDS,
+                interval_seconds=_INTERVAL_SECONDS,
             ):
                 last_sync = time.time()
                 try:
@@ -143,4 +144,4 @@ def watch_and_sync(
                 # What the sync wrote is not a change to sync again. A change
                 # made while it ran is not either, which the interval brings in.
                 synced_change = newest_change(directory=directory)
-            time.sleep(poll_seconds)
+            time.sleep(_POLL_SECONDS)
