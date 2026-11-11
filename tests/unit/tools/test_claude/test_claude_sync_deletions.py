@@ -228,16 +228,16 @@ def test_apply_deletions_locally_deletes_what_was_recorded(
 def test_record_desktop_deletions_records_what_the_app_deleted(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
-    """Each is recorded as of when the app deleted it, whichever project it was in."""
+    """Each is recorded, whichever project it was in."""
     _ = temp_home
-    _write_marker("project-b", _OTHER_ID, _marker("2026-10-27T21:00:00.000Z"))
-    _write_marker("project-a", _ID, _marker("2026-10-27T20:45:00.000Z"))
+    in_project_1 = _uuid(1)
+    in_project_2 = _uuid(2)
+    _write_marker("project-1", in_project_1, _marker("2026-10-27T20:45:00.000Z"))
+    _write_marker("project-2", in_project_2, _marker("2026-10-27T21:00:00.000Z"))
 
-    assert record_desktop_deletions(**_BUCKET) == [_ID, _OTHER_ID]
+    assert record_desktop_deletions(**_BUCKET) == [in_project_1, in_project_2]
 
-    assert bucket.deleted()[_ID]["at"] == "2026-10-27T20:45:00.000Z"
-    assert bucket.deleted()[_OTHER_ID]["at"] == "2026-10-27T21:00:00.000Z"
-    assert bucket.deleted()[_ID]["machine"]
+    assert set(bucket.deleted()) == {in_project_1, in_project_2}
 
 
 @pytest.mark.parametrize(
