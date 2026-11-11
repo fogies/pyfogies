@@ -6,9 +6,13 @@ from collections.abc import Callable
 from typing import cast
 
 import pytest
+from pydantic import ValidationError
 
 from fogies.tools.boto import S3Object, S3PreconditionFailed
 from fogies.tools.claude_sync import claude_directory
+from fogies.tools.claude_sync_deletions import (
+    _DesktopMarker,  # pyright: ignore[reportPrivateUsage]
+)
 from fogies.tools.claude_sync_deletions import (
     _load,  # pyright: ignore[reportPrivateUsage]
 )
@@ -241,21 +245,29 @@ def test_record_desktop_deletions_records_what_the_app_deleted(
 
 
 @pytest.mark.parametrize(
-    ("name", "text"),
+    ("text", "valid"),
     [
-        (_ID, _marker("2026-10-27T20:45:00.000Z", reason="archive")),
-        (_ID, json.dumps({"v": 1, "reason": "delete"})),
-        (_ID, "["),
-        (_ID, "[]"),
-        ("notes", _marker("2026-10-27T20:45:00.000Z")),
+        (_marker("2026-10-27T20:45:00.000Z"), True),
+        (_marker("2026-10-27T20:45:00.000Z", reason="archive"), False),
+        (json.dumps({"v": 1, "reason": "delete"}), False),
+        ("[]", False),
     ],
-    ids=["other reason", "no time", "not JSON", "not an object", "not for a session"],
+    ids=["a deletion", "other reason", "no time", "not an object"],
 )
-def test_record_desktop_deletions_skips_what_is_not_a_deletion(
-    bucket: _FakeBucket, temp_home: pathlib.Path, name: str, text: str
+def test_desktop_marker_is_a_deletion_with_a_time(text: str, valid: bool) -> None:
+    """Only a marker of a deletion, saying when, is of use. An archive is not."""
+    if valid:
+        _ = _DesktopMarker.model_validate_json(text)
+    else:
+        with pytest.raises(ValidationError):
+            _ = _DesktopMarker.model_validate_json(text)
+
+
+def test_record_desktop_deletions_skips_a_marker_not_named_for_a_session(
+    bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
     _ = temp_home
-    _write_marker("project-a", name, text)
+    _write_marker("project-1", "notes", _marker("2026-10-27T20:45:00.000Z"))
 
     assert record_desktop_deletions(**_BUCKET) == []
 
