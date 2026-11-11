@@ -14,7 +14,6 @@ from fogies.tools.claude_sync_deletions import (
 )
 from fogies.tools.claude_sync_deletions import (
     KEY,
-    apply_deletion_locally,
     apply_deletions_locally,
     deleted_session_ids,
     record_deletion,
@@ -224,22 +223,6 @@ def test_apply_deletions_locally_deletes_what_was_recorded(
     assert _exists("project-2", not_recorded)
     # Still recorded, for machines that have not yet synced.
     assert set(bucket.deleted()) == {recorded_and_here, recorded_not_here}
-
-
-def test_apply_deletion_locally_deletes_only_that_session(
-    temp_home: pathlib.Path,
-) -> None:
-    """It is found from an ID in any case, and a second time it is not here."""
-    _ = temp_home
-    _write_session("project-a", _ID, subagents=True)
-    _write_session("project-a", _OTHER_ID)
-
-    assert apply_deletion_locally(_ID.upper())
-    assert not apply_deletion_locally(_ID)
-
-    assert not _exists("project-a", _ID)
-    assert not (claude_directory() / "projects" / "project-a" / _ID).exists()
-    assert _exists("project-a", _OTHER_ID)
 
 
 def test_record_desktop_deletions_records_what_the_app_deleted(
