@@ -160,12 +160,7 @@ def get_task_delete(
     return cast(Task[Callable[..., None]], task_delete)
 
 
-def get_task_pull(
-    *,
-    binary_cache_path: pathlib.Path,
-    default_dry_run: bool = False,
-    default_force: bool = False,
-) -> Task[Callable[..., None]]:
+def get_task_pull(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., None]]:
     @task(
         name="pull",
         auto_shortflags=False,
@@ -174,11 +169,7 @@ def get_task_pull(
             "force": "Force overwrite of local files.",
         },
     )  # pyright: ignore[reportUntypedFunctionDecorator]
-    def task_pull(
-        context: Context,
-        dry_run: bool = default_dry_run,
-        force: bool = default_force,
-    ) -> None:
+    def task_pull(context: Context, dry_run: bool = False, force: bool = False) -> None:
         """
         Download remote changes.
         """
