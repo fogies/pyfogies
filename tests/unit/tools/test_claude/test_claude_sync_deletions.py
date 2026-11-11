@@ -177,11 +177,23 @@ def test_record_deletion_gives_up_if_the_record_keeps_changing(
         record_deletion(**_BUCKET, session_id=_ID)
 
 
-def test_load_raises_for_a_record_that_is_not_understood(bucket: _FakeBucket) -> None:
-    bucket.set({"format": "something-else"})
+@pytest.mark.parametrize(
+    ("session", "understood"),
+    [(_uuid(1), True), (_uuid(1)[:-1], False)],
+    ids=["a UUID", "a UUID missing a digit"],
+)
+def test_load_understands_a_record_only_of_session_ids(
+    bucket: _FakeBucket, session: str, understood: bool
+) -> None:
+    """What is not quite a session ID is not understood, as it is used in paths."""
+    bucket.set(_record(session))
 
-    with pytest.raises(ValueError, match="not a record of deleted sessions"):
-        _ = _load(**_BUCKET)
+    if understood:
+        record, _ = _load(**_BUCKET)
+        assert list(record.deleted) == [session]
+    else:
+        with pytest.raises(ValueError, match="not a record of deleted sessions"):
+            _ = _load(**_BUCKET)
 
 
 def test_apply_deletions_locally_deletes_what_was_recorded(

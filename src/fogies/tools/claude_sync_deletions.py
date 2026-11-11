@@ -28,10 +28,10 @@ import datetime
 import socket
 import uuid
 from collections.abc import Callable
-from typing import Literal
+from typing import Annotated, Literal
 
 from claude_agent_sdk import delete_session
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import AfterValidator, BaseModel, Field, ValidationError
 
 from fogies.tools.boto import S3PreconditionFailed, s3_get_object, s3_put_object
 from fogies.tools.claude_sync import claude_directory
@@ -66,14 +66,6 @@ class _DesktopMarker(BaseModel):
     released_at: str = Field(alias="releasedAt")
 
 
-class _DeletedSessions(BaseModel):
-    """What is in the object. What is not this format is not changed or acted on."""
-
-    format: Literal["pyfogies-deleted-sessions"] = _FORMAT
-    version: Literal[1] = 1
-    deleted: dict[str, _Deletion] = {}
-
-
 def _session_id(value: str) -> str | None:
     """Return value as a session ID, or None if it is not one.
 
@@ -92,6 +84,19 @@ def _require_session_id(value: str) -> str:
     if session_id is None:
         raise ValueError("'{}' is not a session ID.".format(value))
     return session_id
+
+
+# A session ID, as validated in the record, which is not understood if one of
+# the sessions in it is not.
+_SessionId = Annotated[str, AfterValidator(_require_session_id)]
+
+
+class _DeletedSessions(BaseModel):
+    """What is in the object. What is not this format is not changed or acted on."""
+
+    format: Literal["pyfogies-deleted-sessions"] = _FORMAT
+    version: Literal[1] = 1
+    deleted: dict[_SessionId, _Deletion] = {}
 
 
 def _load(*, bucket_name: str, region: str) -> tuple[_DeletedSessions, str | None]:
@@ -115,10 +120,11 @@ def _load(*, bucket_name: str, region: str) -> tuple[_DeletedSessions, str | Non
 def deleted_session_ids(*, bucket_name: str, region: str) -> set[str]:
     """Return the IDs of the sessions that have been recorded as deleted.
 
-    Anything in the record that is not a session ID is skipped.
+    Raises ValueError if what is in the bucket is not understood, which includes
+    a record of a session that is not a session ID.
     """
     record, _ = _load(bucket_name=bucket_name, region=region)
-    return {i for i in map(_session_id, record.deleted) if i is not None}
+    return set(record.deleted)
 
 
 def _update(
