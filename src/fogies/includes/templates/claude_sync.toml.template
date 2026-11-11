@@ -1,7 +1,7 @@
 # Config for claude-sync tasks.
 # See https://github.com/tawanorg/claude-sync
 
-# Profile in the AWS config, for an IAM user that can use the bucket.
+# Profile in the AWS config, for an IAM user that can use the buckets.
 aws_profile = "..."
 
 # S3 bucket that claude-sync syncs to.
