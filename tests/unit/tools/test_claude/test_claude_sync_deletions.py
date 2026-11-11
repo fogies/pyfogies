@@ -25,6 +25,11 @@ _THIRD_ID = "11111111-0000-4000-8000-000000000001"
 _BUCKET = {"bucket_name": "bucket", "region": "us-west-2"}
 
 
+def _uuid(number: int) -> str:
+    """A session ID, which has to be a UUID, that sorts in the order of number."""
+    return "00000000-0000-4000-8000-{:012d}".format(number)
+
+
 class _FakeBucket:
     """A bucket of one object, with the conditional writes that S3 has."""
 
@@ -219,18 +224,26 @@ def test_apply_deletions_locally_deletes_what_was_recorded(
 ) -> None:
     """The session and its subagents go, from whichever project, and others stay."""
     _ = temp_home
-    _write_session("project-b", _ID, subagents=True)
-    _write_session("project-a", _OTHER_ID)
-    # Recorded, but never here.
-    bucket.set(_record(_ID, _THIRD_ID))
+    # Recorded as deleted, and on this machine, with subagents.
+    recorded_and_here = _uuid(1)
+    # On this machine, but never recorded as deleted.
+    not_recorded = _uuid(2)
+    # Recorded as deleted, but never on this machine.
+    recorded_not_here = _uuid(3)
 
-    assert apply_deletions_locally(**_BUCKET) == [_ID]
+    _write_session("project-1", recorded_and_here, subagents=True)
+    _write_session("project-2", not_recorded)
+    bucket.set(_record(recorded_and_here, recorded_not_here))
 
-    assert not _exists("project-b", _ID)
-    assert not (claude_directory() / "projects" / "project-b" / _ID).exists()
-    assert _exists("project-a", _OTHER_ID)
+    # Only what was here is reported as deleted.
+    assert apply_deletions_locally(**_BUCKET) == [recorded_and_here]
+
+    assert not _exists("project-1", recorded_and_here)
+    subagents = claude_directory() / "projects" / "project-1" / recorded_and_here
+    assert not subagents.exists()
+    assert _exists("project-2", not_recorded)
     # Still recorded, for machines that have not yet synced.
-    assert set(bucket.deleted()) == {_ID, _THIRD_ID}
+    assert set(bucket.deleted()) == {recorded_and_here, recorded_not_here}
 
 
 @pytest.mark.usefixtures("bucket")
