@@ -154,27 +154,33 @@ def test_record_deletion_adds_to_what_is_recorded(bucket: _FakeBucket) -> None:
     assert deleted_session_ids(**_BUCKET) == {_ID, _OTHER_ID}
 
 
-def test_record_deletion_keeps_what_another_machine_recorded_meanwhile(
-    bucket: _FakeBucket,
+@pytest.mark.parametrize(
+    ("changes", "succeeds"),
+    [(1, True), (10, False)],
+    ids=["changed once", "keeps changing"],
+)
+def test_record_deletion_retries_if_the_record_changed_meanwhile(
+    bucket: _FakeBucket, changes: int, succeeds: bool
 ) -> None:
     """A write is refused if the record changed, and is made again from the change."""
-    bucket.set(_record(_THIRD_ID))
-    # Another machine records its deletion between this one reading and writing.
-    bucket.interference.append(lambda: bucket.set(_record(_THIRD_ID, _OTHER_ID)))
+    this_deletion = _uuid(1)
+    recorded_by_others = [_uuid(10 + i) for i in range(changes)]
 
-    record_deletion(**_BUCKET, session_id=_ID)
+    def another_machine_records(count: int) -> Callable[[], None]:
+        return lambda: bucket.set(_record(*recorded_by_others[:count]))
 
-    assert set(bucket.deleted()) == {_ID, _OTHER_ID, _THIRD_ID}
-
-
-def test_record_deletion_gives_up_if_the_record_keeps_changing(
-    bucket: _FakeBucket,
-) -> None:
     bucket.set(_record())
-    bucket.interference.extend(lambda: bucket.set(_record()) for _ in range(10))
+    # Each time this machine tries to write, another has recorded a deletion since
+    # it read, until there are no more.
+    bucket.interference.extend(another_machine_records(i + 1) for i in range(changes))
 
-    with pytest.raises(RuntimeError, match="kept changing"):
-        record_deletion(**_BUCKET, session_id=_ID)
+    if succeeds:
+        record_deletion(**_BUCKET, session_id=this_deletion)
+
+        assert set(bucket.deleted()) == {this_deletion, *recorded_by_others}
+    else:
+        with pytest.raises(RuntimeError, match="kept changing"):
+            record_deletion(**_BUCKET, session_id=this_deletion)
 
 
 @pytest.mark.parametrize(
