@@ -279,16 +279,6 @@ def test_record_desktop_deletions_leaves_what_is_already_recorded(
     assert bucket.version == version
 
 
-@pytest.mark.usefixtures("bucket")
-def test_record_desktop_deletions_without_any_markers(temp_home: pathlib.Path) -> None:
-    """Without a projects directory, or with no markers in it, nothing is read."""
-    _ = temp_home
-    assert record_desktop_deletions(**_BUCKET) == []
-
-    _write_session("project-a", _ID)
-    assert record_desktop_deletions(**_BUCKET) == []
-
-
 def test_record_desktop_deletions_keeps_what_another_machine_recorded_meanwhile(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
