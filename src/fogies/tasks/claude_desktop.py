@@ -19,6 +19,8 @@ from fogies.tools.claude_code import claude_code
 from fogies.tools.claude_desktop import (
     desktop_sessions,
     desktop_sessions_directory,
+    desktop_statuses,
+    plan_resume,
 )
 from fogies.tools.claude_sessions import describe_session, find_session_id
 
@@ -38,22 +40,17 @@ def get_task_sessions() -> Task[Callable[..., None]]:
         if recorded is None:
             raise ValueError(_NOT_FOUND(desktop_sessions_directory()))
 
-        transcripts = list_sessions()
-        for session in transcripts:
-            record = recorded.get(session.session_id)
-            if record is None:
-                status = "not listed"
+        sessions = {session.session_id: session for session in list_sessions()}
+        statuses = desktop_statuses(transcripts=sessions, recorded=recorded)
+        for session_id, status in statuses.items():
+            if session_id in sessions:
+                print(
+                    "{:<10}  {}".format(status, describe_session(sessions[session_id]))
+                )
             else:
-                status = "archived" if record.archived else "listed"
-            print("{:<10}  {}".format(status, describe_session(session)))
-
-        # Listed by the app, but with no transcript here, so not able to be opened.
-        have = {session.session_id for session in transcripts}
-        for record in recorded.values():
-            if record.session_id not in have:
                 print(
                     "{:<10}  {}  {}".format(
-                        "no history", record.session_id, record.title or ""
+                        status, session_id, recorded[session_id].title or ""
                     )
                 )
 
@@ -85,40 +82,33 @@ def get_task_resume(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., No
             if recorded is None:
                 # Without knowing what is listed, all would be every session.
                 raise ValueError(_NOT_FOUND(desktop_sessions_directory()))
+            directories = {i: session.cwd for i, session in sessions.items()}
             # Archived sessions are recorded, so are not resumed.
-            session_ids = [i for i in sessions if i not in recorded]
+            listed = recorded.keys()
         else:
             assert session_id is not None
-            session_ids = [find_session_id(list(sessions), session_id)]
+            resume_id = find_session_id(list(sessions), session_id)
+            directories = {resume_id: sessions[resume_id].cwd}
+            listed = ()
+        resumable, skipped = plan_resume(directories=directories, listed=listed)
 
-        resumed = 0
+        # One session that is asked for is an error. Skipping a session is for
+        # when all of them are.
+        if skipped and not all_:
+            ((skipped_id, problem),) = skipped.items()
+            raise ValueError("Session '{}' {}".format(skipped_id, problem))
+        for skipped_id, problem in skipped.items():
+            print("Skipping {}, as it {}.".format(skipped_id, problem))
+
         with claude_code(binary_cache_path=binary_cache_path) as cc:
-            for resume_id in session_ids:
-                cwd = sessions[resume_id].cwd
-                if cwd is None:
-                    problem = "has no recorded directory"
-                elif not pathlib.Path(cwd).is_dir():
-                    problem = "ran in '{}', which does not exist here".format(cwd)
-                else:
-                    problem = None
-
-                if problem is not None:
-                    # One session that is asked for is an error. Skipping a
-                    # session is for when all of them are.
-                    if not all_:
-                        raise ValueError("Session '{}' {}".format(resume_id, problem))
-                    print("Skipping {}, as it {}.".format(resume_id, problem))
-                    continue
-
-                assert cwd is not None
+            for resume_id, cwd in resumable.items():
                 print("Resuming {}.".format(resume_id))
-                cc.resume_in_desktop(session_id=resume_id, cwd=pathlib.Path(cwd))
-                resumed += 1
+                cc.resume_in_desktop(session_id=resume_id, cwd=cwd)
 
         if all_:
             print(
                 "Resumed {} of {} sessions not listed.".format(
-                    resumed, len(session_ids)
+                    len(resumable), len(resumable) + len(skipped)
                 )
             )
 

@@ -7,7 +7,10 @@ import pytest
 
 from fogies.tools.claude_desktop import (
     DesktopSession,
+    DesktopStatus,
     desktop_sessions,
+    desktop_statuses,
+    plan_resume,
 )
 
 
@@ -60,3 +63,52 @@ def test_desktop_sessions_in_a_format_that_is_not_recognised(
 
     with pytest.raises(ValueError, match="not recognised"):
         _ = desktop_sessions(directory=tmp_path)
+
+
+def test_desktop_statuses_say_whether_the_app_lists_each_session() -> None:
+    """Sessions with a transcript come first, then those the app lists without one."""
+    recorded = {
+        "listed": DesktopSession(session_id="listed", archived=False),
+        "archived": DesktopSession(session_id="archived", archived=True),
+        "no_transcript": DesktopSession(session_id="no_transcript", archived=False),
+    }
+
+    statuses = desktop_statuses(
+        transcripts=["not_listed", "listed", "archived"], recorded=recorded
+    )
+
+    assert statuses == {
+        "not_listed": DesktopStatus.NOT_LISTED,
+        "listed": DesktopStatus.LISTED,
+        "archived": DesktopStatus.ARCHIVED,
+        "no_transcript": DesktopStatus.NO_HISTORY,
+    }
+    assert list(statuses)[-1] == "no_transcript"
+
+
+def test_plan_resume_resumes_what_can_be_and_says_why_not_for_the_rest(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A session that is listed is left out, whether or not it could be resumed."""
+    here = tmp_path / "here"
+    here.mkdir()
+    missing = tmp_path / "elsewhere"
+
+    resumable, skipped = plan_resume(
+        directories={
+            "not_listed": str(here),
+            "listed": str(here),
+            "listed_no_directory": None,
+            "not_listed_no_directory": None,
+            "not_listed_directory_missing": str(missing),
+        },
+        listed=["listed", "listed_no_directory"],
+    )
+
+    assert resumable == {"not_listed": here}
+    assert skipped == {
+        "not_listed_no_directory": "has no recorded directory",
+        "not_listed_directory_missing": "ran in '{}', which does not exist here".format(
+            missing
+        ),
+    }

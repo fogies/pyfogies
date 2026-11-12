@@ -14,6 +14,8 @@ CLI. See fogies.tools.claude_code.
 import os
 import pathlib
 import sys
+from collections.abc import Collection, Iterable, Mapping
+from enum import StrEnum
 from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -110,3 +112,61 @@ def desktop_sessions(
             )
         )
     return sessions
+
+
+class DesktopStatus(StrEnum):
+    """Whether the app lists a session, as its value says it to a person."""
+
+    LISTED = "listed"
+    # Kept by the app, but hidden from the sidebar.
+    ARCHIVED = "archived"
+    # Has a transcript here, but the app has no record of it.
+    NOT_LISTED = "not listed"
+    # The app has a record of it, but there is no transcript here to open.
+    NO_HISTORY = "no history"
+
+
+def desktop_statuses(
+    *, transcripts: Iterable[str], recorded: Mapping[str, DesktopSession]
+) -> dict[str, DesktopStatus]:
+    """Return whether the app lists each session, by session ID.
+
+    Those with transcripts here are first, in order, and then those that the app
+    has a record of but with no transcript here.
+    """
+    statuses: dict[str, DesktopStatus] = {}
+    for session_id in transcripts:
+        record = recorded.get(session_id)
+        if record is None:
+            statuses[session_id] = DesktopStatus.NOT_LISTED
+        else:
+            statuses[session_id] = (
+                DesktopStatus.ARCHIVED if record.archived else DesktopStatus.LISTED
+            )
+    for session_id in recorded:
+        _ = statuses.setdefault(session_id, DesktopStatus.NO_HISTORY)
+    return statuses
+
+
+def plan_resume(
+    *, directories: Mapping[str, str | None], listed: Collection[str]
+) -> tuple[dict[str, pathlib.Path], dict[str, str]]:
+    """Return which sessions can be resumed in the app, and why others can't.
+
+    directories has the directory that each session ran in, if it is known. A
+    session in listed is left out of both. What can be resumed is by session ID
+    with its directory, and what can't is by session ID with the reason, which
+    is a clause (e.g., "has no recorded directory").
+    """
+    resumable: dict[str, pathlib.Path] = {}
+    skipped: dict[str, str] = {}
+    for session_id, cwd in directories.items():
+        if session_id in listed:
+            continue
+        if cwd is None:
+            skipped[session_id] = "has no recorded directory"
+        elif not pathlib.Path(cwd).is_dir():
+            skipped[session_id] = "ran in '{}', which does not exist here".format(cwd)
+        else:
+            resumable[session_id] = pathlib.Path(cwd)
+    return resumable, skipped
