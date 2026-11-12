@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 
 import pytest
+from invoke.runners import Result
 
 from fogies.age_key import generate_age_key
 from fogies.tools.aws_environ import AwsProfile
@@ -14,12 +15,23 @@ from fogies.tools.claude_sync import (
     _YAML_FILE_NAME,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
+    _conflicts_remain,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync import _had_errors  # pyright: ignore[reportPrivateUsage]
+from fogies.tools.claude_sync import (
+    _pull_finished,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync import (
+    claude_directory,
     claude_sync,
     claude_sync_files_directory,
     configure_claude_sync,
+    is_first_pull,
     load_claude_sync_config,
     render_claude_sync_yaml,
+    update_claude_sync_config,
 )
+from fogies.tools.command import CommandParams
 from tasks.paths import STAGING_BINARY_CACHE_PATH
 
 # Any two different age secret keys will do.
@@ -33,16 +45,6 @@ _AWS_PROFILE = AwsProfile(
     aws_access_key_id="id",
     aws_secret_access_key="a/secret+with=symbols",
 )
-
-
-@pytest.fixture
-def temp_home(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathlib.Path:
-    """Replace the home directory, where claude-sync looks for its files."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
-    return home
 
 
 @pytest.fixture
@@ -76,6 +78,7 @@ def _config_file(tmp_path: pathlib.Path, *, age_key: str | None = None) -> pathl
     text = """
 aws_profile = "{}"
 bucket = "my-bucket"
+deletions_bucket = "my-deletions-bucket"
 region = "us-west-2"
 scope = "sessions"
 """.format(_AWS_PROFILE.name)
@@ -265,3 +268,177 @@ def test_configure_claude_sync_replaces_what_differs_when_forced(
     assert yaml_path.read_text(encoding="utf-8") == render_claude_sync_yaml(
         load_claude_sync_config(path=claude_sync_config_path), _AWS_PROFILE
     )
+
+
+def test_update_claude_sync_config_updates_what_a_redirect_points_to(
+    tmp_path: pathlib.Path,
+) -> None:
+    (tmp_path / "shared").mkdir()
+    shared_path = _config_file(tmp_path / "shared")
+    redirect_path = tmp_path / "project" / "claude-sync.toml"
+    redirect_path.parent.mkdir()
+    redirect_text = 'redirect = "../shared/claude-sync.toml"\n'
+    _ = redirect_path.write_text(redirect_text, encoding="utf-8")
+
+    update_claude_sync_config(path=redirect_path, age_key=_KEY)
+
+    assert load_claude_sync_config(path=shared_path).age_key == _KEY
+    assert redirect_path.read_text(encoding="utf-8") == redirect_text
+
+
+def test_claude_sync_conflicts_keeps_the_chosen_version(
+    temp_home: pathlib.Path,
+) -> None:
+    """A conflict is resolved by keeping the remote version, which is saved beside it."""
+    project_path = temp_home / ".claude" / "projects" / "demo"
+    project_path.mkdir(parents=True)
+    local_path = project_path / "a.jsonl"
+    conflict_path = project_path / "a.jsonl.conflict.20260208-095132"
+    _ = local_path.write_text("local", encoding="utf-8")
+    _ = conflict_path.write_text("remote", encoding="utf-8")
+
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        _ = cs.resolve_conflicts(
+            command_params=CommandParams(in_stream=False, hide=True), keep="remote"
+        )
+
+    assert local_path.read_text(encoding="utf-8") == "remote"
+    assert not conflict_path.exists()
+
+
+def test_claude_sync_list_conflicts_changes_nothing(temp_home: pathlib.Path) -> None:
+    project_path = temp_home / ".claude" / "projects" / "demo"
+    project_path.mkdir(parents=True)
+    local_path = project_path / "a.jsonl"
+    conflict_path = project_path / "a.jsonl.conflict.20260208-095132"
+    _ = local_path.write_text("local", encoding="utf-8")
+    _ = conflict_path.write_text("remote", encoding="utf-8")
+
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        result = cs.list_conflicts(
+            command_params=CommandParams(in_stream=False, hide=True)
+        )
+
+    assert "a.jsonl" in result.stdout
+    assert local_path.read_text(encoding="utf-8") == "local"
+    assert conflict_path.read_text(encoding="utf-8") == "remote"
+
+
+def test_had_errors() -> None:
+    """Both a pull and a push print what failed, and still exit successfully."""
+    assert not _had_errors("Pull complete: 2 downloaded")
+    assert _had_errors("Pull complete: 1 failed\n\nErrors:\n  a.jsonl: timeout")
+    assert _had_errors("Push complete: 1 failed\n\nErrors:\n  b.jsonl: timeout")
+
+
+def test_pull_finished() -> None:
+    # Every pull that runs to its end rebuilds the history, with nothing else
+    # printed when there was nothing to download.
+    assert _pull_finished(
+        "\n".join(
+            [
+                "Fetching remote file list...",
+                "  Rebuilt history.jsonl: 5 entries (5 existing + 0 recovered)",
+            ]
+        )
+    )
+    # A pull that was stopped, or did nothing, printed none of it.
+    assert not _pull_finished("  Aborted.")
+    assert not _pull_finished("Pull complete: 2 downloaded")
+    assert not _pull_finished("")
+
+
+def test_conflicts_remain() -> None:
+    assert not _conflicts_remain("No conflicts found")
+    assert _conflicts_remain("Found 1 conflict(s):")
+    # What is not recognized is not taken to be none.
+    assert _conflicts_remain("something else")
+
+
+def test_is_first_pull(claude_sync_files_dir: pathlib.Path) -> None:
+    """It is the first pull until claude-sync has recorded files, or if unsure."""
+    assert is_first_pull()
+
+    claude_sync_files_dir.mkdir()
+    state_path = claude_sync_files_dir / "state.json"
+    _ = state_path.write_text('{"files": {}}', encoding="utf-8")
+    assert is_first_pull()
+
+    _ = state_path.write_text("not json", encoding="utf-8")
+    assert is_first_pull()
+
+    _ = state_path.write_text('{"files": {"a.jsonl": {"hash": "x"}}}', encoding="utf-8")
+    assert not is_first_pull()
+
+
+def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(
+    temp_home: pathlib.Path,
+) -> None:
+    """Nothing is run, or changed, for an unattended first sync."""
+    _ = temp_home
+
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        with pytest.raises(ValueError, match="first sync"):
+            cs.sync(command_params=CommandParams(in_stream=False), unattended=True)
+
+    assert not claude_directory().exists()
+
+
+@pytest.mark.parametrize(
+    ("pull_output", "calls"),
+    [
+        ("Rebuilt history.jsonl: 3 entries", ["pull", "after_pull", "push"]),
+        ("Errors:\n  a.jsonl: failed", ["pull"]),
+        ("Pull stopped", ["pull"]),
+    ],
+    ids=["finished", "errors", "not finished"],
+)
+def test_claude_sync_sync_calls_after_pull_before_the_push(
+    temp_home: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pull_output: str,
+    calls: list[str],
+) -> None:
+    """What it changes is pushed, and it is not run for a pull that failed."""
+    _ = temp_home
+    made: list[str] = []
+
+    def fake_pull(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("pull")
+        return Result(stdout=pull_output)
+
+    def fake_push(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("push")
+        return Result(stdout="Pushed")
+
+    def fake_conflicts_remain(**kwargs: object) -> bool:
+        _ = kwargs
+        return False
+
+    monkeypatch.setattr("fogies.tools.claude_sync.is_first_pull", lambda: False)
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        monkeypatch.setattr(cs, "pull", fake_pull)
+        monkeypatch.setattr(cs, "push", fake_push)
+        monkeypatch.setattr(cs, "_conflicts_remain", fake_conflicts_remain)
+
+        try:
+            cs.sync(
+                command_params=CommandParams(in_stream=False),
+                unattended=True,
+                after_pull=lambda: made.append("after_pull"),
+            )
+        except ValueError:
+            # A pull that failed stops the sync, which is what is tested.
+            pass
+
+    assert made == calls

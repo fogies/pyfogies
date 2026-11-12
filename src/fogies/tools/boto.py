@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from botocore.exceptions import ClientError
 
 from fogies.boto_clients import boto_client_s3
 
 if TYPE_CHECKING:
-    from mypy_boto3_s3.type_defs import ErrorTypeDef, ObjectIdentifierTypeDef
+    from mypy_boto3_s3.type_defs import (
+        ErrorTypeDef,
+        ObjectIdentifierTypeDef,
+        PutObjectRequestTypeDef,
+    )
 
 
 def s3_delete_keys(*, bucket_name: str, region: str, keys: set[str]) -> None:
@@ -69,3 +76,68 @@ def s3_delete_keys(*, bucket_name: str, region: str, keys: set[str]) -> None:
                 json.dumps(errors, indent=2),
             )
         )
+
+
+@dataclass(frozen=True)
+class S3Object:
+    """An object read from S3, and the ETag that identifies this version of it."""
+
+    body: bytes
+    etag: str
+
+
+class S3PreconditionFailed(Exception):
+    """A write was refused, as the object is not as the write needed it to be."""
+
+
+def s3_get_object(*, bucket_name: str, region: str, key: str) -> S3Object | None:
+    """Read key from bucket_name, or return None if it does not exist."""
+    client = boto_client_s3(region=region)
+    try:
+        response = client.get_object(Bucket=bucket_name, Key=key)
+    except client.exceptions.NoSuchKey:
+        return None
+    return S3Object(body=response["Body"].read(), etag=response["ETag"])
+
+
+def s3_put_object(
+    *,
+    bucket_name: str,
+    region: str,
+    key: str,
+    body: bytes,
+    if_match: str | None = None,
+    if_absent: bool = False,
+) -> str:
+    """Write body to key in bucket_name, and return the new ETag.
+
+    With *if_match*, the write is only made if the object has that ETag, as
+    read earlier, so that it does not replace a change made since. With
+    *if_absent*, only if there is no such object. Raises S3PreconditionFailed
+    if not, including if another write was in progress, or if the object is
+    gone, and the caller can read it again and retry.
+    """
+    if if_match is not None and if_absent:
+        raise ValueError("Give if_match, or if_absent, and not both.")
+
+    request: PutObjectRequestTypeDef = {
+        "Bucket": bucket_name,
+        "Key": key,
+        "Body": body,
+    }
+    if if_match is not None:
+        request["IfMatch"] = if_match
+    if if_absent:
+        request["IfNoneMatch"] = "*"
+
+    client = boto_client_s3(region=region)
+    try:
+        response = client.put_object(**request)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        if code in ("PreconditionFailed", "ConditionalRequestConflict", "NoSuchKey"):
+            raise S3PreconditionFailed(
+                "'{}' is not as it was expected to be.".format(key)
+            ) from exc
+        raise
+    return response["ETag"]

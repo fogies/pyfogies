@@ -3,8 +3,13 @@ output "bucket" {
   value       = aws_s3_bucket.claude_sync.bucket
 }
 
+output "deletions_bucket" {
+  description = "Name of the S3 bucket for the record of deleted sessions, which claude-sync does not use."
+  value       = aws_s3_bucket.deletions.bucket
+}
+
 output "region" {
-  description = "Region of the S3 bucket."
+  description = "Region of both S3 buckets."
   value       = aws_s3_bucket.claude_sync.region
 }
 

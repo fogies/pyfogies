@@ -2,7 +2,8 @@
 
 See <https://github.com/tawanorg/claude-sync>. claude-sync ships no Windows
 release binary, so it's built from source here rather than downloaded
-pre-built, unlike fogies.tools.terraform. Only push/pull/status are wrapped.
+pre-built, unlike fogies.tools.terraform. Only push/pull/status/conflicts are
+wrapped.
 
 claude-sync's own setup wizard (`claude-sync init`) can't run unattended: for
 S3 it prompts for the credentials, region and bucket even when they are given
@@ -20,17 +21,17 @@ other way makes them differ from it.
 import dataclasses
 import json
 import pathlib
-import tomllib
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Literal
 
 import tomlkit
 from invoke.runners import Result
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ValidationError, field_validator
 
 from fogies.age_key import generate_age_key, validate_age_key
-from fogies.templates import claude_sync_toml_template_factory, ensure_from_template
+from fogies.config import load_config, resolve_config_path
+from fogies.templates import claude_sync_toml_template_factory
 from fogies.tools.aws_environ import AwsProfile, load_aws_profile_from_config
 from fogies.tools.command import CommandParams, command_run
 from fogies.tools.go import go
@@ -50,9 +51,66 @@ _YAML_FILE_NAME = "config.yaml"
 _KEY_FILE_NAME = "age-key.txt"
 
 
+def _had_errors(output: str) -> bool:
+    """Return whether the output of a pull or a push says that some files failed.
+
+    claude-sync exits successfully even then, and only prints them.
+    """
+    return "Errors:" in output
+
+
+def _pull_finished(output: str) -> bool:
+    """Return whether the output of a pull says that it ran to its end.
+
+    A pull that does nothing, or is stopped (e.g., a first pull that is
+    aborted), exits successfully too. What every pull that runs to its end
+    prints, as it is always asked to rebuild the history, is that it did. The
+    messages for a pull with nothing to download, or one that is up to date,
+    are not printed in every case, so are not relied on.
+    """
+    return "Rebuilt history.jsonl" in output
+
+
+def _conflicts_remain(output: str) -> bool:
+    """Return whether the output of listing conflicts is not that there are none.
+
+    Anything else, including wording that is not recognized, counts as there
+    being some, so that a change in what claude-sync prints stops a push rather
+    than allowing one.
+    """
+    return "No conflicts found" not in output
+
+
+def claude_directory() -> pathlib.Path:
+    """Where claude-sync syncs from, which is not configurable."""
+    return pathlib.Path.home() / ".claude"
+
+
 def claude_sync_files_directory() -> pathlib.Path:
     """Where the claude-sync files are: its config.yaml and encryption key."""
     return pathlib.Path.home() / _DIRECTORY_NAME
+
+
+class _SyncState(BaseModel):
+    """What claude-sync records of syncing, of which only the files matter."""
+
+    files: dict[str, object] = {}
+
+
+def is_first_pull() -> bool:
+    """Return whether claude-sync has recorded nothing of syncing on this machine.
+
+    If it is not sure, it is taken to be, because what follows is forcing the
+    pull. If it is wrong the other way, claude-sync asks about overwriting files
+    before its first pull, which does not work from a task.
+    """
+    try:
+        state = _SyncState.model_validate_json(
+            (claude_sync_files_directory() / "state.json").read_text(encoding="utf-8")
+        )
+    except OSError, ValidationError:
+        return True
+    return not state.files
 
 
 class ClaudeSyncConfig(BaseModel):
@@ -61,6 +119,9 @@ class ClaudeSyncConfig(BaseModel):
     # A profile in the AWS config, with the credentials claude-sync signs in with.
     aws_profile: str
     bucket: str
+    # A bucket of its own for the record of deleted sessions, which claude-sync
+    # does not use. In the same region.
+    deletions_bucket: str
     region: str
     scope: Literal["full", "sessions"]
     # Absent until created by configure.
@@ -78,13 +139,19 @@ def load_claude_sync_config(*, path: pathlib.Path) -> ClaudeSyncConfig:
     If it doesn't exist yet, it is created from a template and FileNotFoundError
     is raised, so that it is filled in before it is used.
     """
-    ensure_from_template(path=path, template_factory=claude_sync_toml_template_factory)
-    with path.open("rb") as f:
-        return ClaudeSyncConfig.model_validate(tomllib.load(f))
+    return load_config(
+        path=path,
+        model=ClaudeSyncConfig,
+        template_factory=claude_sync_toml_template_factory,
+    )
 
 
 def update_claude_sync_config(*, path: pathlib.Path, age_key: str) -> None:
-    """Update the config with age_key, keeping its comments and layout."""
+    """Update the config with age_key, keeping its comments and layout.
+
+    If the config redirects, the shared config it redirects to is updated.
+    """
+    path = resolve_config_path(path=path)
     with path.open("r", encoding="utf-8") as f:
         doc = tomlkit.parse(f.read())
     doc["age_key"] = age_key
@@ -195,23 +262,45 @@ class _ClaudeSync:
         """The path to the claude-sync executable."""
         return self._path
 
-    def push(
-        self,
-        *,
-        command_params: CommandParams,
-        include_mcp: bool = False,
-        quiet: bool = False,
-    ) -> Result:
-        """Run `claude-sync push`, uploading local changes to cloud storage."""
-        push_args = ["push"]
-        if include_mcp:
-            push_args.append("--include-mcp")
-        if quiet:
-            push_args.append("-q")
+    def list_conflicts(self, *, command_params: CommandParams) -> Result:
+        """Run `claude-sync conflicts --list`, listing conflicts from a sync.
+
+        When both the local and remote file change, the remote version is saved
+        as a .conflict file.
+        """
         return command_run(
             command=self.binary_path,
             command_params=command_params,
-            args=push_args,
+            args=["conflicts", "--list"],
+        )
+
+    def resolve_conflicts(
+        self,
+        *,
+        command_params: CommandParams,
+        keep: Literal["local", "remote"] | None = None,
+    ) -> Result:
+        """Run `claude-sync conflicts`, resolving conflicts from a sync.
+
+        By default they are resolved interactively, where showing differences
+        runs a `diff` command, so one has to be on PATH. *keep* resolves all of
+        them, keeping the local or the remote version.
+        """
+        resolve_args = ["conflicts"]
+        if keep is not None:
+            resolve_args.extend(["--keep", keep])
+        return command_run(
+            command=self.binary_path,
+            command_params=command_params,
+            args=resolve_args,
+        )
+
+    def push(self, *, command_params: CommandParams) -> Result:
+        """Run `claude-sync push`, uploading local changes to cloud storage."""
+        return command_run(
+            command=self.binary_path,
+            command_params=command_params,
+            args=["push"],
         )
 
     def pull(
@@ -220,38 +309,103 @@ class _ClaudeSync:
         command_params: CommandParams,
         dry_run: bool = False,
         force: bool = False,
-        include_mcp: bool = False,
-        quiet: bool = False,
-        rebuild_history: bool = False,
     ) -> Result:
-        """Run `claude-sync pull`, downloading remote changes."""
-        pull_args = ["pull"]
+        """Run `claude-sync pull`, downloading remote changes.
+
+        The history is always rebuilt afterward, from the session files, because
+        otherwise history.jsonl, which is a single file that machines replace
+        each other's copies of, loses entries. (Nothing is rebuilt for a dry run.)
+
+        The first pull on a machine merges what is in the bucket with what is
+        here, the newer of a file on both sides winning, and claude-sync asks
+        whether to back up first. The prompt does not work from a task, and the
+        bucket keeps earlier versions of what was pushed, so it is skipped with
+        --force. A dry run shows what that would do, without it.
+        """
+        pull_args = ["pull", "--rebuild-history"]
         if dry_run:
             pull_args.append("--dry-run")
+        elif is_first_pull():
+            force = True
         if force:
             pull_args.append("--force")
-        if include_mcp:
-            pull_args.append("--include-mcp")
-        if quiet:
-            pull_args.append("-q")
-        if rebuild_history:
-            pull_args.append("--rebuild-history")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
             args=pull_args,
         )
 
-    def status(self, *, command_params: CommandParams, quiet: bool = False) -> Result:
+    def status(self, *, command_params: CommandParams) -> Result:
         """Run `claude-sync status`, showing pending local changes."""
-        status_args = ["status"]
-        if quiet:
-            status_args.append("-q")
         return command_run(
             command=self.binary_path,
             command_params=command_params,
-            args=status_args,
+            args=["status"],
         )
+
+    def _conflicts_remain(self, *, command_params: CommandParams) -> bool:
+        """Return whether conflicts are left, according to listing them."""
+        return _conflicts_remain(
+            self.list_conflicts(command_params=command_params).stdout
+        )
+
+    def sync(
+        self,
+        *,
+        command_params: CommandParams,
+        unattended: bool = False,
+        after_pull: Callable[[], None] | None = None,
+    ) -> None:
+        """Pull, resolve any conflicts, and then push.
+
+        A push does not look at what is in the bucket, so pushing without
+        pulling replaces other machines' changes, and pushing with conflicts
+        unresolved replaces the bucket's version with this machine's. So the
+        history is rebuilt after the pull, and conflicts are resolved
+        interactively.
+
+        *after_pull* is called once the pull, and any conflicts, are done, and
+        before the push, so that what it changes (e.g., files it deletes because
+        another machine did) is what is pushed. It is not called if the sync
+        stops before then, and if it raises, nothing is pushed.
+
+        *unattended* when true never asks, so what would need resolving stops
+        it. Conflicts left from before also stop it before it pulls, which would
+        otherwise add to them. The first sync on a machine merges what is here
+        with the bucket, so it is not unattended.
+
+        Raises ValueError, without pushing, if the pull had errors or did not
+        finish, or conflicts are unresolved (e.g., skipped). Raises it after
+        pushing, which is not undone, if the push had errors.
+        """
+        if unattended and is_first_pull():
+            raise ValueError("The first sync on this machine has to be attended.")
+
+        hidden = dataclasses.replace(command_params, hide=True)
+        if unattended and self._conflicts_remain(command_params=hidden):
+            raise ValueError("Not syncing, because conflicts are unresolved.")
+
+        pull_result = self.pull(command_params=command_params)
+        if _had_errors(pull_result.stdout):
+            raise ValueError("Not pushing, because the pull had errors.")
+        if not _pull_finished(pull_result.stdout):
+            raise ValueError("Not pushing, because the pull did not finish.")
+
+        if unattended:
+            if self._conflicts_remain(command_params=hidden):
+                raise ValueError("Not pushing, because the pull had conflicts.")
+        elif self._conflicts_remain(command_params=command_params):
+            _ = self.resolve_conflicts(command_params=command_params)
+            # What was resolved was already shown, so only what is left is.
+            if self._conflicts_remain(command_params=hidden):
+                raise ValueError("Not pushing, because conflicts are unresolved.")
+
+        if after_pull is not None:
+            after_pull()
+
+        push_result = self.push(command_params=command_params)
+        if _had_errors(push_result.stdout):
+            raise ValueError("The push had errors, so some files were not uploaded.")
 
 
 @contextmanager

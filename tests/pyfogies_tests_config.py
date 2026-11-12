@@ -1,12 +1,11 @@
 """Pydantic model and fixture for pyfogies-tests.toml configuration."""
 
-import tomllib
 from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
 
-from fogies.templates import ensure_from_template
+from fogies.config import load_config
 from tasks.paths import SECRETS_PYFOGIES_TESTS_PATH, TEMPLATE_PYFOGIES_TESTS_PATH
 
 
@@ -35,12 +34,11 @@ class PyfogiesTestsConfig(BaseModel):
         expect a FileNotFoundError-style failure the first time, prompting
         them to fill in the newly-created file and re-run.
         """
-        ensure_from_template(
-            path=path, template_factory=_pyfogies_tests_toml_template_factory
+        return load_config(
+            path=path,
+            model=PyfogiesTestsConfig,
+            template_factory=_pyfogies_tests_toml_template_factory,
         )
-        with path.open("rb") as f:
-            data = tomllib.load(f)
-        return PyfogiesTestsConfig.model_validate(data)
 
 
 @pytest.fixture(scope="session")
