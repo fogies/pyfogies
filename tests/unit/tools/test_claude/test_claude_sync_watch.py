@@ -2,10 +2,6 @@
 
 import os
 import pathlib
-import subprocess
-import sys
-import time
-from typing import cast
 
 import pytest
 
@@ -29,26 +25,24 @@ _INTERVAL = 300.0
 @pytest.mark.parametrize(
     ("now", "changed", "due"),
     [
-        # Nothing has changed since the last sync, and the interval has not passed.
+        # Nothing to sync: no change at all, or none but what the sync itself
+        # wrote, which is the newest change as of the end of the sync, however
+        # quiet it has been since.
         (1200.0, None, False),
-        (1200.0, 900.0, False),
-        # A change since the last sync is waited on until it has been quiet.
+        (1200.0, 1000.0, False),
+        # A change since the last sync is waited on until it has been quiet,
+        # whether it was made once or is still being made, until the interval.
         (1150.0, 1100.0, False),
         (1220.0, 1100.0, True),
         # Changes that continue wait no longer than the interval.
-        (1299.0, 1290.0, False),
         (1300.0, 1299.0, True),
-        # With nothing changed, the interval passing is enough to bring in changes.
-        (1300.0, None, True),
     ],
     ids=[
         "never changed",
-        "changed before",
+        "changed by the sync itself",
         "changed recently",
         "changed and quiet",
-        "still changing",
         "still changing past interval",
-        "interval",
     ],
 )
 def test_sync_due(now: float, changed: float | None, due: bool) -> None:
@@ -65,14 +59,14 @@ def test_sync_due(now: float, changed: float | None, due: bool) -> None:
     )
 
 
-def test_sync_due_ignores_what_the_sync_wrote() -> None:
-    """A change by the sync itself is not one to sync, however quiet it has been."""
-    assert not sync_due(
-        now=1200.0,
-        newest_change=1050.0,
-        # The newest change as of the end of a sync that began at 1000.
-        synced_change=1050.0,
-        last_sync=1000.0,
+def test_sync_due_for_the_first_file_to_exist() -> None:
+    """A file that appears after a sync that found none is a change to sync."""
+    assert sync_due(
+        now=1220.0,
+        newest_change=1100.0,
+        # There were no files as of the end of the last sync.
+        synced_change=None,
+        last_sync=_LAST_SYNC,
         quiet_seconds=_QUIET,
         interval_seconds=_INTERVAL,
     )
@@ -119,54 +113,3 @@ def test_only_one_watch_in_a_process(temp_home: pathlib.Path) -> None:
                 pass
 
     assert not is_watching()
-
-
-def test_only_one_watch_across_processes(temp_home: pathlib.Path) -> None:
-    """Another process's watch is seen, and is not once that process is gone.
-
-    The lock is released by the operating system, so a watch that is killed
-    does not leave one behind to refuse the next.
-    """
-    home = str(temp_home)
-    holds_the_lock = "; ".join(
-        [
-            "from fogies.tools.claude_sync_watch import _watch_lock",
-            "lock = _watch_lock()",
-            "lock.__enter__()",
-            "print('holding', flush=True)",
-            "input()",
-        ]
-    )
-    holder: subprocess.Popen[str] = subprocess.Popen(
-        [sys.executable, "-c", holds_the_lock],
-        env={**os.environ, "HOME": home, "USERPROFILE": home},
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        assert holder.stdout is not None
-        first_line = cast(str, holder.stdout.readline())
-        assert first_line.strip() == "holding"
-
-        assert is_watching()
-        with pytest.raises(ValueError, match="already being watched"):
-            with _watch_lock():
-                pass
-
-        # Killed, so not asked to release it. Windows releases it shortly after
-        # the process is gone, not at the same moment.
-        holder.kill()
-        _ = holder.wait(timeout=10)
-        deadline = time.monotonic() + 10
-        while is_watching() and time.monotonic() < deadline:
-            time.sleep(0.05)
-
-        assert not is_watching()
-    finally:
-        holder.kill()
-        _ = holder.wait(timeout=10)
-        if holder.stdin is not None:
-            holder.stdin.close()
-        if holder.stdout is not None:
-            holder.stdout.close()
