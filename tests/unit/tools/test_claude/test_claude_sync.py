@@ -2,6 +2,8 @@
 
 import pathlib
 import subprocess
+from collections.abc import Callable
+from contextlib import nullcontext
 
 import pytest
 from invoke.runners import Result
@@ -44,6 +46,76 @@ _AWS_PROFILE = AwsProfile(
     name="claude-sync",
     aws_access_key_id="id",
     aws_secret_access_key="a/secret+with=symbols",
+)
+
+
+def _green(text: str) -> str:
+    """Colour text as claude-sync does, which it does whatever it prints to."""
+    return "\x1b[32m" + text + "\x1b[0m"
+
+
+def _garbled(text: str) -> str:
+    """Decode text as it is on Windows when the locale is not UTF-8.
+
+    claude-sync prints UTF-8, and its symbols (e.g., a tick) come out as other
+    characters, which is also how a pytest run on Windows sees them.
+    """
+    return text.encode("utf-8").decode("cp1252")
+
+
+def _push_had_errors(output: str) -> bool:
+    return _had_errors(command="push", output=output)
+
+
+# What claude-sync prints, as of the version these forms are checked for.
+_REBUILT = (
+    "  "
+    + _green(
+        "Rebuilt history.jsonl: 5 entries (4 existing + 1 recovered from sessions)"
+    )
+    + "\n"
+)
+
+_PULL_WITH_A_CONFLICT_AND_AN_ERROR = "\n".join(
+    [
+        "\x1b[2m⋯\x1b[0m projects\\demo\r↓ [1/2] projects\\demo\\a.jsonl (1.2 KB)          ",
+        "\r↓ [2/2] projects\\demo\\b.jsonl (3 B)          ",
+        "\r\x1b[33m⚠\x1b[0m Conflict: projects\\demo\\c.jsonl (saved as .conflict)",
+        "\r\x1b[33m✗\x1b[0m projects\\demo\\d.jsonl: timeout",
+        "",
+        _green("✓") + " Pull complete: 2 downloaded, 1 conflicts, 1 failed",
+        "",
+        "\x1b[33mConflicts (both local and remote changed):\x1b[0m",
+        "  \x1b[33m•\x1b[0m projects\\demo\\c.jsonl",
+        "",
+        "\x1b[2mLocal versions kept. Remote saved as .conflict files.\x1b[0m",
+        "\x1b[2mRun '\x1b[36mclaude-sync conflicts\x1b[0m\x1b[2m' to review and resolve.\x1b[0m",
+        "",
+        "\x1b[33mErrors:\x1b[0m",
+        "  \x1b[33m•\x1b[0m projects\\demo\\d.jsonl: timeout",
+        "",
+    ]
+)
+
+_PUSH_WITH_AN_ERROR = "\n".join(
+    [
+        "\r\x1b[36m↑\x1b[0m \x1b[2m[1/1]\x1b[0m projects\\demo\\a.jsonl (1.2 KB)          ",
+        "\r\x1b[33m✗\x1b[0m [1/1] projects\\demo\\old.jsonl (deleted)          ",
+        "\r\x1b[33m✗\x1b[0m projects\\demo\\b.jsonl: timeout",
+        "",
+        _green("✓")
+        + " Push complete: \x1b[32m1 uploaded\x1b[0m, \x1b[33m1 deleted\x1b[0m, \x1b[33m1 failed\x1b[0m",
+        "",
+        "\x1b[33mErrors:\x1b[0m",
+        "  \x1b[33m•\x1b[0m projects\\demo\\b.jsonl: timeout",
+        "",
+    ]
+)
+
+_CONFLICTS_LISTED = (
+    "\x1b[33mFound 1 conflict(s):\x1b[0m\n\n"
+    "  \x1b[36m1.\x1b[0m projects\\demo\\a.jsonl\n"
+    "     \x1b[2mConflict from: 20260208-095132\x1b[0m\n\n"
 )
 
 
@@ -324,39 +396,109 @@ def test_claude_sync_list_conflicts_changes_nothing(temp_home: pathlib.Path) -> 
         )
 
     assert "a.jsonl" in result.stdout
+    # What it prints is what the parser reads, so this is checked against the
+    # real claude-sync.
+    assert _conflicts_remain(result.stdout)
     assert local_path.read_text(encoding="utf-8") == "local"
     assert conflict_path.read_text(encoding="utf-8") == "remote"
 
 
-def test_had_errors() -> None:
-    """Both a pull and a push print what failed, and still exit successfully."""
-    assert not _had_errors("Pull complete: 2 downloaded")
-    assert _had_errors("Pull complete: 1 failed\n\nErrors:\n  a.jsonl: timeout")
-    assert _had_errors("Push complete: 1 failed\n\nErrors:\n  b.jsonl: timeout")
+def test_claude_sync_list_conflicts_when_there_are_none(
+    temp_home: pathlib.Path,
+) -> None:
+    (temp_home / ".claude").mkdir()
 
-
-def test_pull_finished() -> None:
-    # Every pull that runs to its end rebuilds the history, with nothing else
-    # printed when there was nothing to download.
-    assert _pull_finished(
-        "\n".join(
-            [
-                "Fetching remote file list...",
-                "  Rebuilt history.jsonl: 5 entries (5 existing + 0 recovered)",
-            ]
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        result = cs.list_conflicts(
+            command_params=CommandParams(in_stream=False, hide=True)
         )
-    )
-    # A pull that was stopped, or did nothing, printed none of it.
-    assert not _pull_finished("  Aborted.")
-    assert not _pull_finished("Pull complete: 2 downloaded")
-    assert not _pull_finished("")
+
+    assert not _conflicts_remain(result.stdout)
 
 
-def test_conflicts_remain() -> None:
-    assert not _conflicts_remain("No conflicts found")
-    assert _conflicts_remain("Found 1 conflict(s):")
-    # What is not recognized is not taken to be none.
-    assert _conflicts_remain("something else")
+@pytest.mark.parametrize(
+    ("output", "errors", "finished"),
+    [
+        (_REBUILT, False, True),
+        (_green("✓") + " Already up to date\n\n" + _REBUILT, False, True),
+        (_PULL_WITH_A_CONFLICT_AND_AN_ERROR + _REBUILT, True, True),
+        (_garbled(_PULL_WITH_A_CONFLICT_AND_AN_ERROR + _REBUILT), True, True),
+        # A pull that downloaded, but did not go on to rebuild the history.
+        (_green("✓") + " Pull complete: 2 downloaded\n", False, False),
+        ("", False, False),
+    ],
+    ids=[
+        "nothing to download",
+        "up to date",
+        "conflict and error",
+        "conflict and error, decoded as cp1252",
+        "stopped",
+        "empty",
+    ],
+)
+def test_pull_output_is_understood(output: str, errors: bool, finished: bool) -> None:
+    """A pull is understood from what it prints, as it exits successfully either way."""
+    assert _had_errors(command="pull", output=output) is errors
+    assert _pull_finished(output) is finished
+
+
+@pytest.mark.parametrize(
+    ("output", "errors"),
+    [
+        ("\r" + _green("✓") + " No changes to push\n\n", False),
+        ("", False),
+        (_PUSH_WITH_AN_ERROR, True),
+        (_garbled(_PUSH_WITH_AN_ERROR), True),
+    ],
+    ids=[
+        "no changes",
+        "nothing printed",
+        "uploads, a delete and an error",
+        "uploads, a delete and an error, decoded as cp1252",
+    ],
+)
+def test_push_output_is_understood(output: str, errors: bool) -> None:
+    assert _had_errors(command="push", output=output) is errors
+
+
+@pytest.mark.parametrize(
+    ("output", "remain"),
+    [
+        (_green("✓") + " No conflicts found\n", False),
+        (_CONFLICTS_LISTED, True),
+        (_garbled(_green("✓") + " No conflicts found\n"), False),
+    ],
+    ids=["none", "some", "none, decoded as cp1252"],
+)
+def test_conflicts_output_is_understood(output: str, remain: bool) -> None:
+    assert _conflicts_remain(output) is remain
+
+
+@pytest.mark.parametrize(
+    ("understand", "output"),
+    [
+        # A summary, an errors heading, and a statement of how many conflicts
+        # that are worded differently, as a new version of claude-sync might.
+        (
+            _pull_finished,
+            _REBUILT + _green("✓") + " Pull finished: 2 downloaded\n",
+        ),
+        (
+            _push_had_errors,
+            _PUSH_WITH_AN_ERROR.replace("Errors:", "Problems:"),
+        ),
+        (_conflicts_remain, "There are 1 conflict(s):\n"),
+    ],
+    ids=["pull summary", "push errors heading", "conflicts count"],
+)
+def test_output_that_has_changed_is_not_recognised(
+    understand: Callable[[str], object], output: str
+) -> None:
+    """A line that is not a form that was checked stops what is being done."""
+    with pytest.raises(ValueError, match="not recognised"):
+        _ = understand(output)
 
 
 def test_is_first_pull(claude_sync_files_dir: pathlib.Path) -> None:
@@ -391,19 +533,45 @@ def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(
 
 
 @pytest.mark.parametrize(
-    ("pull_output", "calls"),
+    ("pull_output", "push_output", "calls", "error"),
     [
-        ("Rebuilt history.jsonl: 3 entries", ["pull", "after_pull", "push"]),
-        ("Errors:\n  a.jsonl: failed", ["pull"]),
-        ("Pull stopped", ["pull"]),
+        (_REBUILT, "", ["pull", "after_pull", "push"], None),
+        (
+            _PULL_WITH_A_CONFLICT_AND_AN_ERROR + _REBUILT,
+            "",
+            ["pull"],
+            "pull had errors",
+        ),
+        (
+            _green("✓") + " Pull complete: 1 downloaded\n",
+            "",
+            ["pull"],
+            "did not finish",
+        ),
+        ("Pull stopped\n", "", ["pull"], "not recognised"),
+        # The push is not undone, so what it changed has been pushed by then.
+        (
+            _REBUILT,
+            _PUSH_WITH_AN_ERROR,
+            ["pull", "after_pull", "push"],
+            "push had errors",
+        ),
     ],
-    ids=["finished", "errors", "not finished"],
+    ids=[
+        "finished",
+        "pull errors",
+        "not finished",
+        "not recognised",
+        "push errors",
+    ],
 )
 def test_claude_sync_sync_calls_after_pull_before_the_push(
     temp_home: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
     pull_output: str,
+    push_output: str,
     calls: list[str],
+    error: str | None,
 ) -> None:
     """What it changes is pushed, and it is not run for a pull that failed."""
     _ = temp_home
@@ -417,7 +585,7 @@ def test_claude_sync_sync_calls_after_pull_before_the_push(
     def fake_push(**kwargs: object) -> Result:
         _ = kwargs
         made.append("push")
-        return Result(stdout="Pushed")
+        return Result(stdout=push_output)
 
     def fake_conflicts_remain(**kwargs: object) -> bool:
         _ = kwargs
@@ -431,14 +599,11 @@ def test_claude_sync_sync_calls_after_pull_before_the_push(
         monkeypatch.setattr(cs, "push", fake_push)
         monkeypatch.setattr(cs, "_conflicts_remain", fake_conflicts_remain)
 
-        try:
+        with pytest.raises(ValueError, match=error) if error else nullcontext():
             cs.sync(
                 command_params=CommandParams(in_stream=False),
                 unattended=True,
                 after_pull=lambda: made.append("after_pull"),
             )
-        except ValueError:
-            # A pull that failed stops the sync, which is what is tested.
-            pass
 
     assert made == calls

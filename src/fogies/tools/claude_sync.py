@@ -20,7 +20,9 @@ other way makes them differ from it.
 
 import dataclasses
 import json
+import locale
 import pathlib
+import re
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Literal
@@ -51,12 +53,119 @@ _YAML_FILE_NAME = "config.yaml"
 _KEY_FILE_NAME = "age-key.txt"
 
 
-def _had_errors(output: str) -> bool:
+# What claude-sync prints, which is all that is known of how a command went:
+# a pull or a push that has failures exits successfully, and only prints them.
+# So what is read from the output is only trusted if every line of it is one of
+# the forms below, as claude-sync prints them (without colours). A line that is
+# not one means its output has changed from what was checked, which stops what
+# is being done instead of being missed. These are as of _KNOWN_VERSIONS[0], from
+# cmd/claude-sync/main.go in its source, so check them when changing that.
+#
+# A path, or the message of an error, in a line is matched as any text.
+
+
+def _symbol(symbol: str) -> str:
+    """Return the pattern of a symbol that begins a line, and the space after it.
+
+    claude-sync prints it as UTF-8, which reaches here decoded as the locale
+    decodes bytes (e.g., cp1252 on Windows, unless it is UTF-8), so it is also
+    matched as that.
+    """
+    variants = {symbol}
+    for encoding in {"cp1252", locale.getpreferredencoding(False)}:
+        variants.add(symbol.encode("utf-8").decode(encoding, errors="replace"))
+    return "(?:{}) ".format("|".join(re.escape(v) for v in sorted(variants)))
+
+
+_DONE = _symbol("✓")
+_FAILED = _symbol("✗")
+_SCANNING = _symbol("⋯")
+_UPLOADING = _symbol("↑")
+_DOWNLOADING = _symbol("↓")
+_CONFLICT = _symbol("⚠")
+_BULLET = _symbol("•")
+
+
+def _forms(*patterns: str) -> list[re.Pattern[str]]:
+    return [re.compile(pattern) for pattern in patterns]
+
+
+def _summary(*names: str) -> str:
+    """Return the pattern of the counts in the summary of a pull or a push."""
+    count = r"\d+ (?:{})".format("|".join(names))
+    return r"{}(?:, {})*".format(count, count)
+
+
+# Printed by both a pull and a push.
+_PROGRESS_FORMS = _forms(
+    # A path being scanned.
+    _SCANNING + r".+",
+    # A path that failed, and why.
+    _FAILED + r".+: .+",
+    # An error, or a conflict, in a list.
+    _BULLET + r".+",
+    r"Errors:",
+)
+
+_PUSH_FORMS = _PROGRESS_FORMS + _forms(
+    _UPLOADING + r"\[\d+/\d+\] .+ \(.+\)",
+    _FAILED + r"\[\d+/\d+\] .+ \(deleted\)",
+    _DONE + r"No changes to push",
+    _DONE + r"Push complete: " + _summary("uploaded", "deleted", "failed"),
+)
+
+_PULL_FORMS = _PROGRESS_FORMS + _forms(
+    _DOWNLOADING + r"\[\d+/\d+\] .+ \(.+\)",
+    _CONFLICT + r"Conflict: .+ \(saved as \.conflict\)",
+    _DONE + r"Already up to date",
+    _DONE + r"Pull complete: " + _summary("downloaded", "conflicts", "failed"),
+    r"Conflicts \(both local and remote changed\):",
+    r"Local versions kept\. Remote saved as \.conflict files\.",
+    r"Run 'claude-sync conflicts' to review and resolve\.",
+    r"Rebuilt history\.jsonl: \d+ entries \(\d+ existing \+ \d+ recovered from sessions\)",
+)
+
+_CONFLICTS_NONE = re.compile(_DONE + r"No conflicts found")
+_CONFLICTS_FORMS = [
+    _CONFLICTS_NONE,
+    *_forms(
+        r"Found \d+ conflict\(s\):",
+        r"\d+\. .+",
+        r"Conflict from: .+",
+    ),
+]
+
+_COLOURS = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _lines(*, command: str, output: str, forms: list[re.Pattern[str]]) -> list[str]:
+    """Return the lines of the output of a claude-sync command, without colours.
+
+    Progress is printed over itself with carriage returns, so those separate
+    lines too. Raises ValueError if a line is not one of forms.
+    """
+    lines = [
+        line.strip()
+        for line in _COLOURS.sub("", output).replace("\r", "\n").split("\n")
+        if line.strip()
+    ]
+    for line in lines:
+        if not any(form.fullmatch(line) for form in forms):
+            raise ValueError(
+                "claude-sync's {} printed '{}', which is not recognised, so how it went is not known. Its output may have changed from what was checked.".format(
+                    command, line
+                )
+            )
+    return lines
+
+
+def _had_errors(*, command: Literal["pull", "push"], output: str) -> bool:
     """Return whether the output of a pull or a push says that some files failed.
 
-    claude-sync exits successfully even then, and only prints them.
+    Raises ValueError if the output is not recognised.
     """
-    return "Errors:" in output
+    forms = _PULL_FORMS if command == "pull" else _PUSH_FORMS
+    return "Errors:" in _lines(command=command, output=output, forms=forms)
 
 
 def _pull_finished(output: str) -> bool:
@@ -66,19 +175,29 @@ def _pull_finished(output: str) -> bool:
     aborted), exits successfully too. What every pull that runs to its end
     prints, as it is always asked to rebuild the history, is that it did. The
     messages for a pull with nothing to download, or one that is up to date,
-    are not printed in every case, so are not relied on.
+    are not printed in every case, so are not relied on. Raises ValueError if
+    the output is not recognised.
     """
-    return "Rebuilt history.jsonl" in output
+    return any(
+        line.startswith("Rebuilt history.jsonl")
+        for line in _lines(command="pull", output=output, forms=_PULL_FORMS)
+    )
 
 
 def _conflicts_remain(output: str) -> bool:
-    """Return whether the output of listing conflicts is not that there are none.
+    """Return whether the output of listing conflicts says that there are some.
 
-    Anything else, including wording that is not recognized, counts as there
-    being some, so that a change in what claude-sync prints stops a push rather
-    than allowing one.
+    Raises ValueError if the output is not recognised, or says neither that
+    there are none nor how many there are.
     """
-    return "No conflicts found" not in output
+    lines = _lines(command="conflicts", output=output, forms=_CONFLICTS_FORMS)
+    if any(_CONFLICTS_NONE.fullmatch(line) for line in lines):
+        return False
+    if any(line.startswith("Found ") for line in lines):
+        return True
+    raise ValueError(
+        "claude-sync's conflicts printed neither that there are none nor how many there are, so whether there are any is not known."
+    )
 
 
 def claude_directory() -> pathlib.Path:
@@ -386,7 +505,7 @@ class _ClaudeSync:
             raise ValueError("Not syncing, because conflicts are unresolved.")
 
         pull_result = self.pull(command_params=command_params)
-        if _had_errors(pull_result.stdout):
+        if _had_errors(command="pull", output=pull_result.stdout):
             raise ValueError("Not pushing, because the pull had errors.")
         if not _pull_finished(pull_result.stdout):
             raise ValueError("Not pushing, because the pull did not finish.")
@@ -404,7 +523,7 @@ class _ClaudeSync:
             after_pull()
 
         push_result = self.push(command_params=command_params)
-        if _had_errors(push_result.stdout):
+        if _had_errors(command="push", output=push_result.stdout):
             raise ValueError("The push had errors, so some files were not uploaded.")
 
 
