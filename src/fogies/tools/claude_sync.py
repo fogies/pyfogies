@@ -19,6 +19,7 @@ other way makes them differ from it.
 """
 
 import dataclasses
+import hashlib
 import json
 import locale
 import pathlib
@@ -237,6 +238,138 @@ def is_first_pull() -> bool:
     except OSError, ValidationError:
         return True
     return not state.files
+
+
+class _RecordedFile(BaseModel):
+    """What claude-sync records of a file it synced, of which only the hash matters."""
+
+    hash: str
+
+
+class _RecordedFiles(BaseModel):
+    """What claude-sync records of the files it synced, by path in the Claude directory."""
+
+    files: dict[str, _RecordedFile] = {}
+
+
+# claude-sync saves the remote version of a conflict beside the local file, as
+# its name followed by this and when.
+_CONFLICT_NAME = re.compile(r"(?P<original>.+)\.conflict\.\d{8}-\d{6}")
+
+
+def _hash_file(path: pathlib.Path) -> str | None:
+    """Return the hash that claude-sync records for the file at path, or None."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+@dataclasses.dataclass(frozen=True)
+class _Conflict:
+    """A conflict that claude-sync saved the remote version of, beside the local file."""
+
+    # The remote version, and the local file, which may not exist.
+    conflict_path: pathlib.Path
+    original_path: pathlib.Path
+    remote_hash: str
+    local_hash: str | None
+
+
+def _conflicts() -> list[_Conflict]:
+    """Return the conflicts that claude-sync has left, as it finds them."""
+    found: list[_Conflict] = []
+    for path in sorted(claude_directory().rglob("*.conflict.*")):
+        match = _CONFLICT_NAME.fullmatch(path.name)
+        remote_hash = _hash_file(path) if match and path.is_file() else None
+        if match is None or remote_hash is None:
+            continue
+        original_path = path.with_name(match["original"])
+        found.append(
+            _Conflict(
+                conflict_path=path,
+                original_path=original_path,
+                remote_hash=remote_hash,
+                local_hash=_hash_file(original_path),
+            )
+        )
+    return found
+
+
+def _relative_path(path: pathlib.Path) -> str:
+    return path.relative_to(claude_directory()).as_posix()
+
+
+def _clear_conflicts_with_own_uploads() -> list[pathlib.Path]:
+    """Delete the conflicts that are only this machine's own earlier upload.
+
+    A pull decides that the remote changed when its object is dated after the
+    upload that claude-sync recorded, but the first is the storage's clock, to
+    the second, and the other is this machine's. So if this machine's is behind,
+    even by a fraction of a second, a file that it uploaded and has changed since
+    looks changed on both sides. Then the remote version is the same as what
+    claude-sync recorded having uploaded. See
+    <https://github.com/tawanorg/claude-sync/issues/99>.
+
+    Those are deleted, and nothing else is, including claude-sync's record. So
+    the local file differs from the record, and the next push uploads it, which
+    is not so if claude-sync keeps it (see _warn_if_kept_local). Returns the
+    local files that were kept.
+    """
+    try:
+        recorded = _RecordedFiles.model_validate_json(
+            (claude_sync_files_directory() / "state.json").read_text(encoding="utf-8")
+        )
+    except OSError, ValidationError:
+        return []
+
+    kept: list[pathlib.Path] = []
+    for conflict in _conflicts():
+        entry = recorded.files.get(_relative_path(conflict.original_path))
+        if entry is None or entry.hash != conflict.remote_hash:
+            continue
+        try:
+            conflict.conflict_path.unlink()
+        except OSError:
+            continue
+        kept.append(conflict.original_path)
+    return kept
+
+
+def _keep_local_of_own_uploads() -> None:
+    """Clear the conflicts that are only this machine's own earlier upload, and say so."""
+    for path in _clear_conflicts_with_own_uploads():
+        print(
+            "Kept the local {}, as claude-sync's conflict with it was only this machine's own earlier upload.".format(
+                _relative_path(path)
+            )
+        )
+
+
+def _warn_if_kept_local(before: list[_Conflict]) -> None:
+    """Warn about the conflicts that were resolved by keeping the local file.
+
+    claude-sync then records the local file as uploaded, though it has not been,
+    and a push only uploads a file that differs from what is recorded. So the
+    bucket, and other machines, keep the remote version until the file next
+    changes here. before is the conflicts from before they were resolved.
+    """
+    kept = [
+        conflict
+        for conflict in before
+        if not conflict.conflict_path.exists()
+        and conflict.local_hash is not None
+        and conflict.local_hash != conflict.remote_hash
+        and _hash_file(conflict.original_path) == conflict.local_hash
+    ]
+    if kept:
+        print(
+            "Kept the local version of {} file(s). claude-sync will not upload them until each next changes here, so other machines keep the remote version until then:".format(
+                len(kept)
+            )
+        )
+        for conflict in kept:
+            print("  {}".format(_relative_path(conflict.original_path)))
 
 
 class ClaudeSyncConfig(BaseModel):
@@ -488,7 +621,8 @@ class _ClaudeSync:
         pulling replaces other machines' changes, and pushing with conflicts
         unresolved replaces the bucket's version with this machine's. So the
         history is rebuilt after the pull, and conflicts are resolved
-        interactively.
+        interactively. Except those that are only this machine's own earlier
+        upload, which are not conflicts, and are cleared, unattended or not.
 
         *after_pull* is called once the pull, and any conflicts, are done, and
         before the push, so that what it changes (e.g., files it deletes because
@@ -508,6 +642,8 @@ class _ClaudeSync:
             raise ValueError("The first sync on this machine has to be attended.")
 
         hidden = dataclasses.replace(command_params, hide=True)
+        # Those left from before, which the pull below may leave again.
+        _keep_local_of_own_uploads()
         if unattended and self._conflicts_remain(command_params=hidden):
             raise ValueError("Not syncing, because conflicts are unresolved.")
 
@@ -517,11 +653,14 @@ class _ClaudeSync:
         if not _pull_finished(pull_result.stdout):
             raise ValueError("Not pushing, because the pull did not finish.")
 
+        _keep_local_of_own_uploads()
         if unattended:
             if self._conflicts_remain(command_params=hidden):
                 raise ValueError("Not pushing, because the pull had conflicts.")
         elif self._conflicts_remain(command_params=command_params):
+            before = _conflicts()
             _ = self.resolve_conflicts(command_params=command_params)
+            _warn_if_kept_local(before)
             # What was resolved was already shown, so only what is left is.
             if self._conflicts_remain(command_params=hidden):
                 raise ValueError("Not pushing, because conflicts are unresolved.")

@@ -1,5 +1,7 @@
 """Test claude-sync is available, and is configured from the config."""
 
+import hashlib
+import json
 import pathlib
 import subprocess
 from collections.abc import Callable
@@ -17,11 +19,18 @@ from fogies.tools.claude_sync import (
     _YAML_FILE_NAME,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
+    _clear_conflicts_with_own_uploads,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync import _conflicts  # pyright: ignore[reportPrivateUsage]
+from fogies.tools.claude_sync import (
     _conflicts_remain,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import _had_errors  # pyright: ignore[reportPrivateUsage]
 from fogies.tools.claude_sync import (
     _pull_finished,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync import (
+    _warn_if_kept_local,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
     claude_directory,
@@ -589,3 +598,142 @@ def test_claude_sync_sync_calls_after_pull_before_the_push(
             )
 
     assert made == calls
+
+
+_UPLOADED = b"What this machine uploaded."
+_GROWN = b"What this machine uploaded. And what it has added since."
+
+
+def _write_conflict(*, remote: bytes) -> tuple[pathlib.Path, pathlib.Path]:
+    """Write a session that has grown, and the remote version saved beside it."""
+    project = claude_directory() / "projects" / "demo"
+    project.mkdir(parents=True)
+    local = project / "a.jsonl"
+    conflict = project / "a.jsonl.conflict.20261113-080344"
+    _ = local.write_bytes(_GROWN)
+    _ = conflict.write_bytes(remote)
+    return local, conflict
+
+
+def _record_upload(name: str, content: bytes) -> pathlib.Path:
+    """Write claude-sync's record of having uploaded a file with this content."""
+    directory = claude_sync_files_directory()
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "state.json"
+    _ = path.write_text(
+        json.dumps({"files": {name: {"hash": hashlib.sha256(content).hexdigest()}}}),
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    ("recorded", "cleared"),
+    [
+        # The remote version is what this machine uploaded.
+        (("projects/demo/a.jsonl", _UPLOADED), True),
+        # Someone else changed it, or it is not known what was uploaded.
+        (("projects/demo/a.jsonl", b"Something else."), False),
+        (("projects/demo/other.jsonl", _UPLOADED), False),
+        (None, False),
+    ],
+    ids=["own upload", "changed by another", "not recorded", "no record"],
+)
+def test_clear_conflicts_with_own_uploads(
+    temp_home: pathlib.Path,
+    recorded: tuple[str, bytes] | None,
+    cleared: bool,
+) -> None:
+    """Only a conflict that is this machine's own upload goes, and nothing else."""
+    _ = temp_home
+    local, conflict = _write_conflict(remote=_UPLOADED)
+    state = _record_upload(*recorded) if recorded else None
+    state_before = state.read_bytes() if state else None
+
+    assert _clear_conflicts_with_own_uploads() == ([local] if cleared else [])
+
+    assert conflict.exists() is not cleared
+    assert local.read_bytes() == _GROWN
+    # claude-sync's record is left, so that the push uploads the local version.
+    assert (state.read_bytes() if state else None) == state_before
+
+
+def _keep_local(local: pathlib.Path, conflict: pathlib.Path) -> None:
+    """Resolve a conflict as claude-sync's resolver does when it keeps the local file."""
+    _ = local
+    conflict.unlink()
+
+
+def _keep_remote(local: pathlib.Path, conflict: pathlib.Path) -> None:
+    """Resolve a conflict as claude-sync's resolver does when it keeps the remote file."""
+    _ = conflict.replace(local)
+
+
+def _skip(local: pathlib.Path, conflict: pathlib.Path) -> None:
+    """Resolve a conflict as claude-sync's resolver does when it skips it, which is not."""
+    _ = (local, conflict)
+
+
+@pytest.mark.parametrize(
+    ("resolve", "warns"),
+    [(_keep_local, True), (_keep_remote, False), (_skip, False)],
+    ids=["kept local", "kept remote", "skipped"],
+)
+def test_warn_if_kept_local(
+    temp_home: pathlib.Path,
+    capsys: pytest.CaptureFixture[str],
+    resolve: Callable[[pathlib.Path, pathlib.Path], None],
+    warns: bool,
+) -> None:
+    """Keeping the local version is warned about, as claude-sync will not upload it."""
+    _ = temp_home
+    local, conflict = _write_conflict(remote=b"What another machine uploaded.")
+    before = _conflicts()
+
+    resolve(local, conflict)
+    _warn_if_kept_local(before)
+
+    out = capsys.readouterr().out
+    assert ("projects/demo/a.jsonl" in out) is warns
+
+
+def test_claude_sync_sync_clears_a_conflict_with_its_own_upload(
+    temp_home: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unattended sync goes on through a conflict that is only its own upload."""
+    _ = temp_home
+    _ = _write_conflict(remote=_UPLOADED)
+    _ = _record_upload("projects/demo/a.jsonl", _UPLOADED)
+    made: list[str] = []
+
+    def fake_pull(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("pull")
+        return Result(stdout=_REBUILT)
+
+    def fake_push(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("push")
+        return Result(stdout="")
+
+    def fake_conflicts_remain(**kwargs: object) -> bool:
+        _ = kwargs
+        return bool(_conflicts())
+
+    monkeypatch.setattr("fogies.tools.claude_sync.is_first_pull", lambda: False)
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        monkeypatch.setattr(cs, "pull", fake_pull)
+        monkeypatch.setattr(cs, "push", fake_push)
+        monkeypatch.setattr(cs, "_conflicts_remain", fake_conflicts_remain)
+
+        cs.sync(
+            command_params=CommandParams(in_stream=False),
+            unattended=True,
+            after_pull=lambda: made.append("after_pull"),
+        )
+
+    assert made == ["pull", "after_pull", "push"]
+    assert not _conflicts()
