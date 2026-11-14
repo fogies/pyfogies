@@ -59,7 +59,9 @@ _KEY_FILE_NAME = "age-key.txt"
 # the forms below, as claude-sync prints them (without colours). A line that is
 # not one means its output has changed from what was checked, which stops what
 # is being done instead of being missed. These are as of _KNOWN_VERSIONS[0], from
-# cmd/claude-sync/main.go in its source, so check them when changing that.
+# everything its source prints in these commands (cmd/claude-sync/main.go, and
+# the log() in internal/sync/sync.go, which is not in the commands themselves),
+# so check them when changing that.
 #
 # A path, or the message of an error, in a line is matched as any text.
 
@@ -112,11 +114,16 @@ _PUSH_FORMS = _PROGRESS_FORMS + _forms(
     _FAILED + r"\[\d+/\d+\] .+ \(deleted\)",
     _DONE + r"No changes to push",
     _DONE + r"Push complete: " + _summary("uploaded", "deleted", "failed"),
+    # A warning that it goes on from, which is not a file that failed.
+    r"Warning: failed to upload manifest: .+",
 )
 
 _PULL_FORMS = _PROGRESS_FORMS + _forms(
     _DOWNLOADING + r"\[\d+/\d+\] .+ \(.+\)",
     _CONFLICT + r"Conflict: .+ \(saved as \.conflict\)",
+    r"Conflict detected: .+ \(keeping local, saving remote as \.conflict\)",
+    # A warning that it goes on from, which is not a file that failed.
+    r"Warning: failed to restore mtime for .+: .+",
     _DONE + r"Already up to date",
     _DONE + r"Pull complete: " + _summary("downloaded", "conflicts", "failed"),
     r"Conflicts \(both local and remote changed\):",

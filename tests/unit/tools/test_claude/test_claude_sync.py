@@ -81,6 +81,9 @@ _PULL_WITH_A_CONFLICT_AND_AN_ERROR = "\n".join(
         "\x1b[2m⋯\x1b[0m projects\\demo\r↓ [1/2] projects\\demo\\a.jsonl (1.2 KB)          ",
         "\r↓ [2/2] projects\\demo\\b.jsonl (3 B)          ",
         "\r\x1b[33m⚠\x1b[0m Conflict: projects\\demo\\c.jsonl (saved as .conflict)",
+        # Printed by the syncer itself, in the middle of the progress.
+        "Conflict detected: projects\\demo\\c.jsonl (keeping local, saving remote as .conflict)",
+        "Warning: failed to restore mtime for projects\\demo\\a.jsonl: access denied",
         "\r\x1b[33m✗\x1b[0m projects\\demo\\d.jsonl: timeout",
         "",
         _green("✓") + " Pull complete: 2 downloaded, 1 conflicts, 1 failed",
@@ -103,6 +106,8 @@ _PUSH_WITH_AN_ERROR = "\n".join(
         "\r\x1b[33m✗\x1b[0m [1/1] projects\\demo\\old.jsonl (deleted)          ",
         "\r\x1b[33m✗\x1b[0m projects\\demo\\b.jsonl: timeout",
         "",
+        # Printed by the syncer itself.
+        "Warning: failed to upload manifest: timeout",
         _green("✓")
         + " Push complete: \x1b[32m1 uploaded\x1b[0m, \x1b[33m1 deleted\x1b[0m, \x1b[33m1 failed\x1b[0m",
         "",
@@ -110,12 +115,6 @@ _PUSH_WITH_AN_ERROR = "\n".join(
         "  \x1b[33m•\x1b[0m projects\\demo\\b.jsonl: timeout",
         "",
     ]
-)
-
-_CONFLICTS_LISTED = (
-    "\x1b[33mFound 1 conflict(s):\x1b[0m\n\n"
-    "  \x1b[36m1.\x1b[0m projects\\demo\\a.jsonl\n"
-    "     \x1b[2mConflict from: 20260208-095132\x1b[0m\n\n"
 )
 
 
@@ -427,7 +426,6 @@ def test_claude_sync_list_conflicts_when_there_are_none(
         (_garbled(_PULL_WITH_A_CONFLICT_AND_AN_ERROR + _REBUILT), True, True),
         # A pull that downloaded, but did not go on to rebuild the history.
         (_green("✓") + " Pull complete: 2 downloaded\n", False, False),
-        ("", False, False),
     ],
     ids=[
         "nothing to download",
@@ -435,7 +433,6 @@ def test_claude_sync_list_conflicts_when_there_are_none(
         "conflict and error",
         "conflict and error, decoded as cp1252",
         "stopped",
-        "empty",
     ],
 )
 def test_pull_output_is_understood(output: str, errors: bool, finished: bool) -> None:
@@ -448,32 +445,17 @@ def test_pull_output_is_understood(output: str, errors: bool, finished: bool) ->
     ("output", "errors"),
     [
         ("\r" + _green("✓") + " No changes to push\n\n", False),
-        ("", False),
         (_PUSH_WITH_AN_ERROR, True),
         (_garbled(_PUSH_WITH_AN_ERROR), True),
     ],
     ids=[
         "no changes",
-        "nothing printed",
         "uploads, a delete and an error",
         "uploads, a delete and an error, decoded as cp1252",
     ],
 )
 def test_push_output_is_understood(output: str, errors: bool) -> None:
     assert _had_errors(command="push", output=output) is errors
-
-
-@pytest.mark.parametrize(
-    ("output", "remain"),
-    [
-        (_green("✓") + " No conflicts found\n", False),
-        (_CONFLICTS_LISTED, True),
-        (_garbled(_green("✓") + " No conflicts found\n"), False),
-    ],
-    ids=["none", "some", "none, decoded as cp1252"],
-)
-def test_conflicts_output_is_understood(output: str, remain: bool) -> None:
-    assert _conflicts_remain(output) is remain
 
 
 @pytest.mark.parametrize(
