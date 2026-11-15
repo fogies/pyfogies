@@ -1,7 +1,9 @@
 """Test running a task in a new terminal."""
 
 import json
+import pathlib
 import platform
+import shlex
 import subprocess
 import sys
 
@@ -43,6 +45,49 @@ def test_spawn_new_terminal_spawns_once(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(sys, "argv", ["invoke.exe", "other"])
     assert spawn_new_terminal(context) is False
     assert len(spawned) == 2
+
+
+def test_macos_command_file_quotes_for_the_shell(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What the shell would otherwise expand, in a directory or an argument, is not.
+
+    The file is only text, so what the shell reads from it is checked here by
+    splitting it as a shell does, rather than by running it on a Mac.
+    """
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    awkward = ["a b", "$HOME", "`x`", 'say "hi"', "back\\slash", "it's"]
+    monkeypatch.setattr(sys, "argv", ["invoke.exe", "claude-sync.sync", *awkward])
+    directory = tmp_path / "a $HOME `x`"
+    directory.mkdir()
+    monkeypatch.chdir(directory)
+    opened: list[str] = []
+
+    def run(command: str, *, disown: bool) -> None:
+        _ = disown
+        opened.append(command)
+
+    context = Context()
+    monkeypatch.setattr(context, "run", run)
+
+    assert spawn_new_terminal(context) is False
+
+    path_command = directory / "INVOKE_SPAWN_NEW_TERMINAL.command"
+    lines = path_command.read_text(encoding="utf-8").splitlines()
+    commands = [shlex.split(line) for line in lines if line and line[0] != "#"]
+    assert ["cd", str(directory)] in commands
+    assert ["rm", "-f", str(path_command)] in commands
+    # The command that runs last is the one that was run here.
+    assert commands[-1] == [
+        sys.executable,
+        "-m",
+        "invoke",
+        "claude-sync.sync",
+        *awkward,
+    ]
+    assert [shlex.split(command) for command in opened] == [
+        ["open", "-a", "Terminal", str(path_command)]
+    ]
 
 
 @pytest.mark.skipif(

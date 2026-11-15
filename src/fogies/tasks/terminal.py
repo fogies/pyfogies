@@ -122,7 +122,7 @@ def spawn_new_terminal(context: Context) -> bool:
             _export(_NEW_TERMINAL_VARIABLE, flag),
             "",
             "# Restore the working directory",
-            'cd "{}"'.format(path_cwd),
+            "cd {}".format(shlex.quote(str(path_cwd))),
             "",
             "# Restore environment variables that configure the virtual environment",
         ]
@@ -133,10 +133,10 @@ def spawn_new_terminal(context: Context) -> bool:
         lines += [
             "",
             "# Delete this command file",
-            'rm -f "{}"'.format(path_command),
+            "rm -f {}".format(shlex.quote(str(path_command))),
             "",
             "# Finally, run the command in the new terminal",
-            " ".join('"{}"'.format(argument) for argument in command_line),
+            shlex.join(command_line),
         ]
         _ = path_command.write_text(
             "".join(line + "\n" for line in lines), encoding="utf-8"
@@ -144,7 +144,7 @@ def spawn_new_terminal(context: Context) -> bool:
         path_command.chmod(path_command.stat().st_mode | stat.S_IXUSR)
 
         _ = context.run(
-            command='open -a Terminal "{}"'.format(path_command),
+            command="open -a Terminal {}".format(shlex.quote(str(path_command))),
             disown=True,
         )
     else:
