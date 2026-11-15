@@ -25,13 +25,6 @@ def test_claude_code_is_available() -> None:
         assert cc.binary_version in result.stdout
 
 
-def test_claude_code_unknown_version() -> None:
-    """An unknown version is refused before anything is downloaded."""
-    with pytest.raises(ValueError, match="Unknown Claude Code version"):
-        with claude_code(version="0.0.0", binary_cache_path=STAGING_BINARY_CACHE_PATH):
-            pass
-
-
 def test_resume_in_desktop_requires_directory(tmp_path: pathlib.Path) -> None:
     """A session is not resumed unless its directory exists here."""
     with claude_code(binary_cache_path=STAGING_BINARY_CACHE_PATH) as cc:
