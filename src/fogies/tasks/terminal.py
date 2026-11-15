@@ -3,6 +3,7 @@
 import os
 import pathlib
 import platform
+import re
 import shlex
 import stat
 import sys
@@ -47,23 +48,33 @@ def _cmd_quote(argument: str) -> str:
     """Return argument quoted for `cmd`, which otherwise reads & | < > and ^ in it.
 
     A % is still read by `cmd` as the start of an environment variable.
+
+    Backslashes before a quote, including the closing one, are doubled, because
+    the program reads a backslash and a quote as an escaped quote.
+
+    An argument with an odd number of quotes is still passed on wrongly, because
+    `cmd` counts every quote, escaped or not, to know what is protected.
     """
-    return '"{}"'.format(argument.replace('"', '\\"'))
+    escaped = re.sub(r'(\\*)"', lambda match: match[1] * 2 + '\\"', argument)
+    return '"{}"'.format(re.sub(r"(\\+)$", lambda match: match[1] * 2, escaped))
+
+
+def _windows_arguments(command_line: list[str]) -> str:
+    """Return what follows `cmd /k` or `cmd /c` to run command_line.
+
+    Those remove the first and last quote of what follows them when that starts
+    with a quote, so the whole is wrapped in a pair for them to remove, which
+    leaves each argument quoted, including a path to the interpreter that has
+    spaces in it. The `cmd` that runs this line first reads a quote as starting
+    or ending what is protected from & and |, so the pair is escaped with a
+    caret, for it to pass on without counting it.
+    """
+    return '^"{}^"'.format(" ".join(_cmd_quote(argument) for argument in command_line))
 
 
 def _windows_command(command_line: list[str]) -> str:
-    """Return the command that opens a new window running command_line.
-
-    The new `cmd /k` removes the first and last quote of what follows it when
-    that starts with a quote, so the whole is wrapped in a pair for it to
-    remove, which leaves each argument quoted, including a path to the
-    interpreter that has spaces in it. The `cmd` that runs this line first
-    reads a quote as starting or ending what is protected from & and |, so the
-    pair is escaped with a caret, for it to pass on without counting it.
-    """
-    return 'start cmd /k ^"{}^"'.format(
-        " ".join(_cmd_quote(argument) for argument in command_line)
-    )
+    """Return the command that opens a new window running command_line."""
+    return "start cmd /k {}".format(_windows_arguments(command_line))
 
 
 def _export(name: str, value: str) -> str:
