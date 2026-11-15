@@ -6,6 +6,7 @@ import pathlib
 import subprocess
 from collections.abc import Callable
 from contextlib import nullcontext
+from typing import Literal
 
 import pytest
 from invoke.runners import Result
@@ -352,10 +353,13 @@ def test_update_claude_sync_config_updates_what_a_redirect_points_to(
     assert redirect_path.read_text(encoding="utf-8") == redirect_text
 
 
+@pytest.mark.parametrize("keep", ["remote", "local"])
 def test_claude_sync_conflicts_keeps_the_chosen_version(
     temp_home: pathlib.Path,
+    capsys: pytest.CaptureFixture[str],
+    keep: Literal["local", "remote"],
 ) -> None:
-    """A conflict is resolved by keeping the remote version, which is saved beside it."""
+    """A conflict is resolved by keeping a version, and keeping local is warned of."""
     project_path = temp_home / ".claude" / "projects" / "demo"
     project_path.mkdir(parents=True)
     local_path = project_path / "a.jsonl"
@@ -367,11 +371,12 @@ def test_claude_sync_conflicts_keeps_the_chosen_version(
         binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
     ) as cs:
         _ = cs.resolve_conflicts(
-            command_params=CommandParams(in_stream=False, hide=True), keep="remote"
+            command_params=CommandParams(in_stream=False, hide=True), keep=keep
         )
 
-    assert local_path.read_text(encoding="utf-8") == "remote"
+    assert local_path.read_text(encoding="utf-8") == keep
     assert not conflict_path.exists()
+    assert ("projects/demo/a.jsonl" in capsys.readouterr().out) is (keep == "local")
 
 
 def test_claude_sync_list_conflicts_changes_nothing(temp_home: pathlib.Path) -> None:

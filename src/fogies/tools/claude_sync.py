@@ -544,15 +544,21 @@ class _ClaudeSync:
         By default they are resolved interactively, where showing differences
         runs a `diff` command, so one has to be on PATH. *keep* resolves all of
         them, keeping the local or the remote version.
+
+        Keeping a local version, either way, is warned about, because
+        claude-sync does not upload it (see _warn_if_kept_local).
         """
         resolve_args = ["conflicts"]
         if keep is not None:
             resolve_args.extend(["--keep", keep])
-        return command_run(
+        before = _conflicts()
+        result = command_run(
             command=self.binary_path,
             command_params=command_params,
             args=resolve_args,
         )
+        _warn_if_kept_local(before)
+        return result
 
     def push(self, *, command_params: CommandParams) -> Result:
         """Run `claude-sync push`, uploading local changes to cloud storage."""
@@ -658,9 +664,7 @@ class _ClaudeSync:
             if self._conflicts_remain(command_params=hidden):
                 raise ValueError("Not pushing, because the pull had conflicts.")
         elif self._conflicts_remain(command_params=command_params):
-            before = _conflicts()
             _ = self.resolve_conflicts(command_params=command_params)
-            _warn_if_kept_local(before)
             # What was resolved was already shown, so only what is left is.
             if self._conflicts_remain(command_params=hidden):
                 raise ValueError("Not pushing, because conflicts are unresolved.")
