@@ -224,12 +224,19 @@ def test_claude_sync_accepts_the_files_that_configure_writes(
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_configure_claude_sync_generates_a_key_when_the_config_has_none(
+@pytest.mark.parametrize(
+    "config_age_key",
+    [None, _KEY],
+    ids=["config has no key", "config has a key"],
+)
+def test_configure_claude_sync_writes_the_files(
     tmp_path: pathlib.Path,
     claude_sync_files_dir: pathlib.Path,
     aws_config_path: pathlib.Path,
+    config_age_key: str | None,
 ) -> None:
-    claude_sync_config_path = _config_file(tmp_path)
+    """The config's key is used, or a new one is generated and saved in the config."""
+    claude_sync_config_path = _config_file(tmp_path, age_key=config_age_key)
     key_path = claude_sync_files_dir / _KEY_FILE_NAME
     yaml_path = claude_sync_files_dir / _YAML_FILE_NAME
 
@@ -239,37 +246,16 @@ def test_configure_claude_sync_generates_a_key_when_the_config_has_none(
         force=False,
     )
 
-    # The key is saved in the config, for other machines, and is the one used.
+    # The key that is used is in the config, for other machines.
     config = load_claude_sync_config(path=claude_sync_config_path)
     assert config.age_key is not None
+    if config_age_key is not None:
+        assert config.age_key == config_age_key
     assert key_path.read_text(encoding="utf-8") == config.age_key + "\n"
     assert yaml_path.read_text(encoding="utf-8") == render_claude_sync_yaml(
         config, _AWS_PROFILE
     )
-    assert setup.generated_age_key
-    assert setup.applied_to_claude_sync_files
-
-
-def test_configure_claude_sync_writes_the_files_when_the_key_is_already_in_the_config(
-    tmp_path: pathlib.Path,
-    claude_sync_files_dir: pathlib.Path,
-    aws_config_path: pathlib.Path,
-) -> None:
-    claude_sync_config_path = _config_file(tmp_path, age_key=_KEY)
-    key_path = claude_sync_files_dir / _KEY_FILE_NAME
-    yaml_path = claude_sync_files_dir / _YAML_FILE_NAME
-
-    setup = configure_claude_sync(
-        claude_sync_config_path=claude_sync_config_path,
-        aws_config_path=aws_config_path,
-        force=False,
-    )
-
-    # The config's key is used, not replaced.
-    assert load_claude_sync_config(path=claude_sync_config_path).age_key == _KEY
-    assert key_path.read_text(encoding="utf-8") == _KEY + "\n"
-    assert yaml_path.exists()
-    assert not setup.generated_age_key
+    assert setup.generated_age_key is (config_age_key is None)
     assert setup.applied_to_claude_sync_files
 
 
