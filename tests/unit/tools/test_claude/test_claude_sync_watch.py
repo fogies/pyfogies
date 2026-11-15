@@ -12,6 +12,7 @@ from fogies.tools.claude_sync_watch import (
     is_watching,
     newest_change,
     sync_due,
+    watch_and_sync,
 )
 
 # A sync at time 1000, with the newest change then also at 1000, and what
@@ -99,6 +100,61 @@ def test_newest_change(tmp_path: pathlib.Path) -> None:
     session.unlink()
     newest = newest_change(directory=tmp_path)
     assert newest is not None and newest > 200
+
+
+class _Clock:
+    """Stands in for the time module, which passes by sleeping, and stops the watch."""
+
+    _now: float
+    _sleeps_left: int
+
+    def __init__(self, *, sleeps: int) -> None:
+        self._now = 1_000_000.0
+        self._sleeps_left = sleeps
+
+    def time(self) -> float:
+        return self._now
+
+    def sleep(self, seconds: float) -> None:
+        _ = seconds
+        if self._sleeps_left == 0:
+            raise KeyboardInterrupt
+        self._sleeps_left -= 1
+        # Past the interval, so that a sync is due each time.
+        self._now += 1000
+
+
+def test_watch_goes_on_after_a_sync_goes_wrong(
+    temp_home: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Whatever goes wrong in a sync is reported, and the next one is tried."""
+    _ = temp_home
+    monkeypatch.setattr("fogies.tools.claude_sync_watch.time", _Clock(sleeps=3))
+    problems: list[Exception] = [
+        # What claude-sync stopping is, and what its hooks can raise.
+        ValueError("Not pushing, because the pull had conflicts."),
+        PermissionError("The session is open in another program."),
+        ConnectionError("No network."),
+    ]
+    syncs = 0
+
+    def sync() -> None:
+        nonlocal syncs
+        syncs += 1
+        if problems:
+            raise problems.pop(0)
+
+    with pytest.raises(KeyboardInterrupt):
+        watch_and_sync(sync=sync)
+
+    assert syncs == 4
+    out = capsys.readouterr().out
+    assert "Not pushing, because the pull had conflicts." in out
+    assert "PermissionError: The session is open in another program." in out
+    assert "ConnectionError: No network." in out
+    assert "Synced." in out
 
 
 def test_only_one_watch_in_a_process(temp_home: pathlib.Path) -> None:

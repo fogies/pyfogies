@@ -115,10 +115,11 @@ def _say(message: str) -> None:
 def watch_and_sync(*, sync: Callable[[], None]) -> None:
     """Call sync whenever it is time to, until interrupted.
 
-    A sync that stops because of a ValueError (e.g., conflicts) or a failed
-    command (e.g., no network) is reported, and tried again when next due.
-    Raises ValueError, without syncing, if another watch is running, as two
-    would sync over each other.
+    A sync that stops because of an error, such as a ValueError (e.g.,
+    conflicts), a failed command, or a failure in what it does after the pull
+    (e.g., no network), is reported, and tried again when next due. Raises
+    ValueError, without syncing, if another watch is running, as two would sync
+    over each other.
     """
     directory = claude_directory()
 
@@ -141,6 +142,11 @@ def watch_and_sync(*, sync: Callable[[], None]) -> None:
                     _say("Synced.")
                 except (ValueError, Failure) as exc:
                     _say(str(exc))
+                except Exception as exc:
+                    # Nothing that goes wrong in a sync (e.g., the network
+                    # being down, or a session file being open) is a reason
+                    # for an unattended watch to stop.
+                    _say("{}: {}".format(type(exc).__name__, exc))
                 # What the sync wrote is not a change to sync again. A change
                 # made while it ran is not either, which the interval brings in.
                 synced_change = newest_change(directory=directory)
