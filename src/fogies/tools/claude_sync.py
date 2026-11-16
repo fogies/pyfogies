@@ -218,6 +218,47 @@ def claude_sync_files_directory() -> pathlib.Path:
     return pathlib.Path.home() / _DIRECTORY_NAME
 
 
+# What claude-sync syncs under the Claude directory, by what its scope is, as of
+# _KNOWN_VERSIONS[0] (SessionSyncPaths and SyncPaths in its
+# internal/config/config.go, so check them when changing that). A name is a
+# file, or a directory with everything in it.
+SESSIONS_PATHS = ["projects", "history.jsonl", "tasks", "plans"]
+_FULL_PATHS = [
+    "CLAUDE.md",
+    "settings.json",
+    "settings.local.json",
+    "agents",
+    "commands",
+    "skills",
+    "plugins",
+    "projects",
+    "plans",
+    "tasks",
+    "history.jsonl",
+    "rules",
+    "workflows",
+]
+
+_SCOPE_LINE = re.compile(r"""^scope:\s*["']?(\w+)["']?\s*$""", re.MULTILINE)
+
+
+def synced_paths() -> list[str]:
+    """Return what claude-sync syncs on this machine, by names in claude_directory().
+
+    That is as its scope says, in its config.yaml, which is what it reads. As it
+    does, anything but the sessions scope, including having none, is the full
+    scope.
+    """
+    try:
+        text = (claude_sync_files_directory() / _YAML_FILE_NAME).read_text(
+            encoding="utf-8"
+        )
+    except OSError:
+        return _FULL_PATHS
+    scope = _SCOPE_LINE.search(text)
+    return SESSIONS_PATHS if scope and scope[1] == "sessions" else _FULL_PATHS
+
+
 class _SyncState(BaseModel):
     """What claude-sync records of syncing, of which only the files matter."""
 
@@ -276,10 +317,21 @@ class _Conflict:
     local_hash: str | None
 
 
+def _conflict_paths() -> list[pathlib.Path]:
+    """Return the files named as conflicts, where claude-sync syncs."""
+    paths: set[pathlib.Path] = set()
+    for name in synced_paths():
+        # A file in the Claude directory has its conflict beside it, and one in a
+        # directory has it in there.
+        paths.update(claude_directory().glob("{}.conflict.*".format(name)))
+        paths.update((claude_directory() / name).rglob("*.conflict.*"))
+    return sorted(paths)
+
+
 def _conflicts() -> list[_Conflict]:
     """Return the conflicts that claude-sync has left, as it finds them."""
     found: list[_Conflict] = []
-    for path in sorted(claude_directory().rglob("*.conflict.*")):
+    for path in _conflict_paths():
         match = _CONFLICT_NAME.fullmatch(path.name)
         remote_hash = _hash_file(path) if match and path.is_file() else None
         if match is None or remote_hash is None:

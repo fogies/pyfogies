@@ -1,4 +1,8 @@
-"""Test claude-sync is available, and is configured from the config."""
+"""Test claude-sync is available, is configured from the config, and is synced.
+
+That includes the conflicts that a sync can leave, and the output of claude-sync
+that is read to know how a pull or a push went.
+"""
 
 import hashlib
 import json
@@ -34,6 +38,7 @@ from fogies.tools.claude_sync import (
     _warn_if_kept_local,  # pyright: ignore[reportPrivateUsage]
 )
 from fogies.tools.claude_sync import (
+    ClaudeSyncConfig,
     claude_directory,
     claude_sync,
     claude_sync_files_directory,
@@ -167,6 +172,22 @@ scope = "sessions"
         text += 'age_key = "{}"\n'.format(age_key)
     _ = path.write_text(text, encoding="utf-8")
     return path
+
+
+# What this machine uploaded, and the session as it is after it has grown.
+_UPLOADED = b"What this machine uploaded."
+_GROWN = b"What this machine uploaded. And what it has added since."
+
+
+def _write_conflict(*, remote: bytes) -> tuple[pathlib.Path, pathlib.Path]:
+    """Write a session that has grown, and the remote version saved beside it."""
+    project = claude_directory() / "projects" / "demo"
+    project.mkdir(parents=True)
+    local = project / "a.jsonl"
+    conflict = project / "a.jsonl.conflict.20261113-080344"
+    _ = local.write_bytes(_GROWN)
+    _ = conflict.write_bytes(remote)
+    return local, conflict
 
 
 def test_claude_sync_is_available() -> None:
@@ -360,12 +381,8 @@ def test_claude_sync_conflicts_keeps_the_chosen_version(
     keep: Literal["local", "remote"],
 ) -> None:
     """A conflict is resolved by keeping a version, and keeping local is warned of."""
-    project_path = temp_home / ".claude" / "projects" / "demo"
-    project_path.mkdir(parents=True)
-    local_path = project_path / "a.jsonl"
-    conflict_path = project_path / "a.jsonl.conflict.20260208-095132"
-    _ = local_path.write_text("local", encoding="utf-8")
-    _ = conflict_path.write_text("remote", encoding="utf-8")
+    _ = temp_home
+    local_path, conflict_path = _write_conflict(remote=_UPLOADED)
 
     with claude_sync(
         binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
@@ -374,38 +391,20 @@ def test_claude_sync_conflicts_keeps_the_chosen_version(
             command_params=CommandParams(in_stream=False, hide=True), keep=keep
         )
 
-    assert local_path.read_text(encoding="utf-8") == keep
+    assert local_path.read_bytes() == (_GROWN if keep == "local" else _UPLOADED)
     assert not conflict_path.exists()
     assert ("projects/demo/a.jsonl" in capsys.readouterr().out) is (keep == "local")
 
 
-def test_claude_sync_list_conflicts_changes_nothing(temp_home: pathlib.Path) -> None:
-    project_path = temp_home / ".claude" / "projects" / "demo"
-    project_path.mkdir(parents=True)
-    local_path = project_path / "a.jsonl"
-    conflict_path = project_path / "a.jsonl.conflict.20260208-095132"
-    _ = local_path.write_text("local", encoding="utf-8")
-    _ = conflict_path.write_text("remote", encoding="utf-8")
-
-    with claude_sync(
-        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
-    ) as cs:
-        result = cs.list_conflicts(
-            command_params=CommandParams(in_stream=False, hide=True)
-        )
-
-    assert "a.jsonl" in result.stdout
-    # What it prints is what the parser reads, so this is checked against the
-    # real claude-sync.
-    assert _conflicts_remain(result.stdout)
-    assert local_path.read_text(encoding="utf-8") == "local"
-    assert conflict_path.read_text(encoding="utf-8") == "remote"
-
-
-def test_claude_sync_list_conflicts_when_there_are_none(
-    temp_home: pathlib.Path,
+@pytest.mark.parametrize("conflicted", [True, False], ids=["conflicts", "none"])
+def test_claude_sync_list_conflicts_is_read_as_it_is_printed(
+    temp_home: pathlib.Path, conflicted: bool
 ) -> None:
-    (temp_home / ".claude").mkdir()
+    """What it prints is what the parser reads, so this is checked against the
+    real claude-sync, which only lists conflicts."""
+    _ = temp_home
+    paths = _write_conflict(remote=_UPLOADED) if conflicted else None
+    claude_directory().mkdir(exist_ok=True)
 
     with claude_sync(
         binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
@@ -414,7 +413,12 @@ def test_claude_sync_list_conflicts_when_there_are_none(
             command_params=CommandParams(in_stream=False, hide=True)
         )
 
-    assert not _conflicts_remain(result.stdout)
+    assert _conflicts_remain(result.stdout) is conflicted
+    if paths:
+        local_path, conflict_path = paths
+        assert "a.jsonl" in result.stdout
+        assert local_path.read_bytes() == _GROWN
+        assert conflict_path.read_bytes() == _UPLOADED
 
 
 @pytest.mark.parametrize(
@@ -591,21 +595,6 @@ def test_claude_sync_sync_calls_after_pull_before_the_push(
     assert made == calls
 
 
-_UPLOADED = b"What this machine uploaded."
-_GROWN = b"What this machine uploaded. And what it has added since."
-
-
-def _write_conflict(*, remote: bytes) -> tuple[pathlib.Path, pathlib.Path]:
-    """Write a session that has grown, and the remote version saved beside it."""
-    project = claude_directory() / "projects" / "demo"
-    project.mkdir(parents=True)
-    local = project / "a.jsonl"
-    conflict = project / "a.jsonl.conflict.20261113-080344"
-    _ = local.write_bytes(_GROWN)
-    _ = conflict.write_bytes(remote)
-    return local, conflict
-
-
 def _record_upload(name: str, content: bytes) -> pathlib.Path:
     """Write claude-sync's record of having uploaded a file with this content."""
     directory = claude_sync_files_directory()
@@ -649,43 +638,21 @@ def test_clear_conflicts_with_own_uploads(
     assert (state.read_bytes() if state else None) == state_before
 
 
-def _keep_local(local: pathlib.Path, conflict: pathlib.Path) -> None:
-    """Resolve a conflict as claude-sync's resolver does when it keeps the local file."""
-    _ = local
-    conflict.unlink()
-
-
-def _keep_remote(local: pathlib.Path, conflict: pathlib.Path) -> None:
-    """Resolve a conflict as claude-sync's resolver does when it keeps the remote file."""
-    _ = conflict.replace(local)
-
-
-def _skip(local: pathlib.Path, conflict: pathlib.Path) -> None:
-    """Resolve a conflict as claude-sync's resolver does when it skips it, which is not."""
-    _ = (local, conflict)
-
-
-@pytest.mark.parametrize(
-    ("resolve", "warns"),
-    [(_keep_local, True), (_keep_remote, False), (_skip, False)],
-    ids=["kept local", "kept remote", "skipped"],
-)
-def test_warn_if_kept_local(
-    temp_home: pathlib.Path,
-    capsys: pytest.CaptureFixture[str],
-    resolve: Callable[[pathlib.Path, pathlib.Path], None],
-    warns: bool,
+def test_a_conflict_that_is_skipped_is_not_warned_about(
+    temp_home: pathlib.Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Keeping the local version is warned about, as claude-sync will not upload it."""
+    """A conflict still there was not kept local, whatever the resolver was asked.
+
+    Keeping either version is checked, with the warning, against the real
+    resolver in test_claude_sync_conflicts_keeps_the_chosen_version.
+    """
     _ = temp_home
-    local, conflict = _write_conflict(remote=b"What another machine uploaded.")
+    _ = _write_conflict(remote=b"What another machine uploaded.")
     before = _conflicts()
 
-    resolve(local, conflict)
     _warn_if_kept_local(before)
 
-    out = capsys.readouterr().out
-    assert ("projects/demo/a.jsonl" in out) is warns
+    assert capsys.readouterr().out == ""
 
 
 def test_claude_sync_sync_clears_a_conflict_with_its_own_upload(
@@ -728,3 +695,55 @@ def test_claude_sync_sync_clears_a_conflict_with_its_own_upload(
 
     assert made == ["pull", "after_pull", "push"]
     assert not _conflicts()
+
+
+def _configure_scope(scope: Literal["full", "sessions"] | None) -> None:
+    """Write claude-sync's config.yaml as configure does, for a scope, or none."""
+    if scope is None:
+        return
+    config = ClaudeSyncConfig(
+        aws_profile=_AWS_PROFILE.name,
+        bucket="my-bucket",
+        deletions_bucket="my-deletions-bucket",
+        region="us-west-2",
+        scope=scope,
+    )
+    directory = claude_sync_files_directory()
+    directory.mkdir(parents=True, exist_ok=True)
+    _ = (directory / _YAML_FILE_NAME).write_text(
+        render_claude_sync_yaml(config, _AWS_PROFILE), encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    ("scope", "found"),
+    [
+        ("sessions", {"a.jsonl", "history.jsonl"}),
+        ("full", {"a.jsonl", "history.jsonl", "p.json"}),
+        # Which claude-sync takes as full.
+        (None, {"a.jsonl", "history.jsonl", "p.json"}),
+    ],
+    ids=["sessions", "full", "no scope"],
+)
+def test_conflicts_are_looked_for_where_claude_sync_syncs(
+    temp_home: pathlib.Path,
+    scope: Literal["full", "sessions"] | None,
+    found: set[str],
+) -> None:
+    """A conflict in a directory, or beside a file, is found if its scope syncs it."""
+    _ = temp_home
+    _configure_scope(scope)
+    (claude_directory() / "projects" / "demo").mkdir(parents=True)
+    (claude_directory() / "plugins").mkdir()
+    for name in [
+        "projects/demo/a.jsonl",
+        "history.jsonl",
+        "plugins/p.json",
+        # Not synced in any scope.
+        "cache/c.json",
+    ]:
+        path = claude_directory() / (name + ".conflict.20261113-080344")
+        path.parent.mkdir(exist_ok=True)
+        _ = path.write_bytes(b"remote")
+
+    assert {c.original_path.name for c in _conflicts()} == found

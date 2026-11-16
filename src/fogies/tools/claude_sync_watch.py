@@ -16,12 +16,11 @@ from contextlib import contextmanager
 from filelock import FileLock, Timeout
 from invoke.exceptions import Failure
 
-from fogies.tools.claude_sync import claude_directory, claude_sync_files_directory
-
-# What is polled for local changes, in the directory claude-sync syncs. It is
-# the sessions scope; whatever else a full scope syncs is picked up on the
-# interval, instead of being polled for.
-_POLLED_NAMES = ["projects", "tasks", "plans", "history.jsonl"]
+from fogies.tools.claude_sync import (
+    SESSIONS_PATHS,
+    claude_directory,
+    claude_sync_files_directory,
+)
 
 # How often to look for changes, in seconds.
 _POLL_SECONDS = 30
@@ -36,7 +35,10 @@ _INTERVAL_SECONDS = 300
 def newest_change(*, directory: pathlib.Path) -> float | None:
     """Return when a polled file in directory last changed, or None if none exist."""
     newest: float | None = None
-    for name in _POLLED_NAMES:
+    # Only what the sessions scope syncs, whatever the scope is. What else a
+    # full scope syncs (e.g., plugins) is picked up on the interval, instead of
+    # being polled for.
+    for name in SESSIONS_PATHS:
         path = directory / name
         paths = [path, *path.rglob("*")] if path.is_dir() else [path]
         for candidate in paths:
