@@ -18,10 +18,8 @@ from fogies.tools.claude_sync_deletions import (
 )
 from fogies.tools.claude_sync_deletions import (
     KEY,
-    apply_deletions_locally,
-    deleted_session_ids,
     record_deletion,
-    record_desktop_deletions,
+    sync_deletions,
 )
 
 _BUCKET = {"bucket_name": "bucket", "region": "us-west-2"}
@@ -147,7 +145,6 @@ def test_record_deletion_adds_to_what_is_recorded(bucket: _FakeBucket) -> None:
     record_deletion(**_BUCKET, session_id=second)
 
     assert list(bucket.deleted()) == [first, second]
-    assert deleted_session_ids(**_BUCKET) == {first, second}
 
 
 @pytest.mark.parametrize(
@@ -198,7 +195,7 @@ def test_load_understands_a_record_only_of_session_ids(
             _ = _load(**_BUCKET)
 
 
-def test_apply_deletions_locally_deletes_what_was_recorded(
+def test_sync_deletions_deletes_what_was_recorded(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
     """The session and its subagents go, from whichever project, and others stay."""
@@ -215,8 +212,10 @@ def test_apply_deletions_locally_deletes_what_was_recorded(
     bucket.set(_record(recorded_and_here, recorded_not_here))
 
     # Only what was here is reported as deleted.
-    assert apply_deletions_locally(**_BUCKET) == [recorded_and_here]
+    synced = sync_deletions(**_BUCKET)
 
+    assert synced.deleted == [recorded_and_here]
+    assert synced.recorded == []
     assert not _exists("project-1", recorded_and_here)
     subagents = claude_directory() / "projects" / "project-1" / recorded_and_here
     assert not subagents.exists()
@@ -225,19 +224,24 @@ def test_apply_deletions_locally_deletes_what_was_recorded(
     assert set(bucket.deleted()) == {recorded_and_here, recorded_not_here}
 
 
-def test_record_desktop_deletions_records_what_the_app_deleted(
+def test_sync_deletions_records_what_the_app_deleted(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
-    """Each is recorded, whichever project it was in."""
+    """Each is recorded, whichever project it was in, and then deleted from here."""
     _ = temp_home
     in_project_1 = _uuid(1)
     in_project_2 = _uuid(2)
     _write_marker("project-1", in_project_1, _marker("2026-10-27T20:45:00.000Z"))
     _write_marker("project-2", in_project_2, _marker("2026-10-27T21:00:00.000Z"))
+    # The app can leave the transcript of a session that it has marked deleted.
+    _write_session("project-2", in_project_2)
 
-    assert record_desktop_deletions(**_BUCKET) == [in_project_1, in_project_2]
+    synced = sync_deletions(**_BUCKET)
 
+    assert synced.recorded == [in_project_1, in_project_2]
+    assert synced.deleted == [in_project_2]
     assert set(bucket.deleted()) == {in_project_1, in_project_2}
+    assert not _exists("project-2", in_project_2)
 
 
 @pytest.mark.parametrize(
@@ -259,18 +263,18 @@ def test_desktop_marker_is_a_deletion_with_a_time(text: str, valid: bool) -> Non
             _ = _DesktopMarker.model_validate_json(text)
 
 
-def test_record_desktop_deletions_skips_a_marker_not_named_for_a_session(
+def test_sync_deletions_skips_a_marker_not_named_for_a_session(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
     _ = temp_home
     _write_marker("project-1", "notes", _marker("2026-10-27T20:45:00.000Z"))
 
-    assert record_desktop_deletions(**_BUCKET) == []
+    assert sync_deletions(**_BUCKET).recorded == []
 
     assert bucket.body is None
 
 
-def test_record_desktop_deletions_writes_nothing_if_all_are_recorded(
+def test_sync_deletions_writes_nothing_if_all_are_recorded(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:
     """A marker for a recorded session leaves the record as it was, not rewritten."""
@@ -280,6 +284,6 @@ def test_record_desktop_deletions_writes_nothing_if_all_are_recorded(
     version = bucket.version
     _write_marker("project-1", recorded, _marker("2026-10-27T20:45:00.000Z"))
 
-    assert record_desktop_deletions(**_BUCKET) == []
+    assert sync_deletions(**_BUCKET).recorded == []
 
     assert bucket.version == version

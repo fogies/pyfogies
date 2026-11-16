@@ -28,6 +28,7 @@ import datetime
 import socket
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from claude_agent_sdk import delete_session
@@ -116,23 +117,16 @@ def _load(*, bucket_name: str, region: str) -> tuple[_DeletedSessions, str | Non
         ) from exc
 
 
-def deleted_session_ids(*, bucket_name: str, region: str) -> set[str]:
-    """Return the IDs of the sessions that have been recorded as deleted.
-
-    Raises ValueError if what is in the bucket is not understood, which includes
-    a record of a session that is not a session ID.
-    """
-    record, _ = _load(bucket_name=bucket_name, region=region)
-    return set(record.deleted)
-
-
 def _update(
     *,
     bucket_name: str,
     region: str,
     change: Callable[[_DeletedSessions], None],
-) -> None:
-    """Change the record, which is not written if the change leaves it as it was.
+) -> _DeletedSessions:
+    """Change the record, and return it as it is then, with the change made.
+
+    The record is not written if the change leaves it as it was, and is read
+    once, if others do not change it meanwhile.
 
     The change is made to the record as it is, and made again to the record as
     it then is if others changed it meanwhile, so it must not depend on being
@@ -145,7 +139,7 @@ def _update(
         before = record.model_copy(deep=True)
         change(record)
         if record == before:
-            return
+            return record
         try:
             _ = s3_put_object(
                 bucket_name=bucket_name,
@@ -158,7 +152,7 @@ def _update(
         except S3PreconditionFailed:
             # Changed since it was read, so read it again.
             continue
-        return
+        return record
     raise RuntimeError("Could not change '{}', as it kept changing.".format(KEY))
 
 
@@ -177,7 +171,7 @@ def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
             machine=socket.gethostname(),
         )
 
-    _update(bucket_name=bucket_name, region=region, change=add)
+    _ = _update(bucket_name=bucket_name, region=region, change=add)
 
 
 def _desktop_deletions() -> dict[str, _Deletion]:
@@ -201,31 +195,6 @@ def _desktop_deletions() -> dict[str, _Deletion]:
     return deletions
 
 
-def record_desktop_deletions(*, bucket_name: str, region: str) -> list[str]:
-    """Record the sessions that were deleted in the Claude desktop app.
-
-    Those that are already recorded are left as they are. Returns the IDs of
-    the sessions that were recorded, and writes nothing if there are none.
-    Raises ValueError if what is in the bucket is not understood. Raises
-    RuntimeError if others kept changing the record, so that this could not.
-    """
-    deletions = _desktop_deletions()
-    if not deletions:
-        return []
-
-    recorded: list[str] = []
-
-    def add(record: _DeletedSessions) -> None:
-        recorded.clear()
-        for session_id, deletion in deletions.items():
-            if session_id not in record.deleted:
-                record.deleted[session_id] = deletion
-                recorded.append(session_id)
-
-    _update(bucket_name=bucket_name, region=region, change=add)
-    return sorted(recorded)
-
-
 def apply_deletion_locally(session_id: str) -> bool:
     """Delete a session from this machine, and return whether it was here.
 
@@ -238,16 +207,43 @@ def apply_deletion_locally(session_id: str) -> bool:
     return True
 
 
-def apply_deletions_locally(*, bucket_name: str, region: str) -> list[str]:
-    """Delete from this machine the sessions that have been recorded as deleted.
+@dataclass(frozen=True)
+class SyncedDeletions:
+    """What sync_deletions did, as the IDs of the sessions."""
 
-    Those that are already gone from here are skipped. Returns the IDs of the
-    sessions that were deleted.
+    # Recorded, because they were deleted in the Claude desktop app.
+    recorded: list[str]
+    # Deleted from this machine, because they were recorded as deleted.
+    deleted: list[str]
+
+
+def sync_deletions(*, bucket_name: str, region: str) -> SyncedDeletions:
+    """Record what was deleted in the Claude desktop app, and delete what is recorded.
+
+    The sessions that were deleted in the app and are not recorded yet are
+    recorded, and then every session that is recorded as deleted is deleted from
+    this machine, unless it is already gone from here. The record is read once,
+    and written only if there is something to record.
+
+    Raises ValueError if what is in the bucket is not understood. Raises
+    RuntimeError if others kept changing the record, so that this could not.
     """
-    return [
-        session_id
-        for session_id in sorted(
-            deleted_session_ids(bucket_name=bucket_name, region=region)
-        )
-        if apply_deletion_locally(session_id)
-    ]
+    desktop = _desktop_deletions()
+    recorded: list[str] = []
+
+    def add(record: _DeletedSessions) -> None:
+        recorded.clear()
+        for session_id, deletion in desktop.items():
+            if session_id not in record.deleted:
+                record.deleted[session_id] = deletion
+                recorded.append(session_id)
+
+    record = _update(bucket_name=bucket_name, region=region, change=add)
+    return SyncedDeletions(
+        recorded=sorted(recorded),
+        deleted=[
+            session_id
+            for session_id in sorted(record.deleted)
+            if apply_deletion_locally(session_id)
+        ],
+    )
