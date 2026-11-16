@@ -3,6 +3,7 @@
 import json
 import pathlib
 from collections.abc import Callable
+from contextlib import nullcontext
 from typing import cast
 
 import pytest
@@ -18,6 +19,7 @@ from fogies.tools.claude_sync_deletions import (
 )
 from fogies.tools.claude_sync_deletions import (
     KEY,
+    delete_everywhere,
     record_deletion,
     sync_deletions,
 )
@@ -193,6 +195,30 @@ def test_load_understands_a_record_only_of_session_ids(
     else:
         with pytest.raises(ValueError, match="not a record of deleted sessions"):
             _ = _load(**_BUCKET)
+
+
+@pytest.mark.parametrize("recordable", [True, False], ids=["recorded", "not recorded"])
+def test_delete_everywhere_deletes_here_only_if_recorded(
+    bucket: _FakeBucket, temp_home: pathlib.Path, recordable: bool
+) -> None:
+    """The session is recorded and then deleted, so if it is not recorded, it stays."""
+    _ = temp_home
+    session = _uuid(1)
+    _write_session("project-1", session, subagents=True)
+    if not recordable:
+        # A record that is not understood cannot be added to.
+        bucket.body = b"not json"
+
+    with (
+        nullcontext()
+        if recordable
+        else pytest.raises(ValueError, match="not a record of deleted sessions")
+    ):
+        delete_everywhere(**_BUCKET, session_id=session)
+
+    assert _exists("project-1", session) is not recordable
+    if recordable:
+        assert list(bucket.deleted()) == [session]
 
 
 def test_sync_deletions_deletes_what_was_recorded(

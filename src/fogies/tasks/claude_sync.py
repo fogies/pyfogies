@@ -19,8 +19,7 @@ from fogies.tools.claude_sync import (
     load_claude_sync_config,
 )
 from fogies.tools.claude_sync_deletions import (
-    apply_deletion_locally,
-    record_deletion,
+    delete_everywhere,
     sync_deletions,
 )
 from fogies.tools.claude_sync_watch import is_watching, watch_and_sync
@@ -147,13 +146,11 @@ def get_task_delete(
             profile_name=config.aws_profile,
             raise_if_env_exists=False,
         ):
-            record_deletion(
+            delete_everywhere(
                 bucket_name=config.deletions_bucket,
                 region=config.region,
                 session_id=delete_id,
             )
-        # Recorded first, so that if that fails nothing is deleted.
-        _ = apply_deletion_locally(delete_id)
         print("Deleted {}.".format(delete_id))
 
     return cast(Task[Callable[..., None]], task_delete)
@@ -251,7 +248,7 @@ def get_task_sync(
             binary_cache_path=binary_cache_path, raise_if_env_exists=False
         ) as cs:
 
-            def delete_what_others_deleted() -> None:
+            def sync_deletions_after_pull() -> None:
                 config = load_claude_sync_config(path=claude_sync_config_path)
                 with aws_environ_from_config(
                     config_path=aws_config_path,
@@ -278,7 +275,7 @@ def get_task_sync(
                 cs.sync(
                     command_params=CommandParams(context=context),
                     unattended=watch,
-                    after_pull=delete_what_others_deleted,
+                    after_pull=sync_deletions_after_pull,
                 )
 
             if watch:

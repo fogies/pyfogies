@@ -5,8 +5,9 @@ a machine that still has it uploads it again, and a pull downloads it to the
 machine that deleted it. So a deletion is recorded in a bucket, and each machine,
 after a pull, deletes what has been recorded. A session is deleted as the Claude
 Agent SDK deletes one, which is its transcript and its subagents' transcripts.
-To delete a session everywhere, record it, and then delete it from this machine,
-so that if recording fails nothing is deleted.
+delete_everywhere records a deletion and then deletes the session from this
+machine, so that if recording fails nothing is deleted. sync_deletions, which is
+run after each pull, deletes from this machine what other machines recorded.
 
 The bucket is not the one claude-sync syncs to (see the claude_sync Terraform
 module), because claude-sync owns the root of that bucket and deletes everything
@@ -15,10 +16,11 @@ write that is conditional on the object being as it was read, so that machines
 that delete at the same time do not replace each other's deletions. The bucket
 is versioned, so earlier versions of it can be recovered.
 
-A session deleted in the Claude desktop app is recorded from the marker that the
-app leaves, `<session ID>.desktop-released.json` in the project, which claude-sync
-syncs. A marker is only a signal to record it, as the app removes it from a
-session it brings back, so the record is what a deletion is kept in.
+A session deleted in the Claude desktop app is recorded, by sync_deletions, from
+the marker that the app leaves, `<session ID>.desktop-released.json` in the
+project, which claude-sync syncs. A marker is only a signal to record it, as the
+app removes it from a session it brings back, so the record is what a deletion
+is kept in.
 
 These use the AWS credentials of the environment, which the caller applies
 (e.g., with fogies.tools.aws_environ.aws_environ_from_config).
@@ -42,28 +44,11 @@ KEY = "deleted-sessions.json"
 
 _FORMAT = "pyfogies-deleted-sessions"
 
-# What the end of the name of a marker is, for the Claude desktop app.
-_MARKER_SUFFIX = ".desktop-released.json"
-
 # How many times a change is tried, if others are changing the record too.
 _ATTEMPTS = 5
 
 
-class _Deletion(BaseModel):
-    """When, and from which machine, a session was deleted."""
-
-    at: str
-    machine: str
-
-
-class _DesktopMarker(BaseModel):
-    """What the Claude desktop app leaves when a session is deleted in it.
-
-    Only a deletion is of use here, and the rest of what is in it is ignored.
-    """
-
-    reason: Literal["delete"]
-    released_at: str = Field(alias="releasedAt")
+# The record.
 
 
 def _session_id(value: str) -> str | None:
@@ -91,7 +76,14 @@ def _require_session_id(value: str) -> str:
 _SessionId = Annotated[str, AfterValidator(_require_session_id)]
 
 
-class _DeletedSessions(BaseModel):
+class _Deletion(BaseModel):
+    """When, and from which machine, a session was deleted."""
+
+    at: str
+    machine: str
+
+
+class _DeletionRecord(BaseModel):
     """What is in the object. What is not this format is not changed or acted on."""
 
     format: Literal["pyfogies-deleted-sessions"] = _FORMAT
@@ -99,16 +91,16 @@ class _DeletedSessions(BaseModel):
     deleted: dict[_SessionId, _Deletion] = {}
 
 
-def _load(*, bucket_name: str, region: str) -> tuple[_DeletedSessions, str | None]:
+def _load(*, bucket_name: str, region: str) -> tuple[_DeletionRecord, str | None]:
     """Return the record, and its ETag, which is None if there is no record yet.
 
     Raises ValueError if the object is not a record that this understands.
     """
     existing = s3_get_object(bucket_name=bucket_name, region=region, key=KEY)
     if existing is None:
-        return _DeletedSessions(), None
+        return _DeletionRecord(), None
     try:
-        return _DeletedSessions.model_validate_json(existing.body), existing.etag
+        return _DeletionRecord.model_validate_json(existing.body), existing.etag
     except ValidationError as exc:
         raise ValueError(
             "'{}' in bucket '{}' is not a record of deleted sessions that is understood, so nothing is done with it: {}".format(
@@ -121,8 +113,8 @@ def _update(
     *,
     bucket_name: str,
     region: str,
-    change: Callable[[_DeletedSessions], None],
-) -> _DeletedSessions:
+    change: Callable[[_DeletionRecord], None],
+) -> _DeletionRecord:
     """Change the record, and return it as it is then, with the change made.
 
     The record is not written if the change leaves it as it was, and is read
@@ -156,6 +148,9 @@ def _update(
     raise RuntimeError("Could not change '{}', as it kept changing.".format(KEY))
 
 
+# Deleting a session.
+
+
 def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
     """Record a session as deleted, for the machines that sync it.
 
@@ -165,13 +160,55 @@ def record_deletion(*, bucket_name: str, region: str, session_id: str) -> None:
     """
     valid_id = _require_session_id(session_id)
 
-    def add(record: _DeletedSessions) -> None:
+    def add(record: _DeletionRecord) -> None:
         record.deleted[valid_id] = _Deletion(
             at=datetime.datetime.now().astimezone().isoformat(),
             machine=socket.gethostname(),
         )
 
     _ = _update(bucket_name=bucket_name, region=region, change=add)
+
+
+def _delete_here(session_id: str) -> bool:
+    """Delete a session from this machine, and return whether it was here.
+
+    Raises ValueError if session_id is not a session ID.
+    """
+    try:
+        delete_session(_require_session_id(session_id))
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def delete_everywhere(*, bucket_name: str, region: str, session_id: str) -> None:
+    """Delete a session from this machine, and from the others when they sync.
+
+    It is recorded as deleted first, so that if that fails nothing is deleted.
+    It is deleted from this machine, if it is here, only once it is recorded.
+
+    Raises ValueError if session_id is not a session ID, or if what is in the
+    bucket is not understood. Raises RuntimeError if others kept changing the
+    record, so that this could not.
+    """
+    record_deletion(bucket_name=bucket_name, region=region, session_id=session_id)
+    _ = _delete_here(session_id)
+
+
+# Deleting in the Claude desktop app.
+
+# What the end of the name of a marker is, for the Claude desktop app.
+_MARKER_SUFFIX = ".desktop-released.json"
+
+
+class _DesktopMarker(BaseModel):
+    """What the Claude desktop app leaves when a session is deleted in it.
+
+    Only a deletion is of use here, and the rest of what is in it is ignored.
+    """
+
+    reason: Literal["delete"]
+    released_at: str = Field(alias="releasedAt")
 
 
 def _desktop_deletions() -> dict[str, _Deletion]:
@@ -195,16 +232,7 @@ def _desktop_deletions() -> dict[str, _Deletion]:
     return deletions
 
 
-def apply_deletion_locally(session_id: str) -> bool:
-    """Delete a session from this machine, and return whether it was here.
-
-    Raises ValueError if session_id is not a session ID.
-    """
-    try:
-        delete_session(_require_session_id(session_id))
-    except FileNotFoundError:
-        return False
-    return True
+# Syncing deletions.
 
 
 @dataclass(frozen=True)
@@ -231,7 +259,8 @@ def sync_deletions(*, bucket_name: str, region: str) -> SyncedDeletions:
     desktop = _desktop_deletions()
     recorded: list[str] = []
 
-    def add(record: _DeletedSessions) -> None:
+    def add(record: _DeletionRecord) -> None:
+        # Start again if this is a retry, as the record has changed since.
         recorded.clear()
         for session_id, deletion in desktop.items():
             if session_id not in record.deleted:
@@ -244,6 +273,6 @@ def sync_deletions(*, bucket_name: str, region: str) -> SyncedDeletions:
         deleted=[
             session_id
             for session_id in sorted(record.deleted)
-            if apply_deletion_locally(session_id)
+            if _delete_here(session_id)
         ],
     )
