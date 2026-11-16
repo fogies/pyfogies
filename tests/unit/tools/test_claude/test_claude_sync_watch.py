@@ -120,8 +120,8 @@ class _Clock:
         if self._sleeps_left == 0:
             raise KeyboardInterrupt
         self._sleeps_left -= 1
-        # Past the interval, so that a sync is due each time.
-        self._now += 1000
+        # A day, which is past any interval, so that a sync is due each time.
+        self._now += 24 * 60 * 60
 
 
 def test_watch_goes_on_after_a_sync_goes_wrong(

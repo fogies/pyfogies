@@ -26,10 +26,10 @@ from fogies.tools.claude_sync import (
 _POLL_SECONDS = 30
 
 # How long local changes have to have stopped for before a sync, in seconds.
-_QUIET_SECONDS = 120
+_QUIET_SECONDS = 10 * 60
 
 # How long between syncs, however quiet it is, in seconds.
-_INTERVAL_SECONDS = 300
+_INTERVAL_SECONDS = 60 * 60
 
 
 def newest_change(*, directory: pathlib.Path) -> float | None:
