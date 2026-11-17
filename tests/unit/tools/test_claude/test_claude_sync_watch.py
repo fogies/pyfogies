@@ -2,9 +2,11 @@
 
 import os
 import pathlib
+from collections.abc import Callable
 
 import pytest
 
+from fogies.tools.claude_sync import claude_directory
 from fogies.tools.claude_sync_watch import (
     _watch_lock,  # pyright: ignore[reportPrivateUsage]
 )
@@ -21,22 +23,27 @@ _LAST_SYNC = 1000.0
 _SYNCED_CHANGE = 1000.0
 _QUIET = 120.0
 _INTERVAL = 300.0
+_RETRY = 60.0
 
 
 @pytest.mark.parametrize(
-    ("now", "changed", "due"),
+    ("now", "changed", "last_attempt", "due"),
     [
         # Nothing to sync: no change at all, or none but what the sync itself
         # wrote, which is the newest change as of the end of the sync, however
         # quiet it has been since.
-        (1200.0, None, False),
-        (1200.0, 1000.0, False),
+        (1200.0, None, _LAST_SYNC, False),
+        (1200.0, 1000.0, _LAST_SYNC, False),
         # A change since the last sync is waited on until it has been quiet,
         # whether it was made once or is still being made, until the interval.
-        (1150.0, 1100.0, False),
-        (1220.0, 1100.0, True),
+        (1150.0, 1100.0, _LAST_SYNC, False),
+        (1220.0, 1100.0, _LAST_SYNC, True),
         # Changes that continue wait no longer than the interval.
-        (1300.0, 1299.0, True),
+        (1300.0, 1299.0, _LAST_SYNC, True),
+        # After an attempt that failed, the last sync is still the earlier one, so
+        # what was due still is, but not until the retry delay has passed.
+        (1320.0, 1100.0, 1300.0, False),
+        (1360.0, 1100.0, 1300.0, True),
     ],
     ids=[
         "never changed",
@@ -44,17 +51,23 @@ _INTERVAL = 300.0
         "changed recently",
         "changed and quiet",
         "still changing past interval",
+        "just failed",
+        "failed a retry delay ago",
     ],
 )
-def test_sync_due(now: float, changed: float | None, due: bool) -> None:
+def test_sync_due(
+    now: float, changed: float | None, last_attempt: float, due: bool
+) -> None:
     assert (
         sync_due(
             now=now,
             newest_change=changed,
             synced_change=_SYNCED_CHANGE,
             last_sync=_LAST_SYNC,
+            last_attempt=last_attempt,
             quiet_seconds=_QUIET,
             interval_seconds=_INTERVAL,
+            retry_seconds=_RETRY,
         )
         is due
     )
@@ -68,8 +81,10 @@ def test_sync_due_for_the_first_file_to_exist() -> None:
         # There were no files as of the end of the last sync.
         synced_change=None,
         last_sync=_LAST_SYNC,
+        last_attempt=_LAST_SYNC,
         quiet_seconds=_QUIET,
         interval_seconds=_INTERVAL,
+        retry_seconds=_RETRY,
     )
 
 
@@ -107,10 +122,20 @@ class _Clock:
 
     _now: float
     _sleeps_left: int
+    _step: float
+    # What runs after each sleep, given the time, to be what happens meanwhile.
+    on_sleep: Callable[[float], None] | None
 
-    def __init__(self, *, sleeps: int) -> None:
+    def __init__(self, *, sleeps: int, step: float = 24 * 60 * 60) -> None:
+        """Pass *sleeps* before stopping, each *step* seconds.
+
+        The step is by default a day, which is past any interval, so that a
+        sync is due each time.
+        """
         self._now = 1_000_000.0
         self._sleeps_left = sleeps
+        self._step = step
+        self.on_sleep = None
 
     def time(self) -> float:
         return self._now
@@ -120,8 +145,9 @@ class _Clock:
         if self._sleeps_left == 0:
             raise KeyboardInterrupt
         self._sleeps_left -= 1
-        # A day, which is past any interval, so that a sync is due each time.
-        self._now += 24 * 60 * 60
+        self._now += self._step
+        if self.on_sleep is not None:
+            self.on_sleep(self._now)
 
 
 def test_watch_goes_on_after_a_sync_goes_wrong(
@@ -155,6 +181,42 @@ def test_watch_goes_on_after_a_sync_goes_wrong(
     assert "PermissionError: The session is open in another program." in out
     assert "ConnectionError: No network." in out
     assert "Synced." in out
+
+
+def test_watch_tries_again_soon_after_a_sync_goes_wrong(
+    temp_home: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed sync is not a sync: a change is still to be synced, and soon."""
+    _ = temp_home
+    # Polled every 30 seconds, which is as it is, and more than enough of them
+    # for the retry delay but not for the interval.
+    clock = _Clock(sleeps=32, step=30.0)
+    monkeypatch.setattr("fogies.tools.claude_sync_watch.time", clock)
+    history = claude_directory() / "history.jsonl"
+    history.parent.mkdir(parents=True, exist_ok=True)
+    attempts: list[float] = []
+
+    def change_after_the_first_sync(now: float) -> None:
+        # Once, a moment after the first sync, which has nothing to sync.
+        if len(attempts) == 1 and not history.exists():
+            _ = history.write_text("changed", encoding="utf-8")
+            os.utime(history, (now, now))
+
+    clock.on_sleep = change_after_the_first_sync
+
+    def sync() -> None:
+        attempts.append(clock.time())
+        # The second, of the change, fails, as with no network yet.
+        if len(attempts) == 2:
+            raise ConnectionError("No network.")
+
+    with pytest.raises(KeyboardInterrupt):
+        watch_and_sync(sync=sync)
+
+    start = 1_000_000.0
+    # The change is at 30, and has been quiet for ten minutes at 630. Tried again
+    # five minutes after, which is not the interval of an hour.
+    assert attempts == [start, start + 630.0, start + 930.0]
 
 
 def test_only_one_watch_in_a_process(temp_home: pathlib.Path) -> None:
