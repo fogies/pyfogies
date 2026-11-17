@@ -259,10 +259,39 @@ def synced_paths() -> list[str]:
     return SESSIONS_PATHS if scope and scope[1] == "sessions" else _FULL_PATHS
 
 
-class _SyncState(BaseModel):
-    """What claude-sync records of syncing, of which only the files matter."""
+_STATE_FILE_NAME = "state.json"
 
-    files: dict[str, object] = {}
+
+class _RecordedFile(BaseModel):
+    """What claude-sync records of a file it synced, of which only the hash matters.
+
+    The hash is not required, so that a file recorded in some other form still
+    counts as recorded for is_first_pull, where not being sure means forcing the
+    pull. Where the hash is needed, a file without one is as if not recorded.
+    """
+
+    hash: str | None = None
+
+
+class _SyncState(BaseModel):
+    """What claude-sync records of syncing, of which only the files matter.
+
+    The files are by path in the Claude directory.
+    """
+
+    files: dict[str, _RecordedFile] = {}
+
+
+def _read_state() -> _SyncState | None:
+    """Return what claude-sync recorded of syncing, or None if not there or not understood."""
+    try:
+        return _SyncState.model_validate_json(
+            (claude_sync_files_directory() / _STATE_FILE_NAME).read_text(
+                encoding="utf-8"
+            )
+        )
+    except OSError, ValidationError:
+        return None
 
 
 def is_first_pull() -> bool:
@@ -272,25 +301,8 @@ def is_first_pull() -> bool:
     pull. If it is wrong the other way, claude-sync asks about overwriting files
     before its first pull, which does not work from a task.
     """
-    try:
-        state = _SyncState.model_validate_json(
-            (claude_sync_files_directory() / "state.json").read_text(encoding="utf-8")
-        )
-    except OSError, ValidationError:
-        return True
-    return not state.files
-
-
-class _RecordedFile(BaseModel):
-    """What claude-sync records of a file it synced, of which only the hash matters."""
-
-    hash: str
-
-
-class _RecordedFiles(BaseModel):
-    """What claude-sync records of the files it synced, by path in the Claude directory."""
-
-    files: dict[str, _RecordedFile] = {}
+    state = _read_state()
+    return state is None or not state.files
 
 
 # claude-sync saves the remote version of a conflict beside the local file, as
@@ -368,16 +380,13 @@ def _clear_conflicts_with_own_uploads() -> list[pathlib.Path]:
     is not so if claude-sync keeps it (see _warn_if_kept_local). Returns the
     local files that were kept.
     """
-    try:
-        recorded = _RecordedFiles.model_validate_json(
-            (claude_sync_files_directory() / "state.json").read_text(encoding="utf-8")
-        )
-    except OSError, ValidationError:
+    state = _read_state()
+    if state is None:
         return []
 
     kept: list[pathlib.Path] = []
     for conflict in _conflicts():
-        entry = recorded.files.get(_relative_path(conflict.original_path))
+        entry = state.files.get(_relative_path(conflict.original_path))
         if entry is None or entry.hash != conflict.remote_hash:
             continue
         try:

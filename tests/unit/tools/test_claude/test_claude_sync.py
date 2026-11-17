@@ -502,6 +502,11 @@ def test_is_first_pull(claude_sync_files_dir: pathlib.Path) -> None:
     _ = state_path.write_text('{"files": {"a.jsonl": {"hash": "x"}}}', encoding="utf-8")
     assert not is_first_pull()
 
+    # A file recorded in some other form is still recorded, as being wrong the
+    # other way forces a pull over what has been synced before.
+    _ = state_path.write_text('{"files": {"a.jsonl": {}}}', encoding="utf-8")
+    assert not is_first_pull()
+
 
 def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(
     temp_home: pathlib.Path,
