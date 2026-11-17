@@ -67,7 +67,11 @@ def get_task_configure(
 
             # What was just shown is what the first pull does, which merges with
             # what is here, and it is followed by a push of what is only here.
-            if is_first_pull():
+            try:
+                first_pull = is_first_pull()
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+            if first_pull:
                 try:
                     answer = input("Run the first sync now? [y/N] ")
                 except EOFError:
@@ -231,10 +235,15 @@ def get_task_sync(
         Pull, resolve any conflicts, delete what other machines deleted, then push.
         """
         # Before a new terminal, so that this one says it.
-        if watch and is_first_pull():
-            raise SystemExit(
-                "This machine has not synced before. Run the sync task without --watch first."
-            )
+        if watch:
+            try:
+                first_pull = is_first_pull()
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+            if first_pull:
+                raise SystemExit(
+                    "This machine has not synced before. Run the sync task without --watch first."
+                )
 
         if watch and is_watching():
             raise SystemExit(

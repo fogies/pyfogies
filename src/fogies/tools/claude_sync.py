@@ -266,8 +266,9 @@ class _RecordedFile(BaseModel):
     """What claude-sync records of a file it synced, of which only the hash matters.
 
     The hash is not required, so that a file recorded in some other form still
-    counts as recorded for is_first_pull, where not being sure means forcing the
-    pull. Where the hash is needed, a file without one is as if not recorded.
+    counts as recorded for is_first_pull, where being wrong the other way forces
+    a pull over what has been synced before. Where the hash is needed, a file
+    without one is as if not recorded.
     """
 
     hash: str | None = None
@@ -283,23 +284,34 @@ class _SyncState(BaseModel):
 
 
 def _read_state() -> _SyncState | None:
-    """Return what claude-sync recorded of syncing, or None if not there or not understood."""
+    """Return what claude-sync recorded of syncing, or None if it recorded nothing.
+
+    Raises ValueError if there is a record that cannot be read or is not
+    understood, as that is not the same as there being none.
+    """
+    path = claude_sync_files_directory() / _STATE_FILE_NAME
     try:
-        return _SyncState.model_validate_json(
-            (claude_sync_files_directory() / _STATE_FILE_NAME).read_text(
-                encoding="utf-8"
-            )
-        )
-    except OSError, ValidationError:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
         return None
+    except OSError as exc:
+        raise ValueError("Cannot read '{}': {}".format(path, exc)) from exc
+    try:
+        return _SyncState.model_validate_json(text)
+    except ValidationError as exc:
+        raise ValueError(
+            "'{}' is not understood, so whether this machine has synced is not known. Check it, or delete it if this machine should sync as for the first time: {}".format(
+                path, exc
+            )
+        ) from exc
 
 
 def is_first_pull() -> bool:
     """Return whether claude-sync has recorded nothing of syncing on this machine.
 
-    If it is not sure, it is taken to be, because what follows is forcing the
-    pull. If it is wrong the other way, claude-sync asks about overwriting files
-    before its first pull, which does not work from a task.
+    The first pull is forced, which skips claude-sync's question about backing
+    up, as it does not work from a task. So this is not guessed at: it raises
+    ValueError if what claude-sync recorded cannot be read or is not understood.
     """
     state = _read_state()
     return state is None or not state.files
@@ -378,7 +390,8 @@ def _clear_conflicts_with_own_uploads() -> list[pathlib.Path]:
     Those are deleted, and nothing else is, including claude-sync's record. So
     the local file differs from the record, and the next push uploads it, which
     is not so if claude-sync keeps it (see _warn_if_kept_local). Returns the
-    local files that were kept.
+    local files that were kept. Raises ValueError if claude-sync's record cannot
+    be read or is not understood.
     """
     state = _read_state()
     if state is None:

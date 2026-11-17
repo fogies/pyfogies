@@ -488,15 +488,12 @@ def test_output_that_has_changed_is_not_recognised(
 
 
 def test_is_first_pull(claude_sync_files_dir: pathlib.Path) -> None:
-    """It is the first pull until claude-sync has recorded files, or if unsure."""
+    """It is the first pull until claude-sync has recorded files."""
     assert is_first_pull()
 
     claude_sync_files_dir.mkdir()
     state_path = claude_sync_files_dir / "state.json"
     _ = state_path.write_text('{"files": {}}', encoding="utf-8")
-    assert is_first_pull()
-
-    _ = state_path.write_text("not json", encoding="utf-8")
     assert is_first_pull()
 
     _ = state_path.write_text('{"files": {"a.jsonl": {"hash": "x"}}}', encoding="utf-8")
@@ -506,6 +503,18 @@ def test_is_first_pull(claude_sync_files_dir: pathlib.Path) -> None:
     # other way forces a pull over what has been synced before.
     _ = state_path.write_text('{"files": {"a.jsonl": {}}}', encoding="utf-8")
     assert not is_first_pull()
+
+
+@pytest.mark.parametrize("text", ["not json", '{"files": 5}', "[]"])
+def test_is_first_pull_is_not_guessed_if_the_record_is_not_understood(
+    claude_sync_files_dir: pathlib.Path, text: str
+) -> None:
+    """A record that is there but not understood is not taken to be none."""
+    claude_sync_files_dir.mkdir()
+    _ = (claude_sync_files_dir / "state.json").write_text(text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not understood"):
+        _ = is_first_pull()
 
 
 def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(
