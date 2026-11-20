@@ -243,6 +243,9 @@ class SyncedDeletions:
     recorded: list[str]
     # Deleted from this machine, because they were recorded as deleted.
     deleted: list[str]
+    # Recorded as deleted, but that could not be deleted from this machine (e.g.,
+    # a file in use), each with why. They are tried again by the next sync.
+    failed: dict[str, str]
 
 
 def sync_deletions(*, bucket_name: str, region: str) -> SyncedDeletions:
@@ -252,6 +255,10 @@ def sync_deletions(*, bucket_name: str, region: str) -> SyncedDeletions:
     recorded, and then every session that is recorded as deleted is deleted from
     this machine, unless it is already gone from here. The record is read once,
     and written only if there is something to record.
+
+    A session that cannot be deleted from here (e.g., a file in use) does not
+    stop the others, or the sync. It is reported as failed, and as it stays
+    recorded, it is tried again by the next sync.
 
     Raises ValueError if what is in the bucket is not understood. Raises
     RuntimeError if others kept changing the record, so that this could not.
@@ -268,11 +275,12 @@ def sync_deletions(*, bucket_name: str, region: str) -> SyncedDeletions:
                 recorded.append(session_id)
 
     record = _update(bucket_name=bucket_name, region=region, change=add)
-    return SyncedDeletions(
-        recorded=sorted(recorded),
-        deleted=[
-            session_id
-            for session_id in sorted(record.deleted)
-            if _delete_here(session_id)
-        ],
-    )
+    deleted: list[str] = []
+    failed: dict[str, str] = {}
+    for session_id in sorted(record.deleted):
+        try:
+            if _delete_here(session_id):
+                deleted.append(session_id)
+        except OSError as exc:
+            failed[session_id] = str(exc)
+    return SyncedDeletions(recorded=sorted(recorded), deleted=deleted, failed=failed)

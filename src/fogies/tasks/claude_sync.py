@@ -279,6 +279,12 @@ def get_task_sync(
                             len(synced.deleted), ", ".join(synced.deleted)
                         )
                     )
+                for session_id, reason in synced.failed.items():
+                    print(
+                        "Could not delete {}, which is tried again by the next sync: {}".format(
+                            session_id, reason
+                        )
+                    )
 
             def sync_once() -> None:
                 cs.sync(

@@ -7,6 +7,7 @@ from contextlib import nullcontext
 from typing import cast
 
 import pytest
+from claude_agent_sdk import delete_session
 from pydantic import ValidationError
 
 from fogies.tools.boto import S3Object, S3PreconditionFailed
@@ -248,6 +249,39 @@ def test_sync_deletions_deletes_what_was_recorded(
     assert _exists("project-2", not_recorded)
     # Still recorded, for machines that have not yet synced.
     assert set(bucket.deleted()) == {recorded_and_here, recorded_not_here}
+
+
+def test_sync_deletions_reports_a_session_it_cannot_delete_and_deletes_the_rest(
+    bucket: _FakeBucket, temp_home: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One that cannot be deleted does not stop the others, and is still recorded."""
+    _ = temp_home
+    stuck = _uuid(2)
+    before = _uuid(1)
+    after = _uuid(3)
+    for session in (before, stuck, after):
+        _write_session("project-1", session)
+    bucket.set(_record(before, stuck, after))
+
+    real_delete_session = delete_session
+
+    def delete_session_unless_stuck(session_id: str) -> None:
+        if session_id == stuck:
+            raise PermissionError("in use")
+        real_delete_session(session_id)
+
+    monkeypatch.setattr(
+        "fogies.tools.claude_sync_deletions.delete_session",
+        delete_session_unless_stuck,
+    )
+
+    synced = sync_deletions(**_BUCKET)
+
+    assert synced.deleted == [before, after]
+    assert synced.failed == {stuck: "in use"}
+    assert _exists("project-1", stuck)
+    # Still recorded, so that the next sync tries again.
+    assert set(bucket.deleted()) == {before, stuck, after}
 
 
 def test_sync_deletions_records_what_the_app_deleted(
