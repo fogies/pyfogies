@@ -41,6 +41,11 @@ def newest_change(*, directory: pathlib.Path) -> float | None:
     # Only what the sessions scope syncs, whatever the scope is. What else a
     # full scope syncs (e.g., plugins) is picked up on the interval, instead of
     # being polled for.
+    #
+    # Each is stat-ed itself, after listing, and not taken from the listing (e.g.,
+    # os.scandir), which on Windows has a directory's, and an open file's, time
+    # as of when it was last closed. So a session that is being written to would
+    # look quiet.
     for name in SESSIONS_PATHS:
         path = directory / name
         paths = [path, *path.rglob("*")] if path.is_dir() else [path]

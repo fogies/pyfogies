@@ -117,6 +117,22 @@ def test_newest_change(tmp_path: pathlib.Path) -> None:
     assert newest is not None and newest > 200
 
 
+def test_newest_change_finds_a_file_however_deep(tmp_path: pathlib.Path) -> None:
+    """A session's subagents are in directories under it, which are looked in too."""
+    shallow = tmp_path / "projects" / "demo" / "a.jsonl"
+    deep = tmp_path / "projects" / "demo" / "a" / "subagents" / "agent.jsonl"
+    deep.parent.mkdir(parents=True)
+    for path, modified in ((shallow, 100), (deep, 300)):
+        _ = path.write_text("{}", encoding="utf-8")
+        os.utime(path, (modified, modified))
+    # Directories are older than the files they were made for.
+    for directory in (*deep.parents, *shallow.parents):
+        if directory != tmp_path and tmp_path in directory.parents:
+            os.utime(directory, (50, 50))
+
+    assert newest_change(directory=tmp_path) == 300
+
+
 class _Clock:
     """Stands in for the time module, which passes by sleeping, and stops the watch."""
 
