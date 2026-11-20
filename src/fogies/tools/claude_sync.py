@@ -208,6 +208,22 @@ def _conflicts_remain(output: str) -> bool:
     )
 
 
+# A conflict in a list of them, as the file that is in conflict.
+_CONFLICT_ITEM = re.compile(r"\d+\. (?P<path>.+)")
+
+
+def _conflict_files(output: str) -> list[str]:
+    """Return the files that the output of listing conflicts says are in conflict.
+
+    Raises ValueError if the output is not recognised.
+    """
+    return [
+        item["path"]
+        for line in _lines(command="conflicts", output=output, forms=_CONFLICTS_FORMS)
+        if (item := _CONFLICT_ITEM.fullmatch(line))
+    ]
+
+
 def claude_directory() -> pathlib.Path:
     """Where claude-sync syncs from, which is not configurable."""
     return pathlib.Path.home() / ".claude"
@@ -683,10 +699,32 @@ class _ClaudeSync:
         )
 
     def _conflicts_remain(self, *, command_params: CommandParams) -> bool:
-        """Return whether conflicts are left, according to listing them."""
+        """Return whether conflicts are left, according to listing them.
+
+        That is claude-sync's own list, which is of every file in the Claude
+        directory that is named as a conflict, not only those that this
+        looks for (see _conflicts). That is deliberate. A push replaces what is
+        in the bucket with what is here, so being stopped by a file that is not
+        a conflict that matters is better than missing one that is.
+        """
         return _conflicts_remain(
             self.list_conflicts(command_params=command_params).stdout
         )
+
+    def _unresolved_error(
+        self, *, message: str, command_params: CommandParams
+    ) -> ValueError:
+        """Return a ValueError of message that names the files in conflict.
+
+        The listing is hidden when unattended, and nothing else says which they
+        are, so a sync that is stopped by one that this cannot clear (e.g., a
+        file that is not claude-sync's to begin with) is otherwise stuck without
+        saying why.
+        """
+        files = _conflict_files(
+            self.list_conflicts(command_params=command_params).stdout
+        )
+        return ValueError("{}: {}".format(message, ", ".join(files)))
 
     def sync(
         self,
@@ -725,7 +763,10 @@ class _ClaudeSync:
         # Those left from before, which the pull below may leave again.
         _keep_local_of_own_uploads()
         if unattended and self._conflicts_remain(command_params=hidden):
-            raise ValueError("Not syncing, because conflicts are unresolved.")
+            raise self._unresolved_error(
+                message="Not syncing, because conflicts are unresolved",
+                command_params=hidden,
+            )
 
         pull_result = self.pull(command_params=command_params)
         if _had_errors(command="pull", output=pull_result.stdout):
@@ -736,7 +777,10 @@ class _ClaudeSync:
         _keep_local_of_own_uploads()
         if unattended:
             if self._conflicts_remain(command_params=hidden):
-                raise ValueError("Not pushing, because the pull had conflicts.")
+                raise self._unresolved_error(
+                    message="Not pushing, because the pull had conflicts",
+                    command_params=hidden,
+                )
         elif self._conflicts_remain(command_params=command_params):
             _ = self.resolve_conflicts(command_params=command_params)
             # What was resolved was already shown, so only what is left is.

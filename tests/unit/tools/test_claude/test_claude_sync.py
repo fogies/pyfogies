@@ -711,6 +711,37 @@ def test_claude_sync_sync_clears_a_conflict_with_its_own_upload(
     assert not _conflicts()
 
 
+def test_claude_sync_sync_unattended_names_the_conflicts_that_stop_it(
+    temp_home: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A conflict outside what is synced stops it, as claude-sync lists it, and is named.
+
+    This is checked against the real claude-sync, as what it lists is what is named.
+    """
+    _ = temp_home
+    stray = claude_directory() / "cache" / "c.json.conflict.20261113-080344"
+    stray.parent.mkdir(parents=True)
+    _ = stray.write_bytes(b"remote")
+    made: list[str] = []
+
+    def fake_pull(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("pull")
+        return Result(stdout=_REBUILT)
+
+    monkeypatch.setattr("fogies.tools.claude_sync.is_first_pull", lambda: False)
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        monkeypatch.setattr(cs, "pull", fake_pull)
+
+        with pytest.raises(ValueError, match="Not syncing.*c\\.json"):
+            cs.sync(command_params=CommandParams(in_stream=False), unattended=True)
+
+    assert made == []
+    assert stray.exists()
+
+
 def _configure_scope(scope: Literal["full", "sessions"] | None) -> None:
     """Write claude-sync's config.yaml as configure does, for a scope, or none."""
     if scope is None:
