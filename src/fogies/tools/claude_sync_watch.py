@@ -18,7 +18,7 @@ from invoke.exceptions import Failure
 
 from fogies.tools.claude_sync import (
     SESSIONS_PATHS,
-    claude_directory,
+    claude_sync_claude_directory,
     claude_sync_files_directory,
 )
 
@@ -139,7 +139,8 @@ def watch_and_sync(*, sync: Callable[[], None]) -> None:
     one finishes. Raises ValueError, without syncing, if another watch is
     running, as two would sync over each other.
     """
-    directory = claude_directory()
+    # What claude-sync syncs, which is what a change to is one to sync.
+    directory = claude_sync_claude_directory()
 
     with _watch_lock():
         last_sync = 0.0

@@ -37,7 +37,7 @@ from claude_agent_sdk import delete_session
 from pydantic import AfterValidator, BaseModel, Field, ValidationError
 
 from fogies.tools.boto import S3PreconditionFailed, s3_get_object, s3_put_object
-from fogies.tools.claude_sync import claude_directory
+from fogies.tools.claude_sync import claude_directory, require_claude_sync_directory
 
 # Where the record is, in the bucket.
 KEY = "deleted-sessions.json"
@@ -188,9 +188,12 @@ def delete_everywhere(*, bucket_name: str, region: str, session_id: str) -> None
     It is deleted from this machine, if it is here, only once it is recorded.
 
     Raises ValueError if session_id is not a session ID, or if what is in the
-    bucket is not understood. Raises RuntimeError if others kept changing the
-    record, so that this could not.
+    bucket is not understood, or if the Claude directory is not where
+    claude-sync syncs (see require_claude_sync_directory), before recording or
+    deleting anything. Raises RuntimeError if others kept changing the record,
+    so that this could not.
     """
+    require_claude_sync_directory()
     record_deletion(bucket_name=bucket_name, region=region, session_id=session_id)
     _ = _delete_here(session_id)
 
@@ -260,9 +263,12 @@ def sync_deletions(*, bucket_name: str, region: str) -> SyncedDeletions:
     stop the others, or the sync. It is reported as failed, and as it stays
     recorded, it is tried again by the next sync.
 
-    Raises ValueError if what is in the bucket is not understood. Raises
-    RuntimeError if others kept changing the record, so that this could not.
+    Raises ValueError if what is in the bucket is not understood, or if the
+    Claude directory is not where claude-sync syncs (see
+    require_claude_sync_directory). Raises RuntimeError if others kept changing
+    the record, so that this could not.
     """
+    require_claude_sync_directory()
     desktop = _desktop_deletions()
     recorded: list[str] = []
 

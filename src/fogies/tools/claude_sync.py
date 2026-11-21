@@ -22,6 +22,7 @@ import dataclasses
 import hashlib
 import json
 import locale
+import os
 import pathlib
 import re
 from collections.abc import Callable, Generator
@@ -225,8 +226,45 @@ def _conflict_files(output: str) -> list[str]:
 
 
 def claude_directory() -> pathlib.Path:
-    """Where claude-sync syncs from, which is not configurable."""
+    """Where Claude Code keeps its files, which CLAUDE_CONFIG_DIR changes.
+
+    That is as Claude Code, and the Claude Agent SDK, decide it. It is not
+    necessarily where claude-sync syncs (see claude_sync_claude_directory).
+    """
+    configured = os.environ.get("CLAUDE_CONFIG_DIR")
+    if configured:
+        return pathlib.Path(configured)
     return pathlib.Path.home() / ".claude"
+
+
+def claude_sync_claude_directory() -> pathlib.Path:
+    """Where claude-sync syncs, which is always ~/.claude.
+
+    As of _KNOWN_VERSIONS[0] it has no option, environment variable or config
+    to change that (ClaudeDirOverride in its internal/config/config.go is only
+    for its own tests), and it ignores CLAUDE_CONFIG_DIR. So when it can, check
+    that this is claude_directory() (see require_claude_sync_directory).
+    """
+    return pathlib.Path.home() / ".claude"
+
+
+def require_claude_sync_directory() -> None:
+    """Raise ValueError if the Claude directory is not where claude-sync syncs.
+
+    That is when CLAUDE_CONFIG_DIR is set to somewhere other than ~/.claude. Then
+    claude-sync would sync one directory while sessions were listed in, and
+    deleted from, another, so nothing that depends on them agreeing is done.
+    """
+    claude = claude_directory()
+    synced = claude_sync_claude_directory()
+    if claude.resolve() != synced.resolve():
+        raise ValueError(
+            "claude-sync only syncs '{}', but Claude Code's files are in '{}', because CLAUDE_CONFIG_DIR is set. Unset it, or set it to '{}', to use claude-sync.".format(
+                synced,
+                claude,
+                synced,
+            )
+        )
 
 
 def claude_sync_files_directory() -> pathlib.Path:
@@ -259,7 +297,7 @@ _SCOPE_LINE = re.compile(r"""^scope:\s*["']?(\w+)["']?\s*$""", re.MULTILINE)
 
 
 def synced_paths() -> list[str]:
-    """Return what claude-sync syncs on this machine, by names in claude_directory().
+    """Return what claude-sync syncs on this machine, by names in claude_sync_claude_directory().
 
     That is as its scope says, in its config.yaml, which is what it reads. As it
     does, anything but the sessions scope, including having none, is the full
@@ -363,8 +401,8 @@ def _conflict_paths() -> list[pathlib.Path]:
     for name in synced_paths():
         # A file in the Claude directory has its conflict beside it, and one in a
         # directory has it in there.
-        paths.update(claude_directory().glob("{}.conflict.*".format(name)))
-        paths.update((claude_directory() / name).rglob("*.conflict.*"))
+        paths.update(claude_sync_claude_directory().glob("{}.conflict.*".format(name)))
+        paths.update((claude_sync_claude_directory() / name).rglob("*.conflict.*"))
     return sorted(paths)
 
 
@@ -389,7 +427,7 @@ def _conflicts() -> list[_Conflict]:
 
 
 def _relative_path(path: pathlib.Path) -> str:
-    return path.relative_to(claude_directory()).as_posix()
+    return path.relative_to(claude_sync_claude_directory()).as_posix()
 
 
 def _clear_conflicts_with_own_uploads() -> list[pathlib.Path]:
@@ -811,7 +849,11 @@ def claude_sync(
 
     raise_if_env_exists has no default; see fogies.tools.environ.environ()
     for why. Passed through to go().install()'s own GOBIN isolation.
+
+    Raises ValueError, before building anything, if the Claude directory is not
+    where claude-sync syncs (see require_claude_sync_directory).
     """
+    require_claude_sync_directory()
     if version is None:
         version = _DEFAULT_VERSION
 

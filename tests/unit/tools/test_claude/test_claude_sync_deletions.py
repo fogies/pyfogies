@@ -222,6 +222,28 @@ def test_delete_everywhere_deletes_here_only_if_recorded(
         assert list(bucket.deleted()) == [session]
 
 
+def test_deleting_is_refused_if_claude_sync_syncs_somewhere_else(
+    bucket: _FakeBucket,
+    temp_home: pathlib.Path,
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nothing is recorded or deleted, as the session is not in what is synced."""
+    _ = temp_home
+    session = _uuid(1)
+    _write_session("project-1", session)
+    transcript = claude_directory() / "projects" / "project-1" / (session + ".jsonl")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "elsewhere"))
+
+    with pytest.raises(ValueError, match="CLAUDE_CONFIG_DIR"):
+        delete_everywhere(**_BUCKET, session_id=session)
+    with pytest.raises(ValueError, match="CLAUDE_CONFIG_DIR"):
+        _ = sync_deletions(**_BUCKET)
+
+    assert bucket.body is None
+    assert transcript.exists()
+
+
 def test_sync_deletions_deletes_what_was_recorded(
     bucket: _FakeBucket, temp_home: pathlib.Path
 ) -> None:

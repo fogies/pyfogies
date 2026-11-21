@@ -41,11 +41,13 @@ from fogies.tools.claude_sync import (
     ClaudeSyncConfig,
     claude_directory,
     claude_sync,
+    claude_sync_claude_directory,
     claude_sync_files_directory,
     configure_claude_sync,
     is_first_pull,
     load_claude_sync_config,
     render_claude_sync_yaml,
+    require_claude_sync_directory,
     update_claude_sync_config,
 )
 from fogies.tools.command import CommandParams
@@ -190,14 +192,58 @@ def _write_conflict(*, remote: bytes) -> tuple[pathlib.Path, pathlib.Path]:
     return local, conflict
 
 
-def test_claude_sync_is_available() -> None:
+def test_claude_directory_follows_claude_config_dir_but_claude_sync_does_not(
+    temp_home: pathlib.Path, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Claude Code's directory is where it says, and claude-sync's is always ~/.claude."""
+    assert claude_directory() == temp_home / ".claude"
+
+    elsewhere = tmp_path / "elsewhere"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(elsewhere))
+
+    assert claude_directory() == elsewhere
+    assert claude_sync_claude_directory() == temp_home / ".claude"
+
+
+def test_require_claude_sync_directory_refuses_only_where_they_differ(
+    temp_home: pathlib.Path, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A CLAUDE_CONFIG_DIR that is where claude-sync syncs anyway is not a problem."""
+    require_claude_sync_directory()
+
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(temp_home / ".claude"))
+    require_claude_sync_directory()
+
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "elsewhere"))
+    with pytest.raises(ValueError, match="only syncs.*CLAUDE_CONFIG_DIR is set"):
+        require_claude_sync_directory()
+
+
+def test_claude_sync_refuses_before_building_if_the_claude_directory_is_elsewhere(
+    temp_home: pathlib.Path, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No claude-sync command is run, or built to be run, that would sync another one."""
+    _ = temp_home
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "elsewhere"))
+    cache = tmp_path / "cache"
+
+    with pytest.raises(ValueError, match="only syncs"):
+        with claude_sync(binary_cache_path=cache, raise_if_env_exists=False):
+            pass
+
+    assert not cache.exists()
+
+
+def test_claude_sync_is_available(temp_home: pathlib.Path) -> None:
     """Context manager provides a working executable exposing the wrapped commands.
 
     Only checks --help, not push/pull/status themselves: those read
     ~/.claude-sync/config.yaml with no override, so any test exercising them
     would depend on this machine's ambient claude-sync setup rather than a
-    controlled fixture.
+    controlled fixture. (The home is replaced for the same reason, and so that
+    CLAUDE_CONFIG_DIR, which claude_sync refuses, is not inherited.)
     """
+    _ = temp_home
     with claude_sync(
         binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
     ) as cs:
