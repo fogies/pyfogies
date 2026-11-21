@@ -2,6 +2,7 @@
 
 import json
 import pathlib
+import subprocess
 
 import pytest
 
@@ -11,6 +12,7 @@ from fogies.tools.claude_desktop import (
     desktop_sessions,
     desktop_statuses,
     plan_resume,
+    resume_each,
 )
 
 
@@ -112,3 +114,50 @@ def test_plan_resume_resumes_what_can_be_and_says_why_not_for_the_rest(
             missing
         ),
     }
+
+
+def test_resume_each_goes_on_after_a_session_that_cannot_be_resumed(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Each way that one can fail is returned with why, and the rest are resumed."""
+    resumable = {
+        "first": tmp_path,
+        "exits_with_error": tmp_path,
+        "directory_gone": tmp_path,
+        "cannot_run": tmp_path,
+        "last": tmp_path,
+    }
+    tried: list[str] = []
+
+    def resume(session_id: str, cwd: pathlib.Path) -> None:
+        assert cwd == tmp_path
+        tried.append(session_id)
+        if session_id == "exits_with_error":
+            raise subprocess.CalledProcessError(1, ["claude"])
+        if session_id == "directory_gone":
+            raise ValueError("ran in a directory that does not exist here")
+        if session_id == "cannot_run":
+            raise PermissionError("access denied")
+
+    resumed, failed = resume_each(resumable=resumable, resume=resume)
+
+    assert tried == list(resumable)
+    assert resumed == ["first", "last"]
+    assert failed == {
+        "exits_with_error": "Command '['claude']' returned non-zero exit status 1.",
+        "directory_gone": "ran in a directory that does not exist here",
+        "cannot_run": "access denied",
+    }
+
+
+def test_resume_each_does_not_hide_what_is_not_about_a_session(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A mistake in the code, as opposed to one session failing, is not swallowed."""
+
+    def resume(session_id: str, cwd: pathlib.Path) -> None:
+        _ = (session_id, cwd)
+        raise KeyError("a bug")
+
+    with pytest.raises(KeyError):
+        _ = resume_each(resumable={"a": tmp_path}, resume=resume)

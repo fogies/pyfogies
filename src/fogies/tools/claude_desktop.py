@@ -13,8 +13,9 @@ CLI. See fogies.tools.claude_code.
 
 import os
 import pathlib
+import subprocess
 import sys
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from enum import StrEnum
 from typing import ClassVar
 
@@ -170,3 +171,28 @@ def plan_resume(
         else:
             resumable[session_id] = pathlib.Path(cwd)
     return resumable, skipped
+
+
+def resume_each(
+    *,
+    resumable: Mapping[str, pathlib.Path],
+    resume: Callable[[str, pathlib.Path], None],
+) -> tuple[list[str], dict[str, str]]:
+    """Resume each session, and return those that were, and why others weren't.
+
+    resumable is by session ID with its directory, as from plan_resume, and
+    resume is called with each. One that can't be resumed (e.g., claude exits
+    with an error, or its directory has gone since it was planned) does not stop
+    the others. It is returned with why, and what is not resumed is not
+    resumed by this.
+    """
+    resumed: list[str] = []
+    failed: dict[str, str] = {}
+    for session_id, cwd in resumable.items():
+        try:
+            resume(session_id, cwd)
+        except (ValueError, OSError, subprocess.CalledProcessError) as exc:
+            failed[session_id] = str(exc)
+        else:
+            resumed.append(session_id)
+    return resumed, failed

@@ -21,6 +21,7 @@ from fogies.tools.claude_desktop import (
     desktop_sessions_directory,
     desktop_statuses,
     plan_resume,
+    resume_each,
 )
 from fogies.tools.claude_sessions import describe_session, find_session_id
 
@@ -101,16 +102,28 @@ def get_task_resume(*, binary_cache_path: pathlib.Path) -> Task[Callable[..., No
             print("Skipping {}, as it {}.".format(skipped_id, problem))
 
         with claude_code(binary_cache_path=binary_cache_path) as cc:
-            for resume_id, cwd in resumable.items():
+
+            def resume(resume_id: str, cwd: pathlib.Path) -> None:
                 print("Resuming {}.".format(resume_id))
                 cc.resume_in_desktop(session_id=resume_id, cwd=cwd)
 
-        if all_:
-            print(
-                "Resumed {} of {} sessions not listed.".format(
-                    len(resumable), len(resumable) + len(skipped)
-                )
+            if not all_:
+                # One session that is asked for is an error, if it fails.
+                for resume_id, cwd in resumable.items():
+                    resume(resume_id, cwd)
+                return
+            resumed, failed = resume_each(resumable=resumable, resume=resume)
+
+        for failed_id, reason in failed.items():
+            print("Could not resume {}: {}".format(failed_id, reason))
+        print(
+            "Resumed {} of {} sessions not listed.".format(
+                len(resumed), len(resumable) + len(skipped)
             )
+        )
+        # Skipping is not a failure, but a session that was tried is.
+        if failed:
+            raise SystemExit(1)
 
     return cast(Task[Callable[..., None]], task_resume)
 
