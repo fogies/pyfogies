@@ -41,7 +41,6 @@ from fogies.tools.claude_sync import (
     ClaudeSyncConfig,
     claude_directory,
     claude_sync,
-    claude_sync_claude_directory,
     claude_sync_files_directory,
     configure_claude_sync,
     is_first_pull,
@@ -192,19 +191,6 @@ def _write_conflict(*, remote: bytes) -> tuple[pathlib.Path, pathlib.Path]:
     return local, conflict
 
 
-def test_claude_directory_follows_claude_config_dir_but_claude_sync_does_not(
-    temp_home: pathlib.Path, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Claude Code's directory is where it says, and claude-sync's is always ~/.claude."""
-    assert claude_directory() == temp_home / ".claude"
-
-    elsewhere = tmp_path / "elsewhere"
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(elsewhere))
-
-    assert claude_directory() == elsewhere
-    assert claude_sync_claude_directory() == temp_home / ".claude"
-
-
 def test_require_claude_sync_directory_refuses_only_where_they_differ(
     temp_home: pathlib.Path, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -214,7 +200,10 @@ def test_require_claude_sync_directory_refuses_only_where_they_differ(
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(temp_home / ".claude"))
     require_claude_sync_directory()
 
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "elsewhere"))
+    elsewhere = tmp_path / "elsewhere"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(elsewhere))
+    # Claude Code's directory is where it says, and claude-sync's is not.
+    assert claude_directory() == elsewhere
     with pytest.raises(ValueError, match="only syncs.*CLAUDE_CONFIG_DIR is set"):
         require_claude_sync_directory()
 
