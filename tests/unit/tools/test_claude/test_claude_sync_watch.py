@@ -126,8 +126,8 @@ def test_newest_change_finds_a_file_however_deep(tmp_path: pathlib.Path) -> None
         _ = path.write_text("{}", encoding="utf-8")
         os.utime(path, (modified, modified))
     # Directories are older than the files they were made for.
-    for directory in (*deep.parents, *shallow.parents):
-        if directory != tmp_path and tmp_path in directory.parents:
+    for directory in tmp_path.rglob("*"):
+        if directory.is_dir():
             os.utime(directory, (50, 50))
 
     assert newest_change(directory=tmp_path) == 300
