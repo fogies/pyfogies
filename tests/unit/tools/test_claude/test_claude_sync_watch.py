@@ -1,5 +1,6 @@
 """Test when claude-sync is synced while watching."""
 
+import math
 import os
 import pathlib
 from collections.abc import Callable
@@ -7,6 +8,18 @@ from collections.abc import Callable
 import pytest
 
 from fogies.tools.claude_sync import claude_directory
+from fogies.tools.claude_sync_watch import (
+    _INTERVAL_SECONDS,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync_watch import (
+    _POLL_SECONDS,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync_watch import (
+    _QUIET_SECONDS,  # pyright: ignore[reportPrivateUsage]
+)
+from fogies.tools.claude_sync_watch import (
+    _RETRY_SECONDS,  # pyright: ignore[reportPrivateUsage]
+)
 from fogies.tools.claude_sync_watch import (
     _watch_lock,  # pyright: ignore[reportPrivateUsage]
 )
@@ -204,9 +217,25 @@ def test_watch_tries_again_soon_after_a_sync_goes_wrong(
 ) -> None:
     """A failed sync is not a sync: a change is still to be synced, and soon."""
     _ = temp_home
-    # Polled every 30 seconds, which is as it is, and more than enough of them
-    # for the retry delay but not for the interval.
-    clock = _Clock(sleeps=32, step=30.0)
+    start = 1_000_000.0
+
+    def next_poll(at: float) -> float:
+        """Return the first time at or after at that the watch looks, as it polls."""
+        return start + math.ceil((at - start) / _POLL_SECONDS) * _POLL_SECONDS
+
+    # The change is made at the first poll after the start, and the sync is due
+    # at the first poll after it has been quiet for long enough. It fails, and is
+    # tried again at the first poll after the retry delay, which is well before
+    # the interval, so that is as far as it need go.
+    change = start + _POLL_SECONDS
+    failed = next_poll(change + _QUIET_SECONDS)
+    retried = next_poll(failed + _RETRY_SECONDS)
+    assert retried < start + _INTERVAL_SECONDS
+
+    # One poll more than that, so the watch stops after the retry.
+    clock = _Clock(
+        sleeps=round((retried - start) / _POLL_SECONDS) + 1, step=_POLL_SECONDS
+    )
     monkeypatch.setattr("fogies.tools.claude_sync_watch.time", clock)
     history = claude_directory() / "history.jsonl"
     history.parent.mkdir(parents=True, exist_ok=True)
@@ -229,10 +258,7 @@ def test_watch_tries_again_soon_after_a_sync_goes_wrong(
     with pytest.raises(KeyboardInterrupt):
         watch_and_sync(sync=sync)
 
-    start = 1_000_000.0
-    # The change is at 30, and has been quiet for ten minutes at 630. Tried again
-    # five minutes after, which is not the interval of an hour.
-    assert attempts == [start, start + 630.0, start + 930.0]
+    assert attempts == [start, failed, retried]
 
 
 def test_only_one_watch_in_a_process(temp_home: pathlib.Path) -> None:
