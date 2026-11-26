@@ -35,6 +35,17 @@ Will not document changes to agent configuration used in development.
 - Testing change description.
 -->
 
+## [0.0.0-dev.13] (2026-11-26)
+
+### Added
+- Added `load_config` and support for redirection to another location. ([#13](https://github.com/fogies/pyfogies/pull/13))
+- Added `spawn_new_terminal`. ([#13](https://github.com/fogies/pyfogies/pull/13))
+- Added tools and tasks for `claude_code` and `claude_desktop`. ([#13](https://github.com/fogies/pyfogies/pull/13))
+
+### Changed
+- Reworked `claude_sync` tool and tasks. ([#13](https://github.com/fogies/pyfogies/pull/13))
+- Reworked `claude_sync` to use a bucket for recording deletions. ([#13](https://github.com/fogies/pyfogies/pull/13))
+
 ## [0.0.0-dev.12] (2026-10-11)
 
 ### Added
@@ -54,17 +65,17 @@ Will not document changes to agent configuration used in development.
 ## [0.0.0-dev.11] (2026-10-08)
 
 ### Changed
-- Refactored `AwsEnviron` to provide `account_id`. ([#11](https://github.com/fogies/pyfogies/pull/11))
-- Refactored for naming clarity around Terraform modules for `backend`. ([#11](https://github.com/fogies/pyfogies/pull/11))
+- Updated `AwsEnviron` to provide `account_id`. ([#11](https://github.com/fogies/pyfogies/pull/11))
+- Reworked for naming clarity around Terraform modules for `backend`. ([#11](https://github.com/fogies/pyfogies/pull/11))
 
 ### Security
-- Refactored to require S3 buckets are created in account regional namespace. ([#11](https://github.com/fogies/pyfogies/pull/11))
+- Reworked to require S3 buckets are created in account regional namespace. ([#11](https://github.com/fogies/pyfogies/pull/11))
 
 ## [0.0.0-dev.10] (2026-10-05)
 
 ### Changed
-- Refactored `get_collection` support in tasks. ([#10](https://github.com/fogies/pyfogies/pull/10))
-- Refactored Terraform module for `hosted_zone` to support `mode`. ([#10](https://github.com/fogies/pyfogies/pull/10))
+- Reworked `get_collection` support in tasks. ([#10](https://github.com/fogies/pyfogies/pull/10))
+- Reworked Terraform module for `hosted_zone` to support `mode`. ([#10](https://github.com/fogies/pyfogies/pull/10))
 
 ### Removed
 - Removed `terraform_templated`. ([#10](https://github.com/fogies/pyfogies/pull/10))
@@ -80,10 +91,10 @@ Will not document changes to agent configuration used in development.
 - Added `version_format` to `pyfogies_version`. ([#9](https://github.com/fogies/pyfogies/pull/9))
 
 ### Changed
-- Refactored `access-key` task parameters to be explicit. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Reworked `access-key` task parameters to be explicit. ([#9](https://github.com/fogies/pyfogies/pull/9))
 - Refactored for consistent `_path` suffix. ([#9](https://github.com/fogies/pyfogies/pull/9))
-- Refactored `Terraform.output` to allow `None`. ([#9](https://github.com/fogies/pyfogies/pull/9))
-- Refactored Terraform module for `access_key_permissions`. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Updated `Terraform.output` to allow `None`. ([#9](https://github.com/fogies/pyfogies/pull/9))
+- Reworked Terraform module for `access_key_permissions`. ([#9](https://github.com/fogies/pyfogies/pull/9))
 
 ### Fixed
 - Fixed support for AWS root credentials. ([#9](https://github.com/fogies/pyfogies/pull/9))
@@ -97,7 +108,7 @@ Will not document changes to agent configuration used in development.
 
 ### Changed
 - Updated Terraform to require 1.15, gaining support for `const` variables. ([#8](https://github.com/fogies/pyfogies/pull/8))
-- Refactored `environ` to consistently expose `raise_if_env_exists`. ([#8](https://github.com/fogies/pyfogies/pull/8))
+- Reworked `environ` to consistently expose `raise_if_env_exists`. ([#8](https://github.com/fogies/pyfogies/pull/8))
 
 ### Removed
 - Removed `__PYFOGIES_VERSION__` from `terraform_templated`. ([#8](https://github.com/fogies/pyfogies/pull/8))
@@ -109,8 +120,8 @@ Will not document changes to agent configuration used in development.
 - Added `terraform_templated` with support for `__PYFOGIES_VERSION__`. ([#7](https://github.com/fogies/pyfogies/pull/7))
 
 ### Changed
-- Refactored tasks to accept context manager factories. ([#7](https://github.com/fogies/pyfogies/pull/7))
-- Refactored Terraform tool to resolve relative paths. ([#7](https://github.com/fogies/pyfogies/pull/7))
+- Reworked tasks to accept context manager factories. ([#7](https://github.com/fogies/pyfogies/pull/7))
+- Reworked Terraform tool to resolve relative paths. ([#7](https://github.com/fogies/pyfogies/pull/7))
 
 ### Tests
 - Refactored testing for Terraform backend. ([#7](https://github.com/fogies/pyfogies/pull/7))
@@ -123,28 +134,28 @@ Will not document changes to agent configuration used in development.
 - Added `ensure_from_template`. ([#6](https://github.com/fogies/pyfogies/pull/6))
 
 ### Changed
-- Refactored `ready_poll`. ([#6](https://github.com/fogies/pyfogies/pull/6))
-- Refactored `aws_environ_from_config` and `aws_environ_from_profile`. ([#6](https://github.com/fogies/pyfogies/pull/6))
+- Reworked `ready_poll`. ([#6](https://github.com/fogies/pyfogies/pull/6))
+- Reworked `aws_environ_from_config` and `aws_environ_from_profile`. ([#6](https://github.com/fogies/pyfogies/pull/6))
 
 ### Tests
 - Refactored self-signed ALB into a shared fixture. ([#6](https://github.com/fogies/pyfogies/pull/6))
-- Extended testing for Terraform modules. ([#6](https://github.com/fogies/pyfogies/pull/6))
+- Updated testing for Terraform modules. ([#6](https://github.com/fogies/pyfogies/pull/6))
 
 ## [0.0.0-dev.5] (2026-08-11)
 
 ### Added
 - Added Terraform modules for `alb`, `backend`, `ecr`, `hosted_zone`, `network`. ([#5](https://github.com/fogies/pyfogies/pull/5))
-- Added tools and tasks for `terraform` and related `terraform_backend`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Added tools and tasks for `terraform` and `terraform_backend`. ([#5](https://github.com/fogies/pyfogies/pull/5))
 - Added tool for `aws_environ`. ([#5](https://github.com/fogies/pyfogies/pull/5))
 - Added templates for `secrets/aws.toml`, `secrets/poetry.toml`, `secrets/pyfogies-tests.toml`. ([#5](https://github.com/fogies/pyfogies/pull/5))
 
 ### Changed
-- Improved task for `format`. ([#5](https://github.com/fogies/pyfogies/pull/5))
-- Improved tool for `command`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Reworked task for `format`. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Updated tool for `command`. ([#5](https://github.com/fogies/pyfogies/pull/5))
 
 ### Tests
 - Refactored tests. ([#5](https://github.com/fogies/pyfogies/pull/5))
-- Extended testing for Terraform modules. ([#5](https://github.com/fogies/pyfogies/pull/5))
+- Updated testing for Terraform modules. ([#5](https://github.com/fogies/pyfogies/pull/5))
 
 ## [0.0.0-dev.4] (2026-04-14)
 
@@ -164,7 +175,7 @@ Will not document changes to agent configuration used in development.
 
 ### Tests
 - Added testing for Terraform modules. ([#2](https://github.com/fogies/pyfogies/pull/2))
-- Extended testing of tools. ([#2](https://github.com/fogies/pyfogies/pull/2))
+- Updated testing of tools. ([#2](https://github.com/fogies/pyfogies/pull/2))
 
 ## [0.0.0-dev.1] (2025-12-23)
 
