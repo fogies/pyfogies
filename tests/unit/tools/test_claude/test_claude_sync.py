@@ -600,7 +600,7 @@ def test_claude_sync_sync_unattended_requires_a_first_sync_to_be_attended(
         "push errors",
     ],
 )
-def test_claude_sync_sync_calls_after_pull_before_the_push(
+def test_claude_sync_sync_does_not_push_after_a_pull_that_went_wrong(
     temp_home: pathlib.Path,
     monkeypatch: pytest.MonkeyPatch,
     pull_output: str,
@@ -608,8 +608,18 @@ def test_claude_sync_sync_calls_after_pull_before_the_push(
     calls: list[str],
     error: str | None,
 ) -> None:
-    """What it changes is pushed, and it is not run for a pull that failed."""
+    """A pull that went wrong is not pushed over, and after_pull is not run for it.
+
+    For one that went well, after_pull is run before the push, so that what it
+    changes is pushed. A push that had errors is reported after it, as it is not
+    undone. Pull and push are faked, as they need a bucket, but not the check
+    for conflicts, which is claude-sync's, and not whether it is a first pull,
+    which is what it has recorded.
+    """
     _ = temp_home
+    # Not a first pull, and a directory with no conflicts to list.
+    _ = _record_upload("projects/demo/a.jsonl", _UPLOADED)
+    claude_directory().mkdir(parents=True, exist_ok=True)
     made: list[str] = []
 
     def fake_pull(**kwargs: object) -> Result:
@@ -622,17 +632,11 @@ def test_claude_sync_sync_calls_after_pull_before_the_push(
         made.append("push")
         return Result(stdout=push_output)
 
-    def fake_conflicts_remain(**kwargs: object) -> bool:
-        _ = kwargs
-        return False
-
-    monkeypatch.setattr("fogies.tools.claude_sync.is_first_pull", lambda: False)
     with claude_sync(
         binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
     ) as cs:
         monkeypatch.setattr(cs, "pull", fake_pull)
         monkeypatch.setattr(cs, "push", fake_push)
-        monkeypatch.setattr(cs, "_conflicts_remain", fake_conflicts_remain)
 
         with pytest.raises(ValueError, match=error) if error else nullcontext():
             cs.sync(
@@ -724,17 +728,11 @@ def test_claude_sync_sync_clears_a_conflict_with_its_own_upload(
         made.append("push")
         return Result(stdout="")
 
-    def fake_conflicts_remain(**kwargs: object) -> bool:
-        _ = kwargs
-        return bool(_conflicts())
-
-    monkeypatch.setattr("fogies.tools.claude_sync.is_first_pull", lambda: False)
     with claude_sync(
         binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
     ) as cs:
         monkeypatch.setattr(cs, "pull", fake_pull)
         monkeypatch.setattr(cs, "push", fake_push)
-        monkeypatch.setattr(cs, "_conflicts_remain", fake_conflicts_remain)
 
         cs.sync(
             command_params=CommandParams(in_stream=False),
@@ -744,6 +742,52 @@ def test_claude_sync_sync_clears_a_conflict_with_its_own_upload(
 
     assert made == ["pull", "after_pull", "push"]
     assert not _conflicts()
+
+
+def test_claude_sync_sync_unattended_does_not_push_over_conflicts_from_the_pull(
+    temp_home: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pull that leaves a conflict, which nobody is there to resolve, is not pushed over.
+
+    The conflict is made by the pull, as claude-sync does, so it is not one
+    that was there before, which stops a sync before it pulls.
+    """
+    _ = temp_home
+    # Not a first pull, and nothing in conflict until the pull.
+    _ = _record_upload("projects/demo/other.jsonl", _UPLOADED)
+    claude_directory().mkdir(parents=True, exist_ok=True)
+    made: list[str] = []
+    conflicts: list[pathlib.Path] = []
+
+    def fake_pull(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("pull")
+        # What another machine uploaded, which is not this machine's own.
+        conflicts.append(_write_conflict(remote=b"What another machine uploaded.")[1])
+        return Result(stdout=_REBUILT)
+
+    def fake_push(**kwargs: object) -> Result:
+        _ = kwargs
+        made.append("push")
+        return Result(stdout="")
+
+    with claude_sync(
+        binary_cache_path=STAGING_BINARY_CACHE_PATH, raise_if_env_exists=False
+    ) as cs:
+        monkeypatch.setattr(cs, "pull", fake_pull)
+        monkeypatch.setattr(cs, "push", fake_push)
+
+        with pytest.raises(
+            ValueError, match="Not pushing, because the pull had conflicts.*a\\.jsonl"
+        ):
+            cs.sync(
+                command_params=CommandParams(in_stream=False),
+                unattended=True,
+                after_pull=lambda: made.append("after_pull"),
+            )
+
+    assert made == ["pull"]
+    assert conflicts[0].exists()
 
 
 def test_claude_sync_sync_unattended_names_the_conflicts_that_stop_it(
