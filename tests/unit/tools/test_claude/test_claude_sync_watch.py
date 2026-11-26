@@ -261,7 +261,9 @@ def test_watch_tries_again_soon_after_a_sync_goes_wrong(
     assert attempts == [start, failed, retried]
 
 
-def test_only_one_watch_in_a_process(temp_home: pathlib.Path) -> None:
+def test_a_second_watch_is_refused_while_the_first_has_the_lock(
+    temp_home: pathlib.Path,
+) -> None:
     """A second watch is refused while the first has the lock, and not after."""
     _ = temp_home
     assert not is_watching()
