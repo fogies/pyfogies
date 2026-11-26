@@ -33,6 +33,14 @@ Will not document changes to agent configuration used in development.
 
 ### Tests
 - Testing change description.
+
+Entries are described as::
+- Added: something new was added.
+- Removed: something was removed.
+- Fixed: a bug was fixed.
+- Refactored: renamed or reorganized or renamed, with no change in behavior.
+- Updated: something that exists was added to or improved.
+- Reworked: something that exists was changed, with potential change in behavior.
 -->
 
 ## [0.0.0-dev.13] (2026-11-26)
