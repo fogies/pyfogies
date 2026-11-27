@@ -43,7 +43,7 @@ Entries are described as:
 - Reworked: something that exists was changed, with potential change in behavior.
 -->
 
-## [0.0.0-dev.13] (2026-11-26)
+## [0.0.0-dev.13] (2026-11-27)
 
 ### Added
 - Added `load_config` and support for redirection to another location. ([#13](https://github.com/fogies/pyfogies/pull/13))
