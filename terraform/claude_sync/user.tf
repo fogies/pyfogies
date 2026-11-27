@@ -22,6 +22,19 @@ module "claude_sync_permissions" {
       actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
       resources = ["${aws_s3_bucket.claude_sync.arn}/*"]
     },
+    # The record of deleted sessions is read and written, and never deleted.
+    # Listing is only so that a record that doesn't exist yet is reported as
+    # missing, rather than as access denied.
+    {
+      effect    = "Allow"
+      actions   = ["s3:ListBucket"]
+      resources = [aws_s3_bucket.deletions.arn]
+    },
+    {
+      effect    = "Allow"
+      actions   = ["s3:GetObject", "s3:PutObject"]
+      resources = ["${aws_s3_bucket.deletions.arn}/*"]
+    },
   ]
 
   # The permissions module looks the user up by name, so wait until it exists.

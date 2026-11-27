@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import contextlib
-import tomllib
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import cast
 
 import botocore.exceptions
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 from fogies.boto_clients import boto_client_sts
-from fogies.templates import aws_toml_template_factory, ensure_from_template
+from fogies.config import load_config
+from fogies.templates import aws_toml_template_factory
 from fogies.tools.environ import environ
 
 
@@ -22,6 +21,14 @@ class AwsProfile(BaseModel):
     name: str
     aws_access_key_id: str
     aws_secret_access_key: str
+
+
+class _AwsConfig(RootModel[dict[str, dict[str, object]]]):
+    """An AWS config file: the settings of each profile, by profile name.
+
+    Only the profile that is used is validated, so one that is incomplete does
+    not prevent the others from being used.
+    """
 
 
 class AwsEnviron(BaseModel):
@@ -53,21 +60,18 @@ def load_aws_profile_from_config(config_path: Path, profile_name: str) -> AwsPro
     aws_access_key_id = "value-id"
     aws_secret_access_key = "value-secret"
 
-    Created from a template if it doesn't exist yet -- callers should expect
-    a FileNotFoundError-style failure the first time, prompting them to fill
-    in the newly-created file with real credentials and re-run.
+    If the file doesn't exist yet, it is created from a template and
+    FileNotFoundError is raised, so that it is filled in with real credentials
+    before it is used.
     """
-    if config_path.suffix != ".toml":
-        raise ValueError(
-            "AWS config file must have .toml extension, got '{}'".format(config_path)
-        )
-    ensure_from_template(path=config_path, template_factory=aws_toml_template_factory)
-
-    with config_path.open("rb") as config_file:
-        data: dict[str, object] = tomllib.load(config_file)
+    aws_config = load_config(
+        path=config_path,
+        model=_AwsConfig,
+        template_factory=aws_toml_template_factory,
+    )
 
     try:
-        profile_raw = data[profile_name]
+        profile_data = aws_config.root[profile_name]
     except KeyError as exc:
         raise KeyError(
             "AWS profile '{}' not found in '{}'".format(
@@ -76,7 +80,6 @@ def load_aws_profile_from_config(config_path: Path, profile_name: str) -> AwsPro
             )
         ) from exc
 
-    profile_data = cast(dict[str, object], profile_raw)
     return AwsProfile.model_validate({"name": profile_name, **profile_data})
 
 
@@ -168,11 +171,11 @@ def aws_environ_from_config(
 ) -> Generator[AwsEnviron]:
     """Context manager that applies AWS variables read from an AWS config file.
 
-    The *config_path* parameter specifies the AWS config file to read; it
-    must have a ``.toml`` extension. The *profile_name* parameter specifies
-    the AWS profile name, which is mapped to a ``[<name>]`` table in the
-    config file. See aws_environ_from_profile() for credential validation
-    and for raise_if_env_exists/raise_if_env_changed defaults.
+    The *config_path* parameter specifies the AWS config file to read. The
+    *profile_name* parameter specifies the AWS profile name, which is mapped
+    to a ``[<name>]`` table in the config file. See aws_environ_from_profile()
+    for credential validation and for raise_if_env_exists/raise_if_env_changed
+    defaults.
 
     Yields an :class:`AwsEnviron` describing which profile, account ID, IAM
     username, and key ID are active.

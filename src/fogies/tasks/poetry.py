@@ -2,15 +2,24 @@
 Tasks for building and publishing with Poetry.
 """
 
-import tomllib
 from pathlib import Path
 from typing import Callable, cast
 
 from invoke.collection import Collection
 from invoke.context import Context
 from invoke.tasks import Task, task
+from pydantic import BaseModel
 
-from fogies.templates import ensure_from_template, poetry_toml_template_factory
+from fogies.config import load_config
+from fogies.templates import poetry_toml_template_factory
+
+
+class _PypiConfig(BaseModel):
+    api_key: str
+
+
+class _PoetryConfig(BaseModel):
+    pypi: _PypiConfig
 
 
 def get_task_build() -> Task[Callable[[Context], None]]:
@@ -42,14 +51,12 @@ def get_task_publish(*, secrets_poetry_path: Path) -> Task[Callable[[Context], N
         """
         Publish package to PyPI.
         """
-        ensure_from_template(
-            path=secrets_poetry_path, template_factory=poetry_toml_template_factory
+        poetry_config = load_config(
+            path=secrets_poetry_path,
+            model=_PoetryConfig,
+            template_factory=poetry_toml_template_factory,
         )
-
-        with secrets_poetry_path.open("rb") as handle:
-            secrets_poetry = tomllib.load(handle)
-
-        api_key: str = cast(str, secrets_poetry["pypi"]["api_key"])
+        api_key = poetry_config.pypi.api_key
 
         # Read the PyPI token from the environment,
         # so it is not echoed to the terminal as exposed to other processes.
